@@ -167,13 +167,12 @@ export function expandRecurringEvents(events: CalendarEvent[]): CalendarEvent[] 
  */
 export function findNextEvent(
   events: CalendarEvent[], 
-  scatterWindow: number = 60
+  scatterWindow: number = 60,
+  now: Date = new Date()
 ): NextEventInfo | null {
-  const now = new Date();
-  
   // Filter out all-day events and past events
   const upcomingEvents = events
-    .filter(e => !e.isAllDay && e.start > now)
+    .filter(e => !e.isAllDay && e.start >= now)
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   
   if (upcomingEvents.length === 0) return null;

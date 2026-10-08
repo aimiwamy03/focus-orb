@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useCalendar } from '@/lib/useCalendar';
+import { signInWithGoogle } from '@/app/actions';
 
 interface SettingsProps {
   onClose: () => void;
@@ -9,13 +10,42 @@ interface SettingsProps {
 }
 
 export function Settings({ onClose, onStartFocus }: SettingsProps) {
-  const { calendarUrl, setCalendarUrl, scatterWindow, setScatterWindow } = useCalendar();
+  const { 
+    calendarUrl, 
+    setCalendarUrl, 
+    scatterWindow, 
+    setScatterWindow,
+    authMethod,
+    selectAuthMethod,
+    isGoogleConnected,
+    disconnectGoogle,
+  } = useCalendar();
   const [tempUrl, setTempUrl] = useState(calendarUrl);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const handleSave = () => {
     setCalendarUrl(tempUrl);
+    selectAuthMethod('ical');
     onClose();
   };
+
+  const handleGoogleConnect = async () => {
+    setIsConnecting(true);
+    try {
+      await signInWithGoogle();
+      selectAuthMethod('google');
+    } catch (error) {
+      console.error('Failed to connect:', error);
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    await disconnectGoogle();
+  };
+
+  const isConfigured = process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === 'true';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -31,22 +61,73 @@ export function Settings({ onClose, onStartFocus }: SettingsProps) {
           </button>
         </div>
 
-        {/* Calendar URL */}
+        {/* Google Calendar */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-zinc-300">
-            Google Calendar ICS URL
+            Google Calendar
           </label>
-          <input
-            type="text"
-            value={tempUrl}
-            onChange={(e) => setTempUrl(e.target.value)}
-            placeholder="Paste secret iCal URL here..."
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/20"
-          />
-          <p className="text-xs text-zinc-500">
-            Find this in Google Calendar → Settings → Integrate calendar → Secret address in iCal format
-          </p>
+          {isGoogleConnected ? (
+            <div className="space-y-2">
+              <div className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-white text-sm">
+                ✓ Connected
+              </div>
+              <button
+                onClick={handleDisconnect}
+                className="w-full px-3 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors text-sm"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : isConfigured ? (
+            <button
+              onClick={handleGoogleConnect}
+              disabled={isConnecting}
+              className="w-full px-4 py-2 bg-white text-black rounded font-medium hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isConnecting ? 'Connecting...' : 'Connect Google Calendar'}
+            </button>
+          ) : (
+            <div className="px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-500 text-xs">
+              Google Calendar integration not configured
+            </div>
+          )}
         </div>
+
+        {/* Advanced: iCal URL */}
+        {!isGoogleConnected && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
+            >
+              {showAdvanced ? '▼' : '▶'} Other ways to connect
+            </button>
+            
+            {showAdvanced && (
+              <div className="space-y-2 pl-4 border-l border-zinc-700">
+                <label className="text-sm font-medium text-zinc-400">
+                  iCal URL (Advanced)
+                </label>
+                <input
+                  type="text"
+                  value={tempUrl}
+                  onChange={(e) => setTempUrl(e.target.value)}
+                  placeholder="Paste secret iCal URL here..."
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
+                />
+                <p className="text-xs text-zinc-500">
+                  Find this in Google Calendar → Settings → Integrate calendar → Secret address in iCal format
+                </p>
+                <button
+                  onClick={handleSave}
+                  className="w-full px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors text-sm"
+                >
+                  Save iCal URL
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Scatter Window */}
         <div className="space-y-2">
@@ -100,14 +181,6 @@ export function Settings({ onClose, onStartFocus }: SettingsProps) {
             <div><kbd className="bg-zinc-800 px-1.5 py-0.5 rounded">space</kbd> start/stop focus</div>
           </div>
         </div>
-
-        {/* Save button */}
-        <button
-          onClick={handleSave}
-          className="w-full px-4 py-2 bg-white text-black rounded font-medium hover:bg-zinc-200 transition-colors"
-        >
-          Save
-        </button>
       </div>
     </div>
   );

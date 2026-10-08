@@ -79,8 +79,8 @@ export function Handbook() {
             <h3 className="text-white/70 text-xs font-medium mb-1">Connect calendar</h3>
             <p>
               Press <kbd className="bg-white/5 px-1 py-0.5 rounded text-[10px] font-mono">s</kbd> and 
-              paste your Google Calendar "Secret address in iCal format". 
-              Stays in your browser only.
+              click "Connect Google Calendar" to sign in once. Your calendar 
+              stays connected across visits. You can disconnect anytime in settings.
             </p>
           </section>
 
