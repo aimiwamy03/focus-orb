@@ -8,6 +8,8 @@ import { useManualFocus } from '@/lib/useManualFocus';
 import { useTabTitle } from '@/lib/useTabTitle';
 import { Settings } from './Settings';
 import { Overlay } from './Overlay';
+import { Handbook } from './Handbook';
+import { FocusControl } from './FocusControl';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -372,6 +374,15 @@ export function Orb() {
       }}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
+      
+      <Handbook />
+      
+      <FocusControl
+        isActive={isManualFocus}
+        timeRemaining={manualTimeRemaining}
+        onStart={startFocus}
+        onStop={stopFocus}
+      />
       
       <Overlay 
         show={showOverlay}
