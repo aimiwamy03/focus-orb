@@ -192,9 +192,10 @@ export function Orb() {
       canvas.style.width = `${window.innerWidth}px`;
       canvas.style.height = `${window.innerHeight}px`;
       
-      // Regenerate points when canvas resizes
-      // Use physical pixels for radius - make it larger to match reference
-      const physicalRadius = Math.min(canvas.width, canvas.height) * 0.35; // 70% diameter
+      // Regenerate points when canvas resizes  
+      // Use physical pixels for radius
+      // radius 0.20 × 1.35 stray extension × 2 = 54% visual diameter
+      const physicalRadius = Math.min(canvas.width, canvas.height) * 0.20;
       pointsRef.current = generatePoints(physicalRadius);
     };
     
@@ -209,7 +210,7 @@ export function Orb() {
       // Work in physical pixels (canvas backing store coordinates)
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
-      const radius = Math.min(canvas.width, canvas.height) * 0.35; // Match resize
+      const radius = Math.min(canvas.width, canvas.height) * 0.20;
       
       // Clear with dark background
       ctx.fillStyle = '#161616';
