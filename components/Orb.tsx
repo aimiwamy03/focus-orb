@@ -9,7 +9,16 @@ import { useTabTitle } from '@/lib/useTabTitle';
 import { Settings } from './Settings';
 import { Overlay } from './Overlay';
 
-const PARTICLE_COUNT = 3000; // Free particles for scatter effect
+const PARTICLE_COUNT = 60000; // Total random points in disk
+
+interface OrbPoint {
+  x: number; // position relative to center
+  y: number;
+  shade: number; // Lambert shade value
+  threshold: number; // random threshold for shimmer
+  isInside: boolean; // inside orb or stray
+  lowerRightBias: number; // for stray dots and scatter drift
+}
 
 interface FreeParticle {
   x: number;
@@ -21,7 +30,7 @@ interface FreeParticle {
 
 export function Orb() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const freeParticlesRef = useRef<FreeParticle[]>([]);
+  const pointsRef = useRef<OrbPoint[]>([]);
   const animationRef = useRef<number | undefined>(undefined);
   const searchParams = useSearchParams();
   const isDemoMode = searchParams.get('demo') === '1';
@@ -47,9 +56,65 @@ export function Orb() {
     : nextEvent?.minutesToStart ?? null;
   useTabTitle(minutesForTab, isManualFocus);
 
-  // Initialize free particles for scatter effect
-  useEffect(() => {
-    freeParticlesRef.current = [];
+  // Generate points once (will be regenerated on resize)
+  const generatePoints = useCallback((radius: number) => {
+    const points: OrbPoint[] = [];
+    const N = PARTICLE_COUNT;
+    
+    // Light direction (normalized): upper-left-front
+    const lightX = -0.55;
+    const lightY = -0.55;
+    const lightZ = 0.63;
+    const lightLen = Math.sqrt(lightX * lightX + lightY * lightY + lightZ * lightZ);
+    const Lx = lightX / lightLen;
+    const Ly = lightY / lightLen;
+    const Lz = lightZ / lightLen;
+    
+    for (let i = 0; i < N; i++) {
+      // True 2D random points in disk slightly larger than orb (1.35×)
+      const r = radius * 1.35 * Math.sqrt(Math.random());
+      const theta = Math.random() * 2 * Math.PI;
+      
+      const x = r * Math.cos(theta);
+      const y = r * Math.sin(theta);
+      
+      // Distance from center (normalized)
+      const d = Math.sqrt(x * x + y * y) / radius;
+      const isInside = d < 1;
+      
+      // Compute z-coordinate on front hemisphere
+      const z = Math.sqrt(Math.max(0, 1 - d * d));
+      
+      // Surface normal (normalized)
+      const nx = x / radius;
+      const ny = y / radius;
+      
+      // Lambert shading
+      const lam = Math.max(0, Math.min(1, nx * Lx + ny * Ly + z * Lz));
+      
+      // Compute shade for this point
+      let shade: number;
+      if (isInside) {
+        // Inside orb: 0.06 + 0.84 * lam^1.2 (capped below 1 to keep dots individual)
+        shade = 0.06 + 0.84 * Math.pow(lam, 1.2);
+      } else {
+        // Stray dots past rim with exponential falloff and lower-right bias
+        const distPastRim = d - 1;
+        const biasComponent = Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414));
+        shade = 0.25 * Math.exp(-distPastRim * 9) * (0.3 + biasComponent);
+      }
+      
+      points.push({
+        x,
+        y,
+        shade,
+        threshold: Math.random(),
+        isInside,
+        lowerRightBias: Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414)),
+      });
+    }
+    
+    return points;
   }, []);
 
   // Demo mode: cycle scatter 0 -> 1 over 60s, or use debug scatter param
@@ -101,7 +166,7 @@ export function Orb() {
     return () => clearInterval(interval);
   }, [isDemoMode, debugScatter, nextEvent, isManualFocus, manualTimeRemaining, manualTotalDuration]);
 
-  // Canvas rendering with image-space approach
+  // Canvas rendering with true 2D random point sampling
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -109,10 +174,26 @@ export function Orb() {
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
     
+    let dpr = 1;
+    
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      // Fix aspect ratio with devicePixelRatio for perfect circle
+      dpr = window.devicePixelRatio || 1;
+      
+      // Use physical pixels for canvas backing store
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      
+      // CSS size is logical pixels
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      
+      // Regenerate points when canvas resizes
+      // Use physical pixels for radius - make it larger to match reference
+      const physicalRadius = Math.min(canvas.width, canvas.height) * 0.35; // 70% diameter
+      pointsRef.current = generatePoints(physicalRadius);
     };
+    
     resize();
     window.addEventListener('resize', resize);
     
@@ -121,142 +202,65 @@ export function Orb() {
     const render = () => {
       time += 0.008;
       
+      // Work in physical pixels (canvas backing store coordinates)
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = Math.min(canvas.width, canvas.height) * 0.35; // Match resize
+      
       // Clear with dark background
       ctx.fillStyle = '#161616';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
+      // Breathing: subtle scale pulse (3%) and threshold shimmer
+      const breatheScale = 1 + Math.sin(time * 0.5) * 0.03;
       
-      // Orb radius: ~50% of viewport height diameter, slightly shrinks with scatter
-      const baseRadius = canvas.height * 0.25;
-      const breathe = Math.sin(time * 0.5) * 0.03;
-      const scatterShrink = 1 - scatter * 0.15; // Slight shrink at high scatter
-      const radius = baseRadius * (1 + breathe) * scatterShrink;
-      
-      // Light direction (normalized): upper-left-front
-      const lightX = -0.5;
-      const lightY = -0.5;
-      const lightZ = 0.707;
-      
-      // Render orb surface with stochastic (random) dithering
-      // Sample every pixel for dense areas, skip some for sparse areas
-      const step = 1;
-      
-      for (let sy = -radius - 20; sy < radius + 20; sy += step) {
-        for (let sx = -radius - 20; sx < radius + 20; sx += step) {
-          const dx = sx;
-          const dy = sy;
-          const distSq = dx * dx + dy * dy;
-          
-          // Skip if outside sphere
-          if (distSq > radius * radius) continue;
-          
-          // Compute z-coordinate on sphere surface (front hemisphere)
-          const z = Math.sqrt(radius * radius - distSq);
-          
-          // Surface normal (normalized)
-          const nx = dx / radius;
-          const ny = dy / radius;
-          const nz = z / radius;
-          
-          // Lambert shading: dot product with light direction
-          let lighting = nx * lightX + ny * lightY + nz * lightZ;
-          
-          // Map lighting to density with very high values for bright highlight
-          if (lighting > 0) {
-            // Bright side: very high density for near-solid white
-            // Use power curve to boost highlights even more
-            lighting = Math.pow((lighting + 0.707) / 1.414, 0.4);
-          } else {
-            // Dark side: soft falloff
-            lighting = Math.max(0, (lighting + 0.707) / 1.414) * 0.3;
-          }
-          
-          // Very high base density (>1.0) in bright areas for near-solid white
-          const baseDensity = 1.2;
-          
-          // Apply scatter: reduce density overall
-          const densityFactor = 1 - scatter * 0.8;
-          let finalDensity = baseDensity * lighting * densityFactor;
-          
-          // Clamp to [0, 1]
-          finalDensity = Math.max(0, Math.min(1, finalDensity));
-          
-          // Dim during meeting
-          let renderDensity = finalDensity;
-          if (nextEvent && nextEvent.minutesToStart <= 0) {
-            renderDensity *= 0.25;
-          }
-          
-          const screenX = Math.floor(centerX + sx);
-          const screenY = Math.floor(centerY + sy);
-          
-          // Stochastic dithering: random chance based on density
-          // Use deterministic random based on position for stability
-          // Add time-based seed component for subtle variation
-          const seed = (screenX * 12.9898 + screenY * 78.233 + time * 0.001) * 43758.5453;
-          const pseudoRandom = (seed - Math.floor(seed));
-          
-          // Add slight random adjustment to density to break up any scan-line artifacts
-          const jitter = (pseudoRandom * 2 - 1) * 0.05; // ±5% jitter
-          const jitteredDensity = Math.max(0, Math.min(1, renderDensity + jitter));
-          
-          // Scatter effect: some dots become free particles
-          if (scatter > 0 && Math.random() < scatter * 0.001) {
-            if (freeParticlesRef.current.length < PARTICLE_COUNT) {
-              // Bias toward lower-right
-              const angle = Math.atan2(dy, dx);
-              const biasAngle = angle + (Math.PI * 0.25) * scatter;
-              const speed = (0.5 + Math.random() * 0.5) * scatter;
-              
-              freeParticlesRef.current.push({
-                x: screenX,
-                y: screenY,
-                vx: Math.cos(biasAngle) * speed,
-                vy: Math.sin(biasAngle) * speed,
-                opacity: renderDensity,
-              });
-            }
-          }
-          
-          // Draw dot if random value is below density (stochastic dithering)
-          // Use second independent random for draw decision
-          const seed2 = (screenY * 78.233 + screenX * 12.9898) * 43758.5453;
-          const drawRandom = (seed2 - Math.floor(seed2));
-          
-          if (drawRandom < jitteredDensity) {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(screenX, screenY, 1, 1);
-          }
-        }
+      // Re-randomize a small fraction of thresholds for shimmer effect
+      if (Math.random() < 0.01) {
+        const idx = Math.floor(Math.random() * pointsRef.current.length);
+        pointsRef.current[idx].threshold = Math.random();
       }
       
-      // Update and render free particles
+      // Draw all points
       ctx.fillStyle = '#ffffff';
-      for (let i = freeParticlesRef.current.length - 1; i >= 0; i--) {
-        const p = freeParticlesRef.current[i];
+      
+      for (const point of pointsRef.current) {
+        // Compute keep probability based on scatter
+        // At scatter=0: use point.shade directly
+        // At scatter=1: raise threshold (fewer dots), dim
+        const scatterThresholdRaise = scatter * 0.3; // Gentler threshold raise
+        const scatterDim = 1 - scatter * 0.3; // Gentler dimming
+        const keepProb = point.shade * scatterDim;
         
-        // Update position
-        p.x += p.vx;
-        p.y += p.vy;
-        p.opacity *= 0.99; // Fade out
+        // Skip if below threshold
+        if (point.threshold + scatterThresholdRaise >= keepProb) continue;
         
-        // Remove if faded or off-screen
-        if (p.opacity < 0.1 || p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
-          freeParticlesRef.current.splice(i, 1);
-          continue;
+        // Compute position with breathing and scatter offset
+        let x = point.x * breatheScale;
+        let y = point.y * breatheScale;
+        
+        // Scatter: offset points outward with lower-right bias
+        if (scatter > 0) {
+          const scatterDist = scatter * radius * 0.8;
+          const angle = Math.atan2(point.y, point.x);
+          // Bias toward lower-right (positive x, positive y)
+          const biasedAngle = angle + (Math.PI * 0.15) * point.lowerRightBias * scatter;
+          const speed = point.threshold; // Use threshold as random speed factor
+          
+          x += Math.cos(biasedAngle) * scatterDist * speed;
+          y += Math.sin(biasedAngle) * scatterDist * speed;
         }
         
-        // Draw particle with opacity
-        if (Math.random() < p.opacity) {
-          ctx.fillRect(Math.floor(p.x), Math.floor(p.y), 1, 1);
-        }
+        const screenX = centerX + x;
+        const screenY = centerY + y;
+        
+        // Draw larger dots for denser highlight (4x4 physical pixels)
+        ctx.fillRect(Math.floor(screenX), Math.floor(screenY), 4, 4);
       }
       
-      // Clear excess free particles when scatter reduces
-      if (freeParticlesRef.current.length > PARTICLE_COUNT * scatter) {
-        freeParticlesRef.current.length = Math.floor(PARTICLE_COUNT * scatter);
+      // Dim during meeting
+      if (nextEvent && nextEvent.minutesToStart <= 0) {
+        ctx.fillStyle = 'rgba(22, 22, 22, 0.75)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       
       animationRef.current = requestAnimationFrame(render);
@@ -270,7 +274,7 @@ export function Orb() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [scatter, nextEvent]);
+  }, [scatter, nextEvent, generatePoints]);
 
   // Keyboard shortcuts
   useEffect(() => {
