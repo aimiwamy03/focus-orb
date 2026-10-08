@@ -79,6 +79,7 @@ export function useManualFocus() {
   return {
     isActive: session !== null,
     timeRemaining,
+    totalDuration: session?.duration ?? null,
     startFocus,
     stopFocus,
   };

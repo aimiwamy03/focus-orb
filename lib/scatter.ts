@@ -26,6 +26,37 @@ export function calculateScatter(
 }
 
 /**
+ * Calculate scatter for manual focus blocks.
+ * Ramps over the last portion of the block (last 40%, capped at window).
+ * 
+ * @param minutesRemaining - Minutes remaining in the focus block
+ * @param totalMinutes - Total duration of the focus block
+ * @param maxWindow - Maximum scatter window in minutes (default 60)
+ * @returns scatter value: 0 (tight/bright) to 1 (scattered/dim)
+ */
+export function calculateManualScatter(
+  minutesRemaining: number,
+  totalMinutes: number,
+  maxWindow: number = 60
+): number {
+  if (minutesRemaining <= 0) {
+    return 1;
+  }
+  
+  // Ramp window is the last 40% of the block, capped at maxWindow
+  const rampWindow = Math.min(totalMinutes * 0.4, maxWindow);
+  
+  // No scatter if we're before the ramp window
+  if (minutesRemaining > rampWindow) {
+    return 0;
+  }
+  
+  // Ramp from 0 to 1 over the ramp window
+  const progress = 1 - minutesRemaining / rampWindow;
+  return easeIn(progress);
+}
+
+/**
  * Ease-in interpolation: slow start, fast end
  */
 function easeIn(t: number): number {

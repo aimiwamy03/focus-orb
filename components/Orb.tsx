@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { calculateScatter } from '@/lib/scatter';
+import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useTabTitle } from '@/lib/useTabTitle';
@@ -35,6 +35,7 @@ export function Orb() {
   const { 
     isActive: isManualFocus, 
     timeRemaining: manualTimeRemaining,
+    totalDuration: manualTotalDuration,
     startFocus,
     stopFocus 
   } = useManualFocus();
@@ -99,9 +100,9 @@ export function Orb() {
     if (isDemoMode || debugScatter !== null) return;
     
     const updateScatter = () => {
-      if (isManualFocus && manualTimeRemaining !== null) {
-        // Manual focus: use manual time remaining
-        const manualScatter = calculateScatter(manualTimeRemaining, 60); // Last 60 min ramp
+      if (isManualFocus && manualTimeRemaining !== null && manualTotalDuration !== null) {
+        // Manual focus: use calculateManualScatter with total duration
+        const manualScatter = calculateManualScatter(manualTimeRemaining, manualTotalDuration);
         setScatter(manualScatter);
       } else if (nextEvent) {
         // Calendar event
@@ -116,7 +117,7 @@ export function Orb() {
     updateScatter();
     const interval = setInterval(updateScatter, 1000);
     return () => clearInterval(interval);
-  }, [isDemoMode, debugScatter, nextEvent, isManualFocus, manualTimeRemaining]);
+  }, [isDemoMode, debugScatter, nextEvent, isManualFocus, manualTimeRemaining, manualTotalDuration]);
 
   // Canvas rendering
   useEffect(() => {
@@ -145,43 +146,52 @@ export function Orb() {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
       
-      // Sphere radius: 45-55% of viewport height
+      // Sphere radius: 50% of viewport height diameter
       const baseRadius = canvas.height * 0.25;
       
       // Subtle breathing effect
       const breathe = Math.sin(time * 0.5) * 0.03;
       const radius = baseRadius * (1 + breathe);
       
+      // Light direction (normalized): upper-left front
+      const lightX = -0.5;
+      const lightY = -0.5;
+      const lightZ = 0.707; // toward camera
+      
       particlesRef.current.forEach((particle) => {
-        // Scatter effect: particles drift outward
-        const scatterAmount = scatter * (1 + Math.sin(particle.offset + time * 0.5) * 0.2);
-        const finalRadius = radius * (1 + scatterAmount * 2.5);
-        
-        const x = particle.x * finalRadius;
-        const y = particle.y * finalRadius;
-        const z = particle.z * finalRadius;
-        
-        const screenX = centerX + x;
-        const screenY = centerY + y;
-        
-        // Lighting calculation: upper-left is brighter
-        // Light direction vector (normalized)
-        const lightX = -0.5;
-        const lightY = -0.5;
-        const lightZ = 0.707; // sqrt(0.5)
-        
-        // Dot product with surface normal (particle position normalized)
+        // Calculate lighting (Lambert shading)
+        // Dot product of surface normal (particle position) with light direction
         const lighting = Math.max(0, 
           particle.x * lightX + 
           particle.y * lightY + 
           particle.z * lightZ
         );
         
-        // Dithered stippling: use lighting to determine draw probability
-        // At scatter=0: very dense, nearly solid where lit
-        // At scatter=1: sparse, scattered
-        const baseDensity = 1 - scatter * 0.85;
-        const density = baseDensity * (0.2 + lighting * 0.8);
+        // Cull back-facing points (facing away from camera, z < 0)
+        if (particle.z < 0) return;
+        
+        // Scatter effect: particles drift away, biased toward lower-right
+        // Lower-right bias: positive x, positive y
+        const driftX = scatter * (0.5 + particle.x * 0.5) * radius * 1.5;
+        const driftY = scatter * (0.5 + particle.y * 0.5) * radius * 1.5;
+        
+        // Base position on sphere
+        const x = particle.x * radius + driftX;
+        const y = particle.y * radius + driftY;
+        
+        const screenX = centerX + x;
+        const screenY = centerY + y;
+        
+        // Density based on Lambert shading
+        // At scatter=0: very high density in lit areas (nearly solid white)
+        // At scatter=1: much lower overall density (orb dissolving)
+        const scatterDensityFactor = 1 - scatter * 0.75;
+        const baseDensity = 0.95 * scatterDensityFactor;
+        
+        // Lighting drives density: bright areas are very dense, dark areas sparse
+        // Use power function to make bright areas even brighter/denser
+        const lightingPower = Math.pow(lighting, 0.7);
+        const density = baseDensity * (0.1 + lightingPower * 0.9);
         
         // Dim during meeting
         let finalDensity = density;
@@ -190,11 +200,10 @@ export function Orb() {
         }
         
         // Stochastic dithering: only draw if random value is below density
-        // Use z-depth as deterministic "random" seed for stability
-        const seed = (Math.sin(particle.x * 12.9898 + particle.y * 78.233 + z * 45.164) * 43758.5453) % 1;
+        const seed = (Math.sin(particle.x * 12.9898 + particle.y * 78.233 + particle.z * 45.164) * 43758.5453) % 1;
         if (seed > finalDensity) return;
         
-        // Draw uniform small dot (1-2px)
+        // Draw uniform small dot (1px)
         const dotSize = 1;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
