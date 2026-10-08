@@ -9,7 +9,7 @@ import { useTabTitle } from '@/lib/useTabTitle';
 import { Settings } from './Settings';
 import { Overlay } from './Overlay';
 
-const PARTICLE_COUNT = 60000; // Total random points in disk
+const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
 interface OrbPoint {
   x: number; // position relative to center
@@ -18,6 +18,8 @@ interface OrbPoint {
   threshold: number; // random threshold for shimmer
   isInside: boolean; // inside orb or stray
   lowerRightBias: number; // for stray dots and scatter drift
+  scatterSpeed: number; // random radial speed for scatter (0.4-1.2)
+  scatterAngleJitter: number; // random angular jitter for scatter (-0.3 to 0.3 radians)
 }
 
 interface FreeParticle {
@@ -111,6 +113,8 @@ export function Orb() {
         threshold: Math.random(),
         isInside,
         lowerRightBias: Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414)),
+        scatterSpeed: 0.4 + Math.random() * 0.8, // Random speed 0.4-1.2
+        scatterAngleJitter: (Math.random() - 0.5) * 0.6, // Random jitter -0.3 to +0.3 radians
       });
     }
     
@@ -226,9 +230,9 @@ export function Orb() {
       for (const point of pointsRef.current) {
         // Compute keep probability based on scatter
         // At scatter=0: use point.shade directly
-        // At scatter=1: raise threshold (fewer dots), dim
-        const scatterThresholdRaise = scatter * 0.3; // Gentler threshold raise
-        const scatterDim = 1 - scatter * 0.3; // Gentler dimming
+        // At scatter=1: dissolving effect with faint core + diffuse spray
+        const scatterThresholdRaise = scatter * 0.25; // Very gentle threshold raise
+        const scatterDim = 1 - scatter * 0.35; // Gentle dimming so scatter=1 stays visible
         const keepProb = point.shade * scatterDim;
         
         // Skip if below threshold
@@ -238,23 +242,28 @@ export function Orb() {
         let x = point.x * breatheScale;
         let y = point.y * breatheScale;
         
-        // Scatter: offset points outward with lower-right bias
+        // Scatter: offset points outward with randomized radial distance and angular jitter
         if (scatter > 0) {
-          const scatterDist = scatter * radius * 0.8;
           const angle = Math.atan2(point.y, point.x);
-          // Bias toward lower-right (positive x, positive y)
-          const biasedAngle = angle + (Math.PI * 0.15) * point.lowerRightBias * scatter;
-          const speed = point.threshold; // Use threshold as random speed factor
           
-          x += Math.cos(biasedAngle) * scatterDist * speed;
-          y += Math.sin(biasedAngle) * scatterDist * speed;
+          // Bias toward lower-right with jitter
+          const biasedAngle = angle + (Math.PI * 0.2) * point.lowerRightBias * scatter + point.scatterAngleJitter * scatter;
+          
+          // Random radial distance per point (prevents ring artifact)
+          // At scatter=1, points spread 1.5× radius with random variance
+          const baseScatterDist = scatter * radius * 1.5;
+          const randomRadialDist = baseScatterDist * point.scatterSpeed;
+          
+          x += Math.cos(biasedAngle) * randomRadialDist;
+          y += Math.sin(biasedAngle) * randomRadialDist;
         }
         
         const screenX = centerX + x;
         const screenY = centerY + y;
         
-        // Draw larger dots for denser highlight (4x4 physical pixels)
-        ctx.fillRect(Math.floor(screenX), Math.floor(screenY), 4, 4);
+        // Draw 2x2 CSS pixel dots (scaled by DPR for consistent visual size)
+        const dotSize = 2 * dpr;
+        ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
       }
       
       // Dim during meeting
