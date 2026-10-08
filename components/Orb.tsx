@@ -18,8 +18,9 @@ interface OrbPoint {
   threshold: number; // random threshold for shimmer
   isInside: boolean; // inside orb or stray
   lowerRightBias: number; // for stray dots and scatter drift
-  scatterSpeed: number; // random radial speed for scatter (0.4-1.2)
+  scatterSpeed: number; // random radial speed for scatter (0-1 normalized)
   scatterAngleJitter: number; // random angular jitter for scatter (-0.3 to 0.3 radians)
+  escapeAt: number; // scatter level at which this point starts escaping (0-1)
 }
 
 interface FreeParticle {
@@ -42,6 +43,7 @@ export function Orb() {
   const [showOverlay, setShowOverlay] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   
   const { nextEvent, refreshCalendar } = useCalendar();
   const { 
@@ -100,11 +102,21 @@ export function Orb() {
         // Inside orb: 0.06 + 0.84 * lam^1.2 (capped below 1 to keep dots individual)
         shade = 0.06 + 0.84 * Math.pow(lam, 1.2);
       } else {
-        // Stray dots past rim with exponential falloff and lower-right bias
+        // Stray dots past rim: continuous with limb shading
+        // Evaluate limb shade at d=1 for this angle
+        const limbLam = Math.max(0, Math.min(1, nx * Lx + ny * Ly + 0)); // z=0 at limb
+        const limbShade = Math.max(0.06 + 0.84 * Math.pow(limbLam, 1.2), 0.05);
+        
+        // Exponential falloff with lower-right bias
         const distPastRim = d - 1;
-        const biasComponent = Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414));
-        shade = 0.25 * Math.exp(-distPastRim * 9) * (0.3 + biasComponent);
+        const k = 10 - 6 * Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414));
+        shade = limbShade * Math.exp(-distPastRim * k);
       }
+      
+      // Compute escapeAt: rim and lower-right points leave first
+      const escapeAt = Math.max(0, Math.min(1, 
+        Math.random() - 0.35 * Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414)) * Math.min(d, 1.35) / 1.35
+      ));
       
       points.push({
         x,
@@ -113,8 +125,9 @@ export function Orb() {
         threshold: Math.random(),
         isInside,
         lowerRightBias: Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414)),
-        scatterSpeed: 0.4 + Math.random() * 0.8, // Random speed 0.4-1.2
+        scatterSpeed: Math.random(), // Normalized 0-1
         scatterAngleJitter: (Math.random() - 0.5) * 0.6, // Random jitter -0.3 to +0.3 radians
+        escapeAt,
       });
     }
     
@@ -229,34 +242,55 @@ export function Orb() {
       ctx.fillStyle = '#ffffff';
       
       for (const point of pointsRef.current) {
-        // Compute keep probability based on scatter
-        // At scatter=0: use point.shade directly
-        // At scatter=1: dissolving effect with faint core + diffuse spray
-        const scatterThresholdRaise = scatter * 0.25; // Very gentle threshold raise
-        const scatterDim = 1 - scatter * 0.35; // Gentle dimming so scatter=1 stays visible
-        const keepProb = point.shade * scatterDim;
+        // Per-point escape model
+        const progress = scatter <= point.escapeAt 
+          ? 0 
+          : (scatter - point.escapeAt) / (1 - point.escapeAt + 1e-6);
+        
+        // Keep probability based on escape state
+        let keepProb: number;
+        if (progress === 0) {
+          // Non-escaped: shade with gentle dimming
+          keepProb = point.shade * (1 - 0.55 * scatter);
+        } else {
+          // Escaped: fade as it travels
+          keepProb = point.shade * (1 - 0.75 * progress);
+        }
         
         // Skip if below threshold
-        if (point.threshold + scatterThresholdRaise >= keepProb) continue;
+        if (point.threshold >= keepProb) continue;
         
-        // Compute position with breathing and scatter offset
+        // Compute position with breathing
         let x = point.x * breatheScale;
         let y = point.y * breatheScale;
         
-        // Scatter: offset points outward with randomized radial distance and angular jitter
-        if (scatter > 0) {
-          const angle = Math.atan2(point.y, point.x);
+        // Scatter displacement for escaped points only
+        if (progress > 0) {
+          // Radial unit vector
+          const radialDist = Math.sqrt(point.x * point.x + point.y * point.y);
+          const radialUnitX = radialDist > 1e-6 ? point.x / radialDist : 1;
+          const radialUnitY = radialDist > 1e-6 ? point.y / radialDist : 0;
           
-          // Bias toward lower-right with jitter
-          const biasedAngle = angle + (Math.PI * 0.2) * point.lowerRightBias * scatter + point.scatterAngleJitter * scatter;
+          // Mix 40% radial + 60% toward lower-right (0.7071, 0.7071)
+          const mixedDirX = 0.4 * radialUnitX + 0.6 * 0.7071;
+          const mixedDirY = 0.4 * radialUnitY + 0.6 * 0.7071;
           
-          // Random radial distance per point (prevents ring artifact)
-          // At scatter=1, points spread 1.5× radius with random variance
-          const baseScatterDist = scatter * radius * 1.5;
-          const randomRadialDist = baseScatterDist * point.scatterSpeed;
+          // Normalize
+          const mixedDirLen = Math.sqrt(mixedDirX * mixedDirX + mixedDirY * mixedDirY);
+          const dirX = mixedDirX / mixedDirLen;
+          const dirY = mixedDirY / mixedDirLen;
           
-          x += Math.cos(biasedAngle) * randomRadialDist;
-          y += Math.sin(biasedAngle) * randomRadialDist;
+          // Apply angle jitter by rotating direction
+          const cosJitter = Math.cos(point.scatterAngleJitter);
+          const sinJitter = Math.sin(point.scatterAngleJitter);
+          const rotatedDirX = dirX * cosJitter - dirY * sinJitter;
+          const rotatedDirY = dirX * sinJitter + dirY * cosJitter;
+          
+          // Escape distance
+          const escapeDist = progress * radius * (0.5 + 1.2 * point.scatterSpeed);
+          
+          x += rotatedDirX * escapeDist;
+          y += rotatedDirY * escapeDist;
         }
         
         const screenX = centerX + x;
@@ -320,8 +354,21 @@ export function Orb() {
   return (
     <div 
       className="relative w-screen h-screen overflow-hidden"
-      onMouseMove={() => setShowOverlay(true)}
-      onMouseLeave={() => setShowOverlay(false)}
+      onMouseMove={() => {
+        setShowOverlay(true);
+        if (overlayTimeoutRef.current) {
+          clearTimeout(overlayTimeoutRef.current);
+        }
+        overlayTimeoutRef.current = setTimeout(() => {
+          setShowOverlay(false);
+        }, 3000);
+      }}
+      onMouseLeave={() => {
+        setShowOverlay(false);
+        if (overlayTimeoutRef.current) {
+          clearTimeout(overlayTimeoutRef.current);
+        }
+      }}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
       
