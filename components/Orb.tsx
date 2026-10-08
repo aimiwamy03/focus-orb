@@ -9,15 +9,13 @@ import { useTabTitle } from '@/lib/useTabTitle';
 import { Settings } from './Settings';
 import { Overlay } from './Overlay';
 
-const PARTICLE_COUNT = 8000;
-const BASE_RADIUS = 200;
+const PARTICLE_COUNT = 24000;
 
 interface Particle {
-  theta: number;
-  phi: number;
-  baseRadius: number;
+  x: number;
+  y: number;
+  z: number;
   offset: number;
-  opacity: number;
 }
 
 export function Orb() {
@@ -26,6 +24,7 @@ export function Orb() {
   const animationRef = useRef<number | undefined>(undefined);
   const searchParams = useSearchParams();
   const isDemoMode = searchParams.get('demo') === '1';
+  const debugScatter = searchParams.get('scatter');
   
   const [scatter, setScatter] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -46,28 +45,41 @@ export function Orb() {
     : nextEvent?.minutesToStart ?? null;
   useTabTitle(minutesForTab, isManualFocus);
 
-  // Initialize particles
+  // Initialize particles on a sphere
   useEffect(() => {
     const particles: Particle[] = [];
+    
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      // Spherical coordinates with slight randomization
-      const theta = Math.acos(2 * Math.random() - 1);
-      const phi = 2 * Math.PI * Math.random();
-      const baseRadius = BASE_RADIUS * (0.8 + Math.random() * 0.4);
+      // Evenly distributed points on sphere using Fibonacci sphere algorithm
+      const phi = Math.acos(1 - 2 * (i + 0.5) / PARTICLE_COUNT);
+      const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+      
+      const x = Math.sin(phi) * Math.cos(theta);
+      const y = Math.sin(phi) * Math.sin(theta);
+      const z = Math.cos(phi);
       
       particles.push({
-        theta,
-        phi,
-        baseRadius,
+        x,
+        y,
+        z,
         offset: Math.random() * Math.PI * 2,
-        opacity: 0.6 + Math.random() * 0.4,
       });
     }
+    
     particlesRef.current = particles;
   }, []);
 
-  // Demo mode: cycle scatter 0 -> 1 over 60s
+  // Demo mode: cycle scatter 0 -> 1 over 60s, or use debug scatter param
   useEffect(() => {
+    // Debug scatter parameter overrides everything
+    if (debugScatter !== null) {
+      const value = parseFloat(debugScatter);
+      if (!isNaN(value)) {
+        setScatter(Math.max(0, Math.min(1, value)));
+      }
+      return;
+    }
+    
     if (!isDemoMode) return;
     
     const startTime = Date.now();
@@ -80,11 +92,11 @@ export function Orb() {
     }, 16); // ~60fps
     
     return () => clearInterval(interval);
-  }, [isDemoMode]);
+  }, [isDemoMode, debugScatter]);
 
   // Calculate scatter from calendar or manual focus
   useEffect(() => {
-    if (isDemoMode) return;
+    if (isDemoMode || debugScatter !== null) return;
     
     const updateScatter = () => {
       if (isManualFocus && manualTimeRemaining !== null) {
@@ -104,14 +116,14 @@ export function Orb() {
     updateScatter();
     const interval = setInterval(updateScatter, 1000);
     return () => clearInterval(interval);
-  }, [isDemoMode, nextEvent, isManualFocus, manualTimeRemaining]);
+  }, [isDemoMode, debugScatter, nextEvent, isManualFocus, manualTimeRemaining]);
 
   // Canvas rendering
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
     
     const resize = () => {
@@ -124,7 +136,7 @@ export function Orb() {
     let time = 0;
     
     const render = () => {
-      time += 0.01;
+      time += 0.008;
       
       // Clear with dark background
       ctx.fillStyle = '#161616';
@@ -133,56 +145,59 @@ export function Orb() {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
       
-      // Breathing effect
-      const breathe = Math.sin(time * 0.5) * 0.05;
+      // Sphere radius: 45-55% of viewport height
+      const baseRadius = canvas.height * 0.25;
+      
+      // Subtle breathing effect
+      const breathe = Math.sin(time * 0.5) * 0.03;
+      const radius = baseRadius * (1 + breathe);
       
       particlesRef.current.forEach((particle) => {
-        // Convert spherical to cartesian
-        const r = particle.baseRadius * (1 + breathe);
+        // Scatter effect: particles drift outward
+        const scatterAmount = scatter * (1 + Math.sin(particle.offset + time * 0.5) * 0.2);
+        const finalRadius = radius * (1 + scatterAmount * 2.5);
         
-        // Scatter effect: particles drift outward and fade
-        const scatterAmount = scatter * (1 + Math.sin(particle.offset + time) * 0.3);
-        const finalRadius = r * (1 + scatterAmount * 3);
+        const x = particle.x * finalRadius;
+        const y = particle.y * finalRadius;
+        const z = particle.z * finalRadius;
         
-        const x = finalRadius * Math.sin(particle.theta) * Math.cos(particle.phi);
-        const y = finalRadius * Math.sin(particle.theta) * Math.sin(particle.phi);
-        const z = finalRadius * Math.cos(particle.theta);
+        const screenX = centerX + x;
+        const screenY = centerY + y;
         
-        // Simple perspective
-        const scale = 1 / (1 + z / 500);
-        const screenX = centerX + x * scale;
-        const screenY = centerY + y * scale;
+        // Lighting calculation: upper-left is brighter
+        // Light direction vector (normalized)
+        const lightX = -0.5;
+        const lightY = -0.5;
+        const lightZ = 0.707; // sqrt(0.5)
         
-        // Light direction: upper-left is brighter
-        const lightDir = { x: -1, y: -1, z: 1 };
-        const nx = Math.sin(particle.theta) * Math.cos(particle.phi);
-        const ny = Math.sin(particle.theta) * Math.sin(particle.phi);
-        const nz = Math.cos(particle.theta);
-        const lighting = Math.max(0, nx * lightDir.x + ny * lightDir.y + nz * lightDir.z);
+        // Dot product with surface normal (particle position normalized)
+        const lighting = Math.max(0, 
+          particle.x * lightX + 
+          particle.y * lightY + 
+          particle.z * lightZ
+        );
         
-        // Opacity based on scatter and lighting
-        let opacity = particle.opacity * (1 - scatter * 0.8) * (0.3 + lighting * 0.7);
+        // Dithered stippling: use lighting to determine draw probability
+        // At scatter=0: very dense, nearly solid where lit
+        // At scatter=1: sparse, scattered
+        const baseDensity = 1 - scatter * 0.85;
+        const density = baseDensity * (0.2 + lighting * 0.8);
         
         // Dim during meeting
+        let finalDensity = density;
         if (nextEvent && nextEvent.minutesToStart <= 0) {
-          opacity *= 0.3;
+          finalDensity *= 0.25;
         }
         
-        // Particle size based on scatter (stippling effect)
-        const size = (1 + scatter * 2) * scale;
+        // Stochastic dithering: only draw if random value is below density
+        // Use z-depth as deterministic "random" seed for stability
+        const seed = (Math.sin(particle.x * 12.9898 + particle.y * 78.233 + z * 45.164) * 43758.5453) % 1;
+        if (seed > finalDensity) return;
         
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, size, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Add slight glow for brighter particles
-        if (lighting > 0.7 && scatter < 0.5) {
-          ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.2})`;
-          ctx.beginPath();
-          ctx.arc(screenX, screenY, size * 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        // Draw uniform small dot (1-2px)
+        const dotSize = 1;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
       });
       
       animationRef.current = requestAnimationFrame(render);
