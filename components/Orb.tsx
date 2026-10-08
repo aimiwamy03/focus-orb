@@ -114,8 +114,9 @@ export function Orb() {
       }
       
       // Compute escapeAt: rim and lower-right points leave first
-      const escapeAt = Math.max(0, Math.min(1, 
-        Math.random() - 0.35 * Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414)) * Math.min(d, 1.35) / 1.35
+      // Points with escapeAt >= 1 never escape (~1/3 of core stays put)
+      const escapeAt = Math.max(0, Math.min(1.5, 
+        Math.random() * 1.5 - 0.5 * Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414)) * Math.min(d, 1.35) / 1.35
       ));
       
       points.push({
@@ -126,7 +127,7 @@ export function Orb() {
         isInside,
         lowerRightBias: Math.max(0, Math.min(1, 0.5 + 0.5 * (nx + ny) / Math.max(d, 1e-6) / 1.414)),
         scatterSpeed: Math.random(), // Normalized 0-1
-        scatterAngleJitter: (Math.random() - 0.5) * 0.6, // Random jitter -0.3 to +0.3 radians
+        scatterAngleJitter: (Math.random() - 0.5) * 0.9, // Random jitter -0.45 to +0.45 radians
         escapeAt,
       });
     }
@@ -245,13 +246,13 @@ export function Orb() {
         // Per-point escape model
         const progress = scatter <= point.escapeAt 
           ? 0 
-          : (scatter - point.escapeAt) / (1 - point.escapeAt + 1e-6);
+          : Math.min(1, (scatter - point.escapeAt) / (1 - point.escapeAt + 1e-6));
         
         // Keep probability based on escape state
         let keepProb: number;
         if (progress === 0) {
           // Non-escaped: shade with gentle dimming
-          keepProb = point.shade * (1 - 0.55 * scatter);
+          keepProb = point.shade * (1 - 0.4 * scatter);
         } else {
           // Escaped: fade as it travels
           keepProb = point.shade * (1 - 0.75 * progress);
@@ -271,9 +272,9 @@ export function Orb() {
           const radialUnitX = radialDist > 1e-6 ? point.x / radialDist : 1;
           const radialUnitY = radialDist > 1e-6 ? point.y / radialDist : 0;
           
-          // Mix 40% radial + 60% toward lower-right (0.7071, 0.7071)
-          const mixedDirX = 0.4 * radialUnitX + 0.6 * 0.7071;
-          const mixedDirY = 0.4 * radialUnitY + 0.6 * 0.7071;
+          // Mix 15% radial + 85% toward lower-right (0.7071, 0.7071)
+          const mixedDirX = 0.15 * radialUnitX + 0.85 * 0.7071;
+          const mixedDirY = 0.15 * radialUnitY + 0.85 * 0.7071;
           
           // Normalize
           const mixedDirLen = Math.sqrt(mixedDirX * mixedDirX + mixedDirY * mixedDirY);
@@ -287,7 +288,7 @@ export function Orb() {
           const rotatedDirY = dirX * sinJitter + dirY * cosJitter;
           
           // Escape distance
-          const escapeDist = progress * radius * (0.5 + 1.2 * point.scatterSpeed);
+          const escapeDist = progress * radius * (0.3 + 1.1 * point.scatterSpeed);
           
           x += rotatedDirX * escapeDist;
           y += rotatedDirY * escapeDist;
