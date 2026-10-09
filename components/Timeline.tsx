@@ -73,8 +73,8 @@ export function Timeline({ events, now, hidden }: TimelineProps) {
     segmentsRef.current.forEach((seg, i) => {
       const prev = segmentsRef.current[i - 1];
       const next = segmentsRef.current[i + 1];
-      const left = prev && seg.x0 - prev.x1 < 3 ? seg.x0 + 2.5 : seg.x0;
-      const right = next && next.x0 - seg.x1 < 3 ? seg.x1 - 2.5 : seg.x1;
+      const left = prev && seg.x0 - prev.x1 < 4 ? seg.x0 + 3 : seg.x0;
+      const right = next && next.x0 - seg.x1 < 4 ? seg.x1 - 3 : seg.x1;
       for (let x = left; x < right; x += 2) {
         for (let y = 4; y < cssHeight - 4; y += 2) {
           if (seed(x + 11, y + 3) < 0.35) continue;
