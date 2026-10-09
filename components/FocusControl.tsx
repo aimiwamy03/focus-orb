@@ -2,15 +2,17 @@
 
 import { useState } from 'react';
 import { formatTimeRemaining } from '@/lib/scatter';
+import { formatClock, SmartFocusOption } from '@/lib/day';
 
 interface FocusControlProps {
   isActive: boolean;
   timeRemaining: number | null;
   onStart: (duration: number) => void;
   onStop: () => void;
+  smartFocus?: SmartFocusOption | null;
 }
 
-export function FocusControl({ isActive, timeRemaining, onStart, onStop }: FocusControlProps) {
+export function FocusControl({ isActive, timeRemaining, onStart, onStop, smartFocus }: FocusControlProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (isActive && timeRemaining !== null) {
@@ -35,7 +37,7 @@ export function FocusControl({ isActive, timeRemaining, onStart, onStop }: Focus
   if (isExpanded) {
     return (
       <div className="fixed bottom-4 right-4 z-40">
-        <div className="bg-black/40 backdrop-blur-md rounded-lg border border-white/10 p-3 min-w-[140px]">
+        <div className="bg-black/40 backdrop-blur-md rounded-lg border border-white/10 p-3 min-w-[200px]">
           <div className="flex items-center justify-between mb-2">
             <div className="text-white/90 text-xs font-medium">Start focus</div>
             <button
@@ -47,6 +49,18 @@ export function FocusControl({ isActive, timeRemaining, onStart, onStop }: Focus
             </button>
           </div>
           <div className="space-y-1.5">
+            {smartFocus ? (
+              <button
+                data-testid="smart-focus"
+                onClick={() => {
+                  onStart(smartFocus.minutes);
+                  setIsExpanded(false);
+                }}
+                className="w-full px-3 py-1.5 bg-white/15 hover:bg-white/20 text-white/90 hover:text-white rounded text-xs font-medium transition-colors text-left"
+              >
+                Focus until {formatClock(smartFocus.end)} ({smartFocus.minutes} min)
+              </button>
+            ) : null}
             {[25, 50, 90].map((minutes) => (
               <button
                 key={minutes}

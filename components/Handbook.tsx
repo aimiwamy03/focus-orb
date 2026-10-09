@@ -2,26 +2,23 @@
 
 import { useState, useEffect } from 'react';
 
-const STORAGE_KEY = 'focusOrb:handbookCollapsed';
+const SEEN_KEY = 'focusOrb:guideSeen';
 
 export function Handbook() {
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [isFirstVisit, setIsFirstVisit] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === null) {
-      setIsFirstVisit(true);
-      setIsCollapsed(false);
+    const seen = localStorage.getItem(SEEN_KEY);
+    if (seen === 'true') {
+      setIsCollapsed(true);
     } else {
-      setIsCollapsed(stored === 'true');
+      setIsCollapsed(false);
+      localStorage.setItem(SEEN_KEY, 'true');
     }
   }, []);
 
   const toggle = () => {
-    const newState = !isCollapsed;
-    setIsCollapsed(newState);
-    localStorage.setItem(STORAGE_KEY, String(newState));
+    setIsCollapsed((prev) => !prev);
   };
 
   useEffect(() => {
