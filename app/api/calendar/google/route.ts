@@ -13,6 +13,15 @@ interface GoogleCalendarEvent {
     date?: string;
   };
   recurrence?: string[];
+  status?: string;
+  transparency?: string;
+  hangoutLink?: string;
+  location?: string;
+  description?: string;
+  attendees?: { self?: boolean; responseStatus?: string }[];
+  conferenceData?: {
+    entryPoints?: { entryPointType?: string; uri?: string }[];
+  };
 }
 
 interface GoogleCalendarResponse {
@@ -28,15 +37,18 @@ export async function GET() {
     }
 
     const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
 
     const params = new URLSearchParams({
-      timeMin: now.toISOString(),
+      timeMin: startOfDay.toISOString(),
       timeMax: endOfDay.toISOString(),
       singleEvents: "true",
       orderBy: "startTime",
-      maxResults: "10",
+      maxResults: "50",
+      conferenceDataVersion: "1",
     });
 
     const response = await fetch(
@@ -57,15 +69,29 @@ export async function GET() {
 
     const data: GoogleCalendarResponse = await response.json();
     
-    // Filter out all-day events and map to our CalendarEvent format
-    const events = data.items
-      .filter((event) => event.start.dateTime) // Exclude all-day events
-      .map((event) => ({
+    const events = (data.items ?? []).map((event) => {
+      const isAllDay = !event.start.dateTime && !!event.start.date;
+      const self = event.attendees?.find((attendee) => attendee.self);
+      const video = event.conferenceData?.entryPoints?.find((entry) => entry.uri);
+      const status = event.status?.toLowerCase();
+
+      return {
         summary: event.summary || "Untitled Event",
-        start: event.start.dateTime!,
-        end: event.end.dateTime!,
-        isAllDay: false,
-      }));
+        start: event.start.dateTime || event.start.date,
+        end: event.end.dateTime || event.end.date,
+        isAllDay,
+        status:
+          status === "cancelled" || status === "confirmed" || status === "tentative"
+            ? status
+            : undefined,
+        transparency: event.transparency === "transparent" ? "transparent" : "opaque",
+        declined: self?.responseStatus === "declined" || status === "cancelled",
+        hangoutLink: event.hangoutLink,
+        location: event.location,
+        description: event.description,
+        conferenceUri: video?.uri,
+      };
+    });
 
     return NextResponse.json({ events });
   } catch (error) {

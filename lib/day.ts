@@ -206,12 +206,8 @@ export function statusLineText(model: DayModel, now: Date): string {
 
   if (model.state === 'in-meeting' && model.currentEvent) {
     const until = formatClock(model.currentEvent.end);
-    const freeAt = model.nextFreeGap ? formatClock(model.nextFreeGap.start) : null;
-    if (freeAt && model.nextFreeGap && model.nextFreeGap.start.getTime() !== model.currentEvent.end.getTime()) {
-      return `In ${model.currentEvent.summary} until ${until} . free at ${freeAt}`;
-    }
-    if (freeAt) {
-      return `In ${model.currentEvent.summary} until ${until} . free at ${freeAt}`;
+    if (model.nextFreeGap) {
+      return `In ${model.currentEvent.summary} until ${until} . free at ${formatClock(model.nextFreeGap.start)}`;
     }
     return `In ${model.currentEvent.summary} until ${until}`;
   }

@@ -66,6 +66,27 @@ END:VCALENDAR`;
     expect(events[0].summary).toContain('This is a very long summary');
   });
 
+  it('parses transparent, cancelled, location, and description', () => {
+    const ics = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:20261008T140000Z
+DTEND:20261008T150000Z
+SUMMARY:Hold
+TRANSP:TRANSPARENT
+STATUS:CANCELLED
+LOCATION:https://zoom.us/j/123
+DESCRIPTION:Join here
+END:VEVENT
+END:VCALENDAR`;
+
+    const events = parseICS(ics);
+    expect(events[0].transparency).toBe('transparent');
+    expect(events[0].status).toBe('cancelled');
+    expect(events[0].location).toBe('https://zoom.us/j/123');
+    expect(events[0].description).toBe('Join here');
+  });
+
   it('handles escaped characters in summary', () => {
     const ics = `BEGIN:VCALENDAR
 VERSION:2.0
