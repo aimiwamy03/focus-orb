@@ -4,6 +4,13 @@ export interface CalendarEvent {
   end: Date;
   isAllDay: boolean;
   rrule?: string;
+  status?: 'confirmed' | 'tentative' | 'cancelled';
+  transparency?: 'opaque' | 'transparent';
+  declined?: boolean;
+  hangoutLink?: string;
+  location?: string;
+  description?: string;
+  conferenceUri?: string;
 }
 
 export interface NextEventInfo {
