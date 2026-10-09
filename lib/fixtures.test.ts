@@ -42,7 +42,7 @@ describe('mock fixtures', () => {
   it('in-meeting uses the isolated-meeting line', () => {
     const now = parseNowParam('13:45', new Date(2026, 9, 9));
     const model = buildDayModel(getMockEvents('in-meeting', now), now);
-    expect(statusLineText(model, now)).toBe('In Design sync until 2:00 . free at 2:00');
+    expect(statusLineText(model, now)).toBe('In Design sync until 2:00');
   });
 
   it('pre-meeting is a heads-up with a Join URL', () => {

@@ -198,9 +198,7 @@ describe('statusLineText', () => {
       [ev('Design sync', at(13, 30), at(14)), ev('Planning', at(15), at(16))],
       at(13, 45)
     );
-    expect(statusLineText(model, at(13, 45))).toBe(
-      'In Design sync until 2:00 . free at 2:00'
-    );
+    expect(statusLineText(model, at(13, 45))).toBe('In Design sync until 2:00');
   });
 
   it('uses the short free-at line during a run', () => {

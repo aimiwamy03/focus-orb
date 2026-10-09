@@ -54,17 +54,19 @@ export function useCalendar() {
     if (storedAuthMethod) setAuthMethod(storedAuthMethod);
   }, []);
 
-  // Check Google authentication status (skipped in mock mode to keep the console clean)
+  // Only talk to Google when the user already chose that auth method.
+  // An unauthenticated probe 401s and dirties the browser console.
   useEffect(() => {
     if (mockScenario) return;
+    if (authMethod !== 'google') return;
 
     const checkGoogleAuth = async () => {
       try {
         const response = await fetch('/api/calendar/google');
         setIsGoogleConnected(response.ok);
-        if (response.ok && !authMethod) {
-          setAuthMethod('google');
-          localStorage.setItem(AUTH_METHOD_KEY, 'google');
+        if (!response.ok && response.status === 401) {
+          setAuthMethod(null);
+          localStorage.removeItem(AUTH_METHOD_KEY);
         }
       } catch {
         setIsGoogleConnected(false);

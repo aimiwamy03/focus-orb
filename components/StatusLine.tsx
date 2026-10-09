@@ -9,8 +9,7 @@ export function StatusLine({ text, joinUrl }: StatusLineProps) {
   return (
     <div
       data-testid="status-line"
-      className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 px-4 text-center text-xs font-normal tracking-wide text-white/45"
-      style={{ top: 'calc(50% + min(22vw, 22vh))' }}
+      className="pointer-events-none absolute bottom-[5.75rem] left-1/2 z-20 -translate-x-1/2 px-4 text-center text-[12px] font-normal tracking-wide text-white/45"
     >
       <span>{text}</span>
       {joinUrl ? (
@@ -20,7 +19,7 @@ export function StatusLine({ text, joinUrl }: StatusLineProps) {
             href={joinUrl}
             target="_blank"
             rel="noreferrer"
-            className="pointer-events-auto underline decoration-white/30 underline-offset-2 hover:text-white/60"
+            className="pointer-events-auto text-white/50 underline decoration-white/40 underline-offset-2 hover:text-white/70"
           >
             Join
           </a>

@@ -13,6 +13,7 @@ import { Handbook } from './Handbook';
 import { FocusControl } from './FocusControl';
 import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
+import { Satellites } from './Satellites';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -53,10 +54,8 @@ export function Orb() {
   const { nextEvent, day, now, scatterWindow } = useCalendar();
   const density = densityForModel(day);
   const densityRef = useRef(density);
-  const remainingInRunRef = useRef(day.remainingInRun.length);
   const inBusyRef = useRef(day.state === 'in-meeting' || day.state === 'in-run');
   densityRef.current = density;
-  remainingInRunRef.current = day.remainingInRun.length;
   inBusyRef.current = day.state === 'in-meeting' || day.state === 'in-run';
   const { 
     isActive: isManualFocus, 
@@ -322,23 +321,6 @@ export function Orb() {
         ctx.fillStyle = 'rgba(22, 22, 22, 0.75)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-
-      // Satellite dots: one per remaining meeting in the current run
-      const satellites = remainingInRunRef.current;
-      if (inBusyRef.current && satellites > 0) {
-        ctx.fillStyle = '#ffffff';
-        const satDot = 2 * dpr;
-        for (let i = 0; i < satellites; i++) {
-          const t = satellites === 1 ? 0.5 : i / (satellites - 1);
-          const angle = (0.18 + 0.32 * t) * Math.PI;
-          const satR = radius * 1.22;
-          const sx = centerX + Math.cos(angle) * satR;
-          const sy = centerY + Math.sin(angle) * satR;
-          ctx.fillRect(Math.floor(sx), Math.floor(sy), satDot, satDot);
-          ctx.fillRect(Math.floor(sx + 3 * dpr), Math.floor(sy + dpr), satDot, satDot);
-          ctx.fillRect(Math.floor(sx - 2 * dpr), Math.floor(sy + 3 * dpr), satDot, satDot);
-        }
-      }
       
       animationRef.current = requestAnimationFrame(render);
     };
@@ -416,6 +398,8 @@ export function Orb() {
         text={statusLineText(day, now)}
         joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
       />
+
+      <Satellites count={day.state === 'in-run' ? day.remainingInRun.length : 0} />
 
       <Timeline
         events={day.events}
