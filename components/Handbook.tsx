@@ -11,10 +11,16 @@ export function Handbook() {
     const seen = localStorage.getItem(SEEN_KEY);
     if (seen === 'true') {
       setIsCollapsed(true);
-    } else {
-      setIsCollapsed(false);
-      localStorage.setItem(SEEN_KEY, 'true');
+      return;
     }
+
+    setIsCollapsed(false);
+
+    // Remember the visit on leave so Strict Mode remounts don't close the guide
+    // during the first session. The next load starts closed.
+    const markSeen = () => localStorage.setItem(SEEN_KEY, 'true');
+    window.addEventListener('pagehide', markSeen);
+    return () => window.removeEventListener('pagehide', markSeen);
   }, []);
 
   const toggle = () => {
