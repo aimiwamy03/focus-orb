@@ -6,6 +6,7 @@ import {
   filterDayEvents,
   isSkippedEvent,
   statusLineText,
+  hoverDetailText,
   gapDensity,
   densityForModel,
   smartFocusOption,
@@ -224,6 +225,26 @@ describe('statusLineText', () => {
       at(13, 25)
     );
     expect(statusLineText(model, at(13, 25))).toBe('Design sync');
+  });
+});
+
+describe('hoverDetailText', () => {
+  it('lists the next two or three events on one line', () => {
+    const model = buildDayModel(
+      [
+        ev('Design sync', at(13, 30), at(14)),
+        ev('1:1', at(14), at(14, 30)),
+        ev('Review', at(14, 30), at(15)),
+      ],
+      at(12)
+    );
+    expect(hoverDetailText(model, at(12))).toBe(
+      '1:30 Design sync . 2:00 1:1 . 2:30 Review'
+    );
+  });
+
+  it('is empty when the day is clear', () => {
+    expect(hoverDetailText(buildDayModel([], at(11)), at(11))).toBe('');
   });
 });
 

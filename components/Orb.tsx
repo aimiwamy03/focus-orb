@@ -6,9 +6,8 @@ import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useTabTitle } from '@/lib/useTabTitle';
-import { densityForModel, extractJoinUrl, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
+import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
 import { Settings } from './Settings';
-import { Overlay } from './Overlay';
 import { Handbook } from './Handbook';
 import { FocusControl } from './FocusControl';
 import { StatusLine } from './StatusLine';
@@ -396,6 +395,8 @@ export function Orb() {
 
       <StatusLine
         text={statusLineText(day, now)}
+        detail={hoverDetailText(day, now)}
+        hovered={showOverlay}
         joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
       />
 
@@ -415,13 +416,6 @@ export function Orb() {
         onStart={startFocus}
         onStop={stopFocus}
         smartFocus={day.state === 'free' ? smartFocusOption(now, day.nextEvent?.start ?? null) : null}
-      />
-      
-      <Overlay 
-        show={showOverlay}
-        nextEvent={nextEvent}
-        isManualFocus={isManualFocus}
-        manualTimeRemaining={manualTimeRemaining}
       />
       
       {showSettings && (

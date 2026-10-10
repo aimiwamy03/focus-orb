@@ -225,6 +225,12 @@ export function statusLineText(model: DayModel, now: Date): string {
   return `Free until ${until}, then ${model.nextBusy.events[0].summary}`;
 }
 
+export function hoverDetailText(model: DayModel, now: Date): string {
+  const upcoming = model.events.filter((event) => event.end > now).slice(0, 3);
+  if (upcoming.length === 0) return '';
+  return upcoming.map((event) => `${formatClock(event.start)} ${event.summary}`).join(' . ');
+}
+
 /**
  * Gap-aware starting density. Only scales keep probability at scatter 0;
  * existing scatter math still applies on top.
