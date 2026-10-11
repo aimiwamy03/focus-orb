@@ -24,7 +24,13 @@ export function useLiveTab(input: {
   const lastDrawRef = useRef(0);
 
   useEffect(() => {
-    document.title = title;
+    const apply = () => {
+      if (document.title !== title) document.title = title;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
   }, [title]);
 
   useEffect(() => {
