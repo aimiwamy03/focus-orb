@@ -28,7 +28,15 @@ export function StatusLine({
         hovered ? 'text-white/[0.85]' : 'text-white/45'
       }`}
     >
-      <div className="text-[12px] leading-5">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-28 w-[32rem] max-w-[90vw] -translate-x-1/2 -translate-y-1/2"
+        style={{
+          background:
+            'radial-gradient(ellipse at center, rgba(22,22,22,0.80) 0%, rgba(22,22,22,0.55) 42%, rgba(22,22,22,0) 72%)',
+        }}
+      />
+      <div className="relative text-[12px] leading-5">
         <span>{line}</span>
         {nudgeText && nudgeButtonLabel && onNudgeFocus ? (
           <>
