@@ -6,6 +6,8 @@ import {
   filterDayEvents,
   isSkippedEvent,
   statusLineText,
+  focusingLine,
+  orbClickMinutes,
   hoverDetailText,
   gapDensity,
   densityForModel,
@@ -178,7 +180,7 @@ describe('buildDayModel', () => {
 describe('statusLineText', () => {
   it('describes a free stretch before a single meeting', () => {
     const model = buildDayModel([ev('Design sync', at(13, 30), at(14))], at(12));
-    expect(statusLineText(model, at(12))).toBe('Free until 1:30, then Design sync');
+    expect(statusLineText(model, at(12))).toBe('Free until 1:30. Click the orb to focus.');
   });
 
   it('describes a free stretch before a back-to-back run', () => {
@@ -190,9 +192,7 @@ describe('statusLineText', () => {
       ],
       at(12)
     );
-    expect(statusLineText(model, at(12))).toBe(
-      'Free until 1:30, then 3 back-to-back until 3:00'
-    );
+    expect(statusLineText(model, at(12))).toBe('Free until 1:30. Click the orb to focus.');
   });
 
   it('describes an isolated meeting and when you are free', () => {
@@ -200,10 +200,10 @@ describe('statusLineText', () => {
       [ev('Design sync', at(13, 30), at(14)), ev('Planning', at(15), at(16))],
       at(13, 45)
     );
-    expect(statusLineText(model, at(13, 45))).toBe('In Design sync until 2:00');
+    expect(statusLineText(model, at(13, 45))).toBe('In Design sync. Free at 2:00.');
   });
 
-  it('uses the short free-at line during a run', () => {
+  it('uses the in-run line with free-at the end of the run', () => {
     const model = buildDayModel(
       [
         ev('Design sync', at(13, 30), at(14)),
@@ -212,20 +212,40 @@ describe('statusLineText', () => {
       ],
       at(13, 45)
     );
-    expect(statusLineText(model, at(13, 45))).toBe('Free at 3:00');
+    expect(statusLineText(model, at(13, 45))).toBe('In Design sync. Free at 3:00.');
   });
 
   it('says the day is clear when nothing remains', () => {
     const model = buildDayModel([], at(11));
-    expect(statusLineText(model, at(11))).toBe('Clear for the rest of the day');
+    expect(statusLineText(model, at(11))).toBe('Clear for the rest of the day.');
   });
 
-  it('switches to the meeting title in the 5-minute heads-up window', () => {
+  it('switches to the heads-up join line in the 5-minute window', () => {
     const model = buildDayModel(
       [ev('Design sync', at(13, 30), at(14), { hangoutLink: 'https://meet.google.com/abc-defg-hij' })],
       at(13, 25)
     );
-    expect(statusLineText(model, at(13, 25))).toBe('Design sync');
+    expect(statusLineText(model, at(13, 25))).toBe('Design sync in 5 min.');
+  });
+});
+
+describe('orbClickMinutes / focusingLine', () => {
+  it('starts focus until the next meeting minus 5 in a short gap', () => {
+    const model = buildDayModel([ev('Design sync', at(13, 30), at(14))], at(13, 10));
+    expect(orbClickMinutes(model, at(13, 10))).toBe(15);
+  });
+
+  it('starts a 50 minute block when the rest of the day is clear', () => {
+    expect(orbClickMinutes(buildDayModel([], at(11)), at(11))).toBe(50);
+  });
+
+  it('does not start focus during a meeting', () => {
+    const model = buildDayModel([ev('Design sync', at(13, 30), at(14))], at(13, 45));
+    expect(orbClickMinutes(model, at(13, 45))).toBeNull();
+  });
+
+  it('formats the focusing line', () => {
+    expect(focusingLine(38.4)).toBe('Focusing. 38 min left.');
   });
 });
 
@@ -310,7 +330,7 @@ describe('afterMeetingNudge', () => {
     );
     const nudge = afterMeetingNudge(model, at(15));
     expect(nudge).not.toBeNull();
-    expect(nudge?.text).toBe('Free for 25m. Start focus?');
+    expect(nudge?.text).toBe('Free for 25m. Click the orb to focus.');
     expect(nudge?.focus.minutes).toBe(20);
     expect(formatClock(nudge!.focus.end)).toBe('3:20');
   });
