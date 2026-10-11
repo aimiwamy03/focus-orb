@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
-import { useTabTitle } from '@/lib/useTabTitle';
+import { useLiveTab } from '@/lib/useLiveTab';
 import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
 import { Settings } from './Settings';
 import { Handbook } from './Handbook';
@@ -64,11 +64,13 @@ export function Orb() {
     stopFocus 
   } = useManualFocus();
 
-  // Update tab title based on time remaining
-  const minutesForTab = isManualFocus && manualTimeRemaining !== null
-    ? manualTimeRemaining
-    : nextEvent?.minutesToStart ?? null;
-  useTabTitle(minutesForTab, isManualFocus);
+  useLiveTab({
+    model: day,
+    now,
+    scatter,
+    isManualFocus,
+    focusMinutes: manualTimeRemaining,
+  });
 
   // Generate points once (will be regenerated on resize)
   const generatePoints = useCallback((radius: number) => {
