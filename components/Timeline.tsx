@@ -114,6 +114,7 @@ export function Timeline({ events, now, hidden }: TimelineProps) {
     >
       <canvas
         ref={canvasRef}
+        data-text-clear
         className="h-8 w-full cursor-default"
         onMouseMove={(e) => {
           const bounds = e.currentTarget.getBoundingClientRect();
@@ -133,6 +134,7 @@ export function Timeline({ events, now, hidden }: TimelineProps) {
       {hover ? (
         <div
           data-testid="timeline-tooltip"
+          data-text-clear
           className="pointer-events-none absolute bottom-9 whitespace-nowrap text-[10px] text-white/70"
           style={{ left: hover.x, transform: 'translateX(-50%)' }}
         >

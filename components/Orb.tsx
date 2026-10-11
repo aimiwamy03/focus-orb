@@ -7,6 +7,7 @@ import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
 import { afterMeetingNudge, densityForModel, extractJoinUrl, formatClock, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
+import { collectTextClearRects, textClearAlpha } from '@/lib/textClear';
 import { Settings } from './Settings';
 import { Handbook } from './Handbook';
 import { FocusControl } from './FocusControl';
@@ -44,6 +45,7 @@ export function Orb() {
   const isDemoMode = searchParams.get('demo') === '1';
   const debugScatter = searchParams.get('scatter');
   const settingsParam = searchParams.get('settings') === '1';
+  const hoverParam = searchParams.get('hover') === '1';
   
   const [scatter, setScatter] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -278,7 +280,8 @@ export function Orb() {
         pointsRef.current[idx].threshold = Math.random();
       }
       
-      // Draw all points
+      // Draw all points, skipping or fading any that sit under text.
+      const clearRects = collectTextClearRects();
       ctx.fillStyle = '#ffffff';
       
       for (const point of pointsRef.current) {
@@ -337,10 +340,18 @@ export function Orb() {
         
         const screenX = centerX + x;
         const screenY = centerY + y;
+        const clearAlpha = textClearAlpha(screenX / dpr, screenY / dpr, clearRects);
+        if (clearAlpha <= 0) continue;
         
         // Draw 2x2 CSS pixel dots (scaled by DPR for consistent visual size)
         const dotSize = 2 * dpr;
-        ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
+        if (clearAlpha < 1) {
+          ctx.fillStyle = `rgba(255,255,255,${clearAlpha})`;
+          ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
+          ctx.fillStyle = '#ffffff';
+        } else {
+          ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
+        }
       }
       
       // Dim during a meeting or back-to-back run
@@ -429,7 +440,7 @@ export function Orb() {
       <StatusLine
         text={statusLineText(day, now)}
         detail={hoverDetailText(day, now)}
-        hovered={showOverlay}
+        hovered={showOverlay || hoverParam}
         joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
         nudgeText={visibleNudge?.text ?? null}
         nudgeButtonLabel={

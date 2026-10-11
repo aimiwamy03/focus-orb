@@ -37,44 +37,50 @@ export function StatusLine({
         }}
       />
       <div className="relative text-[12px] leading-5">
-        <span>{line}</span>
-        {nudgeText && nudgeButtonLabel && onNudgeFocus ? (
-          <>
-            {' '}
-            <button
-              type="button"
-              data-testid="nudge-focus"
-              onClick={onNudgeFocus}
-              className={`pointer-events-auto underline underline-offset-2 ${
-                hovered
-                  ? 'text-white/[0.85] decoration-white/50'
-                  : 'text-white/50 decoration-white/40'
-              }`}
-            >
-              {nudgeButtonLabel}
-            </button>
-          </>
-        ) : null}
-        {!nudgeText && joinUrl ? (
-          <>
-            {' '}
-            <a
-              href={joinUrl}
-              target="_blank"
-              rel="noreferrer"
-              className={`pointer-events-auto underline underline-offset-2 ${
-                hovered
-                  ? 'text-white/[0.85] decoration-white/50'
-                  : 'text-white/50 decoration-white/40'
-              }`}
-            >
-              Join
-            </a>
-          </>
-        ) : null}
+        <span data-text-clear className="inline-block">
+          {line}
+          {nudgeText && nudgeButtonLabel && onNudgeFocus ? (
+            <>
+              {' '}
+              <button
+                type="button"
+                data-testid="nudge-focus"
+                onClick={onNudgeFocus}
+                className={`pointer-events-auto underline underline-offset-2 ${
+                  hovered
+                    ? 'text-white/[0.85] decoration-white/50'
+                    : 'text-white/50 decoration-white/40'
+                }`}
+              >
+                {nudgeButtonLabel}
+              </button>
+            </>
+          ) : null}
+          {!nudgeText && joinUrl ? (
+            <>
+              {' '}
+              <a
+                href={joinUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`pointer-events-auto underline underline-offset-2 ${
+                  hovered
+                    ? 'text-white/[0.85] decoration-white/50'
+                    : 'text-white/50 decoration-white/40'
+                }`}
+              >
+                Join
+              </a>
+            </>
+          ) : null}
+        </span>
       </div>
       {hovered && detail && !nudgeText ? (
-        <div data-testid="status-detail" className="mt-1 text-[10px] leading-4 text-white/70">
+        <div
+          data-testid="status-detail"
+          data-text-clear
+          className="mt-1 inline-block text-[10px] leading-4 text-white/70"
+        >
           {detail}
         </div>
       ) : null}
