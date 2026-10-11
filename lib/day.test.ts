@@ -353,7 +353,7 @@ describe('afterMeetingNudge', () => {
     expect(afterMeetingNudge(model, at(13, 45))).toBeNull();
   });
 
-  it('starts focus until end of day minus 5 when the rest of the day is free', () => {
+  it('says the day is clear when no later meeting exists', () => {
     const model = buildDayModel(
       [
         ev('Design sync', at(13, 30), at(14)),
@@ -365,10 +365,10 @@ describe('afterMeetingNudge', () => {
     const nudge = afterMeetingNudge(model, at(15));
     expect(nudge).not.toBeNull();
     expect(nudge?.endedEvent.summary).toBe('Review');
-    expect(nudge?.text).toMatch(/^Free for /);
-    const expected = smartFocusOption(at(15), new Date(2026, 9, 9, 23, 59, 59, 999));
-    expect(nudge?.focus.minutes).toBe(expected?.minutes);
-    expect(formatClock(nudge!.focus.end)).toBe(formatClock(expected!.end));
+    expect(nudge?.text).toBe('Clear for the rest of the day. Click the orb to focus.');
+    expect(statusLineText(model, at(15))).toBe(
+      'Clear for the rest of the day. Click the orb to focus.'
+    );
   });
 });
 

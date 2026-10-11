@@ -533,7 +533,9 @@ export function Orb() {
       {!firstOpen ? (
         <div
           className={`transition-opacity duration-300 ${
-            showChrome ? 'opacity-100' : 'pointer-events-none opacity-0'
+            showChrome
+              ? 'visible opacity-100'
+              : 'invisible pointer-events-none opacity-0'
           }`}
         >
           <Timeline

@@ -313,11 +313,23 @@ export function afterMeetingNudge(model: DayModel, now: Date): AfterMeetingNudge
   const minutesSinceEnd = minutesBetween(ended.end, now);
   if (minutesSinceEnd < 0 || minutesSinceEnd > NUDGE_WINDOW_MINUTES) return null;
 
-  const nextStart = model.nextEvent?.start ?? endOfDay(now);
-  const gap = minutesBetween(now, nextStart);
+  if (!model.nextEvent) {
+    const focus =
+      smartFocusOption(now, endOfDay(now)) ?? {
+        end: new Date(now.getTime() + DEFAULT_FOCUS_MINUTES * 60 * 1000),
+        minutes: DEFAULT_FOCUS_MINUTES,
+      };
+    return {
+      text: 'Clear for the rest of the day. Click the orb to focus.',
+      focus,
+      endedEvent: ended,
+    };
+  }
+
+  const gap = minutesBetween(now, model.nextEvent.start);
   if (gap < NUDGE_MIN_GAP_MINUTES) return null;
 
-  const focus = smartFocusOption(now, nextStart);
+  const focus = smartFocusOption(now, model.nextEvent.start);
   if (!focus) return null;
 
   return {

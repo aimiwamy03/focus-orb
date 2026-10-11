@@ -80,7 +80,9 @@ export function Hints({ active, chromeVisible, revision = 0 }: HintsProps) {
         data-testid="help-toggle"
         onClick={() => setHelpOpen((open) => !open)}
         className={`fixed top-4 left-4 z-40 rounded-full px-3 py-1.5 text-xs text-white/40 transition-opacity duration-300 hover:text-white/60 ${
-          chromeVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+          chromeVisible
+            ? 'visible opacity-100'
+            : 'invisible pointer-events-none opacity-0'
         }`}
         aria-label="Show hints"
       >

@@ -53,6 +53,14 @@ describe('mock fixtures', () => {
     expect(extractJoinUrl(model.nextEvent)).toBe('https://meet.google.com/abc-defg-hij');
   });
 
+  it('after the last back-to-back meeting the day is clear, not free-until-midnight', () => {
+    const now = parseNowParam('15:00', new Date(2026, 9, 9));
+    const model = buildDayModel(getMockEvents('back-to-back', now), now);
+    expect(statusLineText(model, now)).toBe(
+      'Clear for the rest of the day. Click the orb to focus.'
+    );
+  });
+
   it('empty is clear', () => {
     const now = parseNowParam('11:00', new Date(2026, 9, 9));
     const model = buildDayModel(getMockEvents('empty', now), now);
