@@ -6,7 +6,7 @@ import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
-import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
+import { afterMeetingNudge, densityForModel, extractJoinUrl, formatClock, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
 import { Settings } from './Settings';
 import { Handbook } from './Handbook';
 import { FocusControl } from './FocusControl';
@@ -48,6 +48,7 @@ export function Orb() {
   const [showOverlay, setShowOverlay] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   
   const { nextEvent, day, now, scatterWindow } = useCalendar();
@@ -71,6 +72,29 @@ export function Orb() {
     isManualFocus,
     focusMinutes: manualTimeRemaining,
   });
+
+  const nudge = !isManualFocus ? afterMeetingNudge(day, now) : null;
+  const visibleNudge = nudge && !nudgeDismissed ? nudge : null;
+
+  useEffect(() => {
+    setNudgeDismissed(false);
+  }, [nudge?.endedEvent.end.getTime(), nudge?.focus.minutes]);
+
+  useEffect(() => {
+    if (!visibleNudge) return;
+
+    const timeout = window.setTimeout(() => setNudgeDismissed(true), 3 * 60 * 1000);
+    const onClick = () => setNudgeDismissed(true);
+    const attach = window.setTimeout(() => {
+      document.addEventListener('click', onClick);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearTimeout(attach);
+      document.removeEventListener('click', onClick);
+    };
+  }, [visibleNudge]);
 
   // Generate points once (will be regenerated on resize)
   const generatePoints = useCallback((radius: number) => {
@@ -400,6 +424,15 @@ export function Orb() {
         detail={hoverDetailText(day, now)}
         hovered={showOverlay}
         joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
+        nudgeText={visibleNudge?.text ?? null}
+        nudgeButtonLabel={
+          visibleNudge ? `Focus until ${formatClock(visibleNudge.focus.end)}` : null
+        }
+        onNudgeFocus={() => {
+          if (!visibleNudge) return;
+          startFocus(visibleNudge.focus.minutes);
+          setNudgeDismissed(true);
+        }}
       />
 
       <Satellites count={day.state === 'in-run' ? day.remainingInRun.length : 0} />

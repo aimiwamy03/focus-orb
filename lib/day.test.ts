@@ -13,6 +13,7 @@ import {
   extractJoinUrl,
   formatClock,
   remainingMeetingsInRun,
+  afterMeetingNudge,
 } from './day';
 
 function ev(
@@ -298,6 +299,56 @@ describe('smartFocusOption', () => {
 
   it('is hidden with no upcoming meeting', () => {
     expect(smartFocusOption(at(12), null)).toBeNull();
+  });
+});
+
+describe('afterMeetingNudge', () => {
+  it('appears when a meeting just ended and the next gap is 25 minutes or more', () => {
+    const model = buildDayModel(
+      [ev('Review', at(14, 30), at(15)), ev('Wrap-up', at(15, 25), at(16))],
+      at(15)
+    );
+    const nudge = afterMeetingNudge(model, at(15));
+    expect(nudge).not.toBeNull();
+    expect(nudge?.text).toBe('Free for 25m. Start focus?');
+    expect(nudge?.focus.minutes).toBe(20);
+    expect(formatClock(nudge!.focus.end)).toBe('3:20');
+  });
+
+  it('does not appear for a 24 minute gap', () => {
+    const model = buildDayModel(
+      [ev('Review', at(14, 30), at(15)), ev('Wrap-up', at(15, 24), at(16))],
+      at(15)
+    );
+    expect(afterMeetingNudge(model, at(15))).toBeNull();
+  });
+
+  it('does not appear more than 3 minutes after the meeting ends', () => {
+    const model = buildDayModel([ev('Review', at(14, 30), at(15))], at(15, 4));
+    expect(afterMeetingNudge(model, at(15, 4))).toBeNull();
+  });
+
+  it('does not appear during a meeting', () => {
+    const model = buildDayModel([ev('Design sync', at(13, 30), at(14))], at(13, 45));
+    expect(afterMeetingNudge(model, at(13, 45))).toBeNull();
+  });
+
+  it('starts focus until end of day minus 5 when the rest of the day is free', () => {
+    const model = buildDayModel(
+      [
+        ev('Design sync', at(13, 30), at(14)),
+        ev('Standup', at(14), at(14, 30)),
+        ev('Review', at(14, 30), at(15)),
+      ],
+      at(15)
+    );
+    const nudge = afterMeetingNudge(model, at(15));
+    expect(nudge).not.toBeNull();
+    expect(nudge?.endedEvent.summary).toBe('Review');
+    expect(nudge?.text).toMatch(/^Free for /);
+    const expected = smartFocusOption(at(15), new Date(2026, 9, 9, 23, 59, 59, 999));
+    expect(nudge?.focus.minutes).toBe(expected?.minutes);
+    expect(formatClock(nudge!.focus.end)).toBe(formatClock(expected!.end));
   });
 });
 

@@ -5,9 +5,22 @@ interface StatusLineProps {
   detail?: string;
   hovered?: boolean;
   joinUrl?: string | null;
+  nudgeText?: string | null;
+  nudgeButtonLabel?: string | null;
+  onNudgeFocus?: () => void;
 }
 
-export function StatusLine({ text, detail, hovered = false, joinUrl }: StatusLineProps) {
+export function StatusLine({
+  text,
+  detail,
+  hovered = false,
+  joinUrl,
+  nudgeText,
+  nudgeButtonLabel,
+  onNudgeFocus,
+}: StatusLineProps) {
+  const line = nudgeText ?? text;
+
   return (
     <div
       data-testid="status-line"
@@ -16,8 +29,25 @@ export function StatusLine({ text, detail, hovered = false, joinUrl }: StatusLin
       }`}
     >
       <div className="text-[12px] leading-5">
-        <span>{text}</span>
-        {joinUrl ? (
+        <span>{line}</span>
+        {nudgeText && nudgeButtonLabel && onNudgeFocus ? (
+          <>
+            {' '}
+            <button
+              type="button"
+              data-testid="nudge-focus"
+              onClick={onNudgeFocus}
+              className={`pointer-events-auto underline underline-offset-2 ${
+                hovered
+                  ? 'text-white/[0.85] decoration-white/50'
+                  : 'text-white/50 decoration-white/40'
+              }`}
+            >
+              {nudgeButtonLabel}
+            </button>
+          </>
+        ) : null}
+        {!nudgeText && joinUrl ? (
           <>
             {' '}
             <a
@@ -35,7 +65,7 @@ export function StatusLine({ text, detail, hovered = false, joinUrl }: StatusLin
           </>
         ) : null}
       </div>
-      {hovered && detail ? (
+      {hovered && detail && !nudgeText ? (
         <div data-testid="status-detail" className="mt-1 text-[10px] leading-4 text-white/70">
           {detail}
         </div>

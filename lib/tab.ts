@@ -1,14 +1,8 @@
-import { DayModel, DayState, formatClock, isHeadsUp } from './day';
+import { DayModel, DayState, formatClock, formatCompactDuration, isHeadsUp } from './day';
 
 export type FaviconState = 'dense' | 'scattered' | 'dim';
 
-export function formatCompactDuration(minutes: number): string {
-  const mins = Math.max(0, Math.floor(minutes));
-  const hours = Math.floor(mins / 60);
-  const rem = mins % 60;
-  if (hours > 0) return rem > 0 ? `${hours}h ${rem}m` : `${hours}h`;
-  return `${mins}m`;
-}
+export { formatCompactDuration };
 
 export function formatLiveTabTitle(
   model: DayModel,
