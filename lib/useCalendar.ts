@@ -1,8 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { parseICS, expandRecurringEvents, findNextEvent, NextEventInfo, CalendarEvent } from './calendar';
 import { buildDayModel, DayModel, minutesBetween } from './day';
 import { getMockEvents, isMockScenario, parseNowParam } from './fixtures';
+import {
+  CalendarInfo,
+  getMockGoogleEventsByCalendar,
+  loadSelectedCalendarIds,
+  mergeEventsFromCalendars,
+  MOCK_GOOGLE_CALENDARS,
+  resolveSelectedCalendarIds,
+  saveSelectedCalendarIds,
+} from './calendars';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const STORAGE_KEY = 'focusOrb:calendarUrl';
@@ -20,6 +29,7 @@ export function useCalendar() {
   const searchParams = useSearchParams();
   const mockParam = searchParams.get('mock');
   const nowParam = searchParams.get('now');
+  const mockCalendars = searchParams.get('mockCalendars') === '1';
   const mockScenario = isMockScenario(mockParam) ? mockParam : null;
 
   const [calendarUrl, setCalendarUrl] = useState<string>('');
@@ -32,6 +42,8 @@ export function useCalendar() {
   const [error, setError] = useState<string | null>(null);
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [calendars, setCalendars] = useState<CalendarInfo[]>([]);
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
 
   // Pin or tick the clock. Mock fixtures never depend on wall time.
   useEffect(() => {
@@ -48,16 +60,31 @@ export function useCalendar() {
     const storedUrl = localStorage.getItem(STORAGE_KEY);
     const storedWindow = localStorage.getItem(SCATTER_WINDOW_KEY);
     const storedAuthMethod = localStorage.getItem(AUTH_METHOD_KEY) as AuthMethod;
+    const storedCalendars = loadSelectedCalendarIds();
     
     if (storedUrl) setCalendarUrl(storedUrl);
     if (storedWindow) setScatterWindow(parseInt(storedWindow, 10));
     if (storedAuthMethod) setAuthMethod(storedAuthMethod);
+    if (storedCalendars) setSelectedCalendarIds(storedCalendars);
   }, []);
+
+  useEffect(() => {
+    if (mockCalendars) {
+      setAuthMethod('google');
+      setIsGoogleConnected(true);
+      setCalendars(MOCK_GOOGLE_CALENDARS);
+      setSelectedCalendarIds((current) =>
+        current.length > 0
+          ? resolveSelectedCalendarIds(MOCK_GOOGLE_CALENDARS, current)
+          : resolveSelectedCalendarIds(MOCK_GOOGLE_CALENDARS, loadSelectedCalendarIds())
+      );
+    }
+  }, [mockCalendars]);
 
   // Only talk to Google when the user already chose that auth method.
   // An unauthenticated probe 401s and dirties the browser console.
   useEffect(() => {
-    if (mockScenario) return;
+    if (mockScenario || mockCalendars) return;
     if (authMethod !== 'google') return;
 
     const checkGoogleAuth = async () => {
@@ -74,7 +101,7 @@ export function useCalendar() {
     };
     
     checkGoogleAuth();
-  }, [authMethod, mockScenario]);
+  }, [authMethod, mockScenario, mockCalendars]);
 
   // Save settings to localStorage
   useEffect(() => {
@@ -106,12 +133,35 @@ export function useCalendar() {
     }
   };
 
-  const fetchGoogleCalendar = async (clock: Date) => {
+  const fetchGoogleCalendar = async (clock: Date, calendarIds: string[] = selectedCalendarIds) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/calendar/google');
+      const listResponse = await fetch('/api/calendar/google?list=1');
+      if (!listResponse.ok) {
+        if (listResponse.status === 401) {
+          setIsGoogleConnected(false);
+          setAuthMethod(null);
+          localStorage.removeItem(AUTH_METHOD_KEY);
+          throw new Error('Google authentication expired');
+        }
+        throw new Error(`Failed to fetch calendars: ${listResponse.statusText}`);
+      }
+
+      const listData = (await listResponse.json()) as { calendars: CalendarInfo[] };
+      const listed = listData.calendars ?? [];
+      setCalendars(listed);
+
+      const resolved = resolveSelectedCalendarIds(
+        listed,
+        calendarIds.length > 0 ? calendarIds : loadSelectedCalendarIds()
+      );
+      setSelectedCalendarIds(resolved);
+      saveSelectedCalendarIds(resolved);
+
+      const params = new URLSearchParams({ calendars: resolved.join(',') });
+      const response = await fetch(`/api/calendar/google?${params}`);
       
       if (!response.ok) {
         if (response.status === 401) {
@@ -179,14 +229,27 @@ export function useCalendar() {
     }
   };
 
-  const fetchCalendar = async (clock: Date = now) => {
+  const applyMockGoogleSelection = (clock: Date, calendarIds: string[]) => {
+    const resolved = resolveSelectedCalendarIds(MOCK_GOOGLE_CALENDARS, calendarIds);
+    applyEvents(
+      mergeEventsFromCalendars(getMockGoogleEventsByCalendar(clock), resolved),
+      clock
+    );
+  };
+
+  const fetchCalendar = async (clock: Date = now, calendarIds: string[] = selectedCalendarIds) => {
     if (mockScenario) {
       applyEvents(getMockEvents(mockScenario, clock), clock);
       return;
     }
 
+    if (mockCalendars) {
+      applyMockGoogleSelection(clock, calendarIds);
+      return;
+    }
+
     if (authMethod === 'google' && isGoogleConnected) {
-      await fetchGoogleCalendar(clock);
+      await fetchGoogleCalendar(clock, calendarIds);
     } else if (authMethod === 'ical' || calendarUrl) {
       await fetchICalCalendar(clock);
     } else {
@@ -202,17 +265,17 @@ export function useCalendar() {
     }
     fetchCalendar(now);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mockScenario, now, calendarUrl, scatterWindow, authMethod, isGoogleConnected]);
+  }, [mockScenario, mockCalendars, now, calendarUrl, scatterWindow, authMethod, isGoogleConnected, selectedCalendarIds]);
 
   // Refresh calendar periodically
   useEffect(() => {
-    if (mockScenario) return;
+    if (mockScenario || mockCalendars) return;
     if (!calendarUrl && !isGoogleConnected) return;
 
     const interval = setInterval(() => fetchCalendar(now), REFRESH_INTERVAL);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mockScenario, calendarUrl, scatterWindow, authMethod, isGoogleConnected, now]);
+  }, [mockScenario, mockCalendars, calendarUrl, scatterWindow, authMethod, isGoogleConnected, now]);
 
   const disconnectGoogle = async () => {
     try {
@@ -244,6 +307,16 @@ export function useCalendar() {
     }
   };
 
+  const toggleCalendar = useCallback((id: string) => {
+    setSelectedCalendarIds((current) => {
+      const next = current.includes(id)
+        ? current.filter((calendarId) => calendarId !== id)
+        : [...current, id];
+      saveSelectedCalendarIds(next);
+      return next;
+    });
+  }, []);
+
   return {
     calendarUrl,
     setCalendarUrl,
@@ -258,8 +331,11 @@ export function useCalendar() {
     refreshCalendar: () => fetchCalendar(now),
     authMethod,
     selectAuthMethod,
-    isGoogleConnected,
+    isGoogleConnected: isGoogleConnected || mockCalendars,
     disconnectGoogle,
     mockScenario,
+    calendars,
+    selectedCalendarIds,
+    toggleCalendar,
   };
 }

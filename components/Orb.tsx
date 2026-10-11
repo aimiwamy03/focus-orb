@@ -43,6 +43,7 @@ export function Orb() {
   const searchParams = useSearchParams();
   const isDemoMode = searchParams.get('demo') === '1';
   const debugScatter = searchParams.get('scatter');
+  const settingsParam = searchParams.get('settings') === '1';
   
   const [scatter, setScatter] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -51,7 +52,8 @@ export function Orb() {
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   
-  const { nextEvent, day, now, scatterWindow } = useCalendar();
+  const calendar = useCalendar();
+  const { nextEvent, day, now, scatterWindow } = calendar;
   const density = densityForModel(day);
   const densityRef = useRef(density);
   const inBusyRef = useRef(day.state === 'in-meeting' || day.state === 'in-run');
@@ -392,6 +394,10 @@ export function Orb() {
   }, [isManualFocus, startFocus, stopFocus]);
 
   useEffect(() => {
+    if (settingsParam) setShowSettings(true);
+  }, [settingsParam]);
+
+  useEffect(() => {
     const onFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFullscreen);
     return () => document.removeEventListener('fullscreenchange', onFullscreen);
@@ -457,6 +463,17 @@ export function Orb() {
         <Settings 
           onClose={() => setShowSettings(false)}
           onStartFocus={startFocus}
+          calendarUrl={calendar.calendarUrl}
+          setCalendarUrl={calendar.setCalendarUrl}
+          scatterWindow={calendar.scatterWindow}
+          setScatterWindow={calendar.setScatterWindow}
+          authMethod={calendar.authMethod}
+          selectAuthMethod={calendar.selectAuthMethod}
+          isGoogleConnected={calendar.isGoogleConnected}
+          disconnectGoogle={calendar.disconnectGoogle}
+          calendars={calendar.calendars}
+          selectedCalendarIds={calendar.selectedCalendarIds}
+          toggleCalendar={calendar.toggleCalendar}
         />
       )}
     </div>
