@@ -5,6 +5,8 @@ import {
 } from "@/lib/calendars";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const session = await auth();

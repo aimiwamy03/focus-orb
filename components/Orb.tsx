@@ -67,7 +67,7 @@ export function Orb() {
     stopFocus 
   } = useManualFocus();
 
-  useLiveTab({
+  const tabTitle = useLiveTab({
     model: day,
     now,
     scatter,
@@ -423,6 +423,7 @@ export function Orb() {
         }
       }}
     >
+      <title>{tabTitle}</title>
       <canvas ref={canvasRef} className="absolute inset-0" />
 
       <StatusLine

@@ -10,7 +10,7 @@ export function useLiveTab(input: {
   scatter: number;
   isManualFocus: boolean;
   focusMinutes: number | null;
-}) {
+}): string {
   const title = formatLiveTabTitle(input.model, input.now, {
     isManualFocus: input.isManualFocus,
     focusMinutes: input.focusMinutes,
@@ -37,4 +37,6 @@ export function useLiveTab(input: {
     lastDrawRef.current = Date.now();
     applyOrbFavicon(state);
   }, [state]);
+
+  return title;
 }
