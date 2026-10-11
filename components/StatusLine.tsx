@@ -5,9 +5,6 @@ interface StatusLineProps {
   detail?: string;
   hovered?: boolean;
   joinUrl?: string | null;
-  nudgeText?: string | null;
-  nudgeButtonLabel?: string | null;
-  onNudgeFocus?: () => void;
 }
 
 export function StatusLine({
@@ -15,12 +12,7 @@ export function StatusLine({
   detail,
   hovered = false,
   joinUrl,
-  nudgeText,
-  nudgeButtonLabel,
-  onNudgeFocus,
 }: StatusLineProps) {
-  const line = nudgeText ?? text;
-
   return (
     <div
       data-testid="status-line"
@@ -38,25 +30,8 @@ export function StatusLine({
       />
       <div className="relative text-[12px] leading-5">
         <span data-text-clear className="inline-block">
-          {line}
-          {nudgeText && nudgeButtonLabel && onNudgeFocus ? (
-            <>
-              {' '}
-              <button
-                type="button"
-                data-testid="nudge-focus"
-                onClick={onNudgeFocus}
-                className={`pointer-events-auto underline underline-offset-2 ${
-                  hovered
-                    ? 'text-white/[0.85] decoration-white/50'
-                    : 'text-white/50 decoration-white/40'
-                }`}
-              >
-                {nudgeButtonLabel}
-              </button>
-            </>
-          ) : null}
-          {!nudgeText && joinUrl ? (
+          {text}
+          {joinUrl ? (
             <>
               {' '}
               <a
@@ -75,7 +50,7 @@ export function StatusLine({
           ) : null}
         </span>
       </div>
-      {hovered && detail && !nudgeText ? (
+      {hovered && detail ? (
         <div
           data-testid="status-detail"
           data-text-clear
