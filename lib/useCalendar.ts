@@ -33,7 +33,7 @@ export function useCalendar() {
   const mockScenario = isMockScenario(mockParam) ? mockParam : null;
 
   const [calendarUrl, setCalendarUrl] = useState<string>('');
-  const [scatterWindow, setScatterWindow] = useState<number>(60);
+  const [scatterWindow, setScatterWindow] = useState<number>(15);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [nextEvent, setNextEvent] = useState<NextEventInfo | null>(null);
   const [now, setNow] = useState(() => parseNowParam(nowParam));

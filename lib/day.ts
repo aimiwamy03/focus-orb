@@ -199,32 +199,41 @@ export function isHeadsUp(model: DayModel, now: Date): boolean {
 
 export function statusLineText(model: DayModel, now: Date): string {
   if (isHeadsUp(model, now) && model.nextEvent) {
-    return model.nextEvent.summary;
+    const minutes = Math.max(1, Math.ceil(minutesBetween(now, model.nextEvent.start)));
+    return `${model.nextEvent.summary} in ${minutes} min.`;
   }
 
-  if (model.state === 'in-run' && model.currentRun) {
-    return `Free at ${formatClock(model.currentRun.end)}`;
+  if (model.state === 'in-run' && model.currentEvent && model.currentRun) {
+    return `In ${model.currentEvent.summary}. Free at ${formatClock(model.currentRun.end)}.`;
   }
 
   if (model.state === 'in-meeting' && model.currentEvent) {
-    const until = formatClock(model.currentEvent.end);
-    const freeAt = model.nextFreeGap;
-    if (freeAt && freeAt.start.getTime() !== model.currentEvent.end.getTime()) {
-      return `In ${model.currentEvent.summary} until ${until} . free at ${formatClock(freeAt.start)}`;
-    }
-    return `In ${model.currentEvent.summary} until ${until}`;
+    return `In ${model.currentEvent.summary}. Free at ${formatClock(model.currentEvent.end)}.`;
   }
+
+  const after = afterMeetingNudge(model, now);
+  if (after) return after.text;
 
   if (!model.nextBusy) {
-    return 'Clear for the rest of the day';
+    return 'Clear for the rest of the day.';
   }
 
-  const until = formatClock(model.nextBusy.start);
-  if (model.nextBusy.events.length >= 2) {
-    return `Free until ${until}, then ${model.nextBusy.events.length} back-to-back until ${formatClock(model.nextBusy.end)}`;
-  }
+  return `Free until ${formatClock(model.nextBusy.start)}. Click the orb to focus.`;
+}
 
-  return `Free until ${until}, then ${model.nextBusy.events[0].summary}`;
+export function focusingLine(minutesLeft: number): string {
+  return `Focusing. ${Math.max(0, Math.floor(minutesLeft))} min left.`;
+}
+
+export const DEFAULT_FOCUS_MINUTES = 50;
+
+export function orbClickMinutes(model: DayModel, now: Date): number | null {
+  if (model.state !== 'free') return null;
+  if (isHeadsUp(model, now)) return null;
+  const smart = smartFocusOption(now, model.nextEvent?.start ?? null);
+  if (smart) return smart.minutes;
+  if (!model.nextEvent) return DEFAULT_FOCUS_MINUTES;
+  return null;
 }
 
 export function hoverDetailText(model: DayModel, now: Date): string {
@@ -304,15 +313,27 @@ export function afterMeetingNudge(model: DayModel, now: Date): AfterMeetingNudge
   const minutesSinceEnd = minutesBetween(ended.end, now);
   if (minutesSinceEnd < 0 || minutesSinceEnd > NUDGE_WINDOW_MINUTES) return null;
 
-  const nextStart = model.nextEvent?.start ?? endOfDay(now);
-  const gap = minutesBetween(now, nextStart);
+  if (!model.nextEvent) {
+    const focus =
+      smartFocusOption(now, endOfDay(now)) ?? {
+        end: new Date(now.getTime() + DEFAULT_FOCUS_MINUTES * 60 * 1000),
+        minutes: DEFAULT_FOCUS_MINUTES,
+      };
+    return {
+      text: 'Clear for the rest of the day. Click the orb to focus.',
+      focus,
+      endedEvent: ended,
+    };
+  }
+
+  const gap = minutesBetween(now, model.nextEvent.start);
   if (gap < NUDGE_MIN_GAP_MINUTES) return null;
 
-  const focus = smartFocusOption(now, nextStart);
+  const focus = smartFocusOption(now, model.nextEvent.start);
   if (!focus) return null;
 
   return {
-    text: `Free for ${formatCompactDuration(gap)}. Start focus?`,
+    text: `Free for ${formatCompactDuration(gap)}. Click the orb to focus.`,
     focus,
     endedEvent: ended,
   };

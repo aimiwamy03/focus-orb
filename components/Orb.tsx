@@ -6,14 +6,15 @@ import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
-import { afterMeetingNudge, densityForModel, extractJoinUrl, formatClock, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
+import { densityForModel, extractJoinUrl, focusingLine, hoverDetailText, isHeadsUp, minutesBetween, orbClickMinutes, smartFocusOption, statusLineText } from '@/lib/day';
 import { collectTextClearRects, textClearAlpha } from '@/lib/textClear';
 import { Settings } from './Settings';
-import { Handbook } from './Handbook';
+import { Hints, markHintSeen } from './Hints';
 import { FocusControl } from './FocusControl';
 import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
 import { Satellites } from './Satellites';
+import { Welcome } from './Welcome';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -51,8 +52,14 @@ export function Orb() {
   const [showOverlay, setShowOverlay] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [nudgeDismissed, setNudgeDismissed] = useState(false);
+  const [orbHovered, setOrbHovered] = useState(false);
+  const [stopArmed, setStopArmed] = useState(false);
+  const [hintRev, setHintRev] = useState(0);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const gatherUntilRef = useRef(0);
+  const hoverBoostRef = useRef(1);
+  const prevBusyRef = useRef(false);
+  const prevFocusRef = useRef(false);
   
   const calendar = useCalendar();
   const { nextEvent, day, now, scatterWindow } = calendar;
@@ -77,28 +84,45 @@ export function Orb() {
     focusMinutes: manualTimeRemaining,
   });
 
-  const nudge = !isManualFocus ? afterMeetingNudge(day, now) : null;
-  const visibleNudge = nudge && !nudgeDismissed ? nudge : null;
+  const firstOpen =
+    !calendar.mockScenario &&
+    !calendar.isGoogleConnected &&
+    !calendar.calendarUrl &&
+    calendar.authMethod !== 'google' &&
+    calendar.authMethod !== 'ical';
+
+  const showChrome = !firstOpen && (showOverlay || hoverParam);
+
+  const line = stopArmed
+    ? 'Click again to stop'
+    : isManualFocus && manualTimeRemaining !== null
+      ? focusingLine(manualTimeRemaining)
+      : statusLineText(day, now);
 
   useEffect(() => {
-    setNudgeDismissed(false);
-  }, [nudge?.endedEvent.end.getTime(), nudge?.focus.minutes]);
+    gatherUntilRef.current = performance.now() + 2000;
+  }, []);
 
   useEffect(() => {
-    if (!visibleNudge) return;
+    const busy = day.state === 'in-meeting' || day.state === 'in-run';
+    if (prevBusyRef.current && !busy) {
+      gatherUntilRef.current = performance.now() + 2000;
+    }
+    prevBusyRef.current = busy;
+  }, [day.state]);
 
-    const timeout = window.setTimeout(() => setNudgeDismissed(true), 3 * 60 * 1000);
-    const onClick = () => setNudgeDismissed(true);
-    const attach = window.setTimeout(() => {
-      document.addEventListener('click', onClick);
-    }, 0);
+  useEffect(() => {
+    if (prevFocusRef.current && !isManualFocus) {
+      gatherUntilRef.current = performance.now() + 2000;
+    }
+    prevFocusRef.current = isManualFocus;
+  }, [isManualFocus]);
 
-    return () => {
-      window.clearTimeout(timeout);
-      window.clearTimeout(attach);
-      document.removeEventListener('click', onClick);
-    };
-  }, [visibleNudge]);
+  useEffect(() => {
+    if (!stopArmed) return;
+    const timeout = window.setTimeout(() => setStopArmed(false), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [stopArmed]);
 
   // Generate points once (will be regenerated on resize)
   const generatePoints = useCallback((radius: number) => {
@@ -258,6 +282,7 @@ export function Orb() {
     window.addEventListener('resize', resize);
     
     let time = 0;
+    gatherUntilRef.current = Math.max(gatherUntilRef.current, performance.now() + 2000);
     
     const render = () => {
       time += 0.008;
@@ -266,13 +291,18 @@ export function Orb() {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
       const radius = Math.min(canvas.width, canvas.height) * 0.20;
+      const gatherLeft = gatherUntilRef.current - performance.now();
+      const gatherT = gatherLeft <= 0 ? 0 : (gatherLeft / 2000) ** 2;
+      const visualScatter = gatherT + (1 - gatherT) * scatter;
+      const hoverBoost = hoverBoostRef.current;
+      const breatheAmp = visualScatter < 0.05 ? 0.05 : 0.03;
       
       // Clear with dark background
       ctx.fillStyle = '#161616';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
       // Breathing: subtle scale pulse (3%) and threshold shimmer
-      const breatheScale = 1 + Math.sin(time * 0.5) * 0.03;
+      const breatheScale = 1 + Math.sin(time * 0.45) * breatheAmp;
       
       // Re-randomize a small fraction of thresholds for shimmer effect
       if (Math.random() < 0.01) {
@@ -286,17 +316,17 @@ export function Orb() {
       
       for (const point of pointsRef.current) {
         // Per-point escape model
-        const progress = scatter <= point.escapeAt 
+        const progress = visualScatter <= point.escapeAt 
           ? 0 
-          : Math.min(1, (scatter - point.escapeAt) / (1 - point.escapeAt + 1e-6));
+          : Math.min(1, (visualScatter - point.escapeAt) / (1 - point.escapeAt + 1e-6));
         
         // Keep probability based on escape state.
         // Gap-aware brightness scales only the starting keep probability.
-        const startingKeep = point.shade * densityRef.current;
+        const startingKeep = point.shade * densityRef.current * hoverBoost;
         let keepProb: number;
         if (progress === 0) {
           // Non-escaped: shade with gentle dimming
-          keepProb = startingKeep * (1 - 0.4 * scatter);
+          keepProb = startingKeep * (1 - 0.4 * visualScatter);
         } else {
           // Escaped: fade as it travels
           keepProb = startingKeep * (1 - 0.75 * progress);
@@ -381,6 +411,8 @@ export function Orb() {
       }
       
       if (e.key === 'f') {
+        markHintSeen('fullscreen');
+        setHintRev((n) => n + 1);
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen();
           setIsFullscreen(true);
@@ -404,6 +436,38 @@ export function Orb() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isManualFocus, startFocus, stopFocus]);
 
+  const bumpHint = (id: 'click' | 'hover' | 'fullscreen') => {
+    markHintSeen(id);
+    setHintRev((n) => n + 1);
+  };
+
+  const isOverOrb = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    const rect = canvas.getBoundingClientRect();
+    const dx = clientX - (rect.left + rect.width / 2);
+    const dy = clientY - (rect.top + rect.height / 2);
+    const r = Math.min(rect.width, rect.height) * 0.2;
+    return dx * dx + dy * dy <= r * r;
+  };
+
+  const handleOrbClick = () => {
+    if (firstOpen) return;
+    if (isManualFocus) {
+      if (stopArmed) {
+        stopFocus();
+        setStopArmed(false);
+      } else {
+        setStopArmed(true);
+      }
+      return;
+    }
+    const minutes = orbClickMinutes(day, now);
+    if (minutes == null) return;
+    startFocus(minutes);
+    bumpHint('click');
+  };
+
   useEffect(() => {
     if (settingsParam) setShowSettings(true);
   }, [settingsParam]);
@@ -416,60 +480,89 @@ export function Orb() {
 
   return (
     <div 
-      className="relative w-screen h-screen overflow-hidden"
+      className={`relative h-screen w-screen overflow-hidden ${
+        firstOpen || showChrome || orbHovered ? '' : 'cursor-none'
+      }`}
       data-satellites={day.remainingInRun.length}
-      onMouseMove={() => {
-        setShowOverlay(true);
-        if (overlayTimeoutRef.current) {
-          clearTimeout(overlayTimeoutRef.current);
+      onMouseMove={(e) => {
+        const over = isOverOrb(e.clientX, e.clientY);
+        setOrbHovered(over);
+        hoverBoostRef.current = over ? 1.12 : 1;
+        if (!firstOpen) {
+          setShowOverlay(true);
+          if (overlayTimeoutRef.current) {
+            clearTimeout(overlayTimeoutRef.current);
+          }
+          overlayTimeoutRef.current = setTimeout(() => {
+            setShowOverlay(false);
+          }, 3000);
         }
-        overlayTimeoutRef.current = setTimeout(() => {
-          setShowOverlay(false);
-        }, 3000);
       }}
       onMouseLeave={() => {
         setShowOverlay(false);
+        setOrbHovered(false);
+        hoverBoostRef.current = 1;
         if (overlayTimeoutRef.current) {
           clearTimeout(overlayTimeoutRef.current);
         }
       }}
     >
       <title>{tabTitle}</title>
-      <canvas ref={canvasRef} className="absolute inset-0" />
-
-      <StatusLine
-        text={statusLineText(day, now)}
-        detail={hoverDetailText(day, now)}
-        hovered={showOverlay || hoverParam}
-        joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
-        nudgeText={visibleNudge?.text ?? null}
-        nudgeButtonLabel={
-          visibleNudge ? `Focus until ${formatClock(visibleNudge.focus.end)}` : null
-        }
-        onNudgeFocus={() => {
-          if (!visibleNudge) return;
-          startFocus(visibleNudge.focus.minutes);
-          setNudgeDismissed(true);
+      <canvas
+        ref={canvasRef}
+        data-testid="orb-canvas"
+        className={`absolute inset-0 ${orbHovered && !firstOpen ? 'cursor-pointer' : ''}`}
+        onClick={(e) => {
+          if (isOverOrb(e.clientX, e.clientY)) handleOrbClick();
         }}
       />
 
+      {firstOpen ? (
+        <Welcome onConnect={() => setShowSettings(true)} />
+      ) : (
+        <StatusLine
+          text={line}
+          detail={hoverDetailText(day, now)}
+          hovered={showOverlay || hoverParam}
+          joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
+        />
+      )}
+
       <Satellites count={day.state === 'in-run' ? day.remainingInRun.length : 0} />
 
-      <Timeline
-        events={day.events}
-        now={now}
-        hidden={isFullscreen && !showOverlay}
-      />
-      
-      <Handbook />
-      
-      <FocusControl
-        isActive={isManualFocus}
-        timeRemaining={manualTimeRemaining}
-        onStart={startFocus}
-        onStop={stopFocus}
-        smartFocus={day.state === 'free' ? smartFocusOption(now, day.nextEvent?.start ?? null) : null}
-      />
+      {!firstOpen ? (
+        <div
+          className={`transition-opacity duration-300 ${
+            showChrome
+              ? 'visible opacity-100'
+              : 'invisible pointer-events-none opacity-0'
+          }`}
+        >
+          <Timeline
+            events={day.events}
+            now={now}
+            hidden={isFullscreen && !showOverlay}
+          />
+          <FocusControl
+            isActive={isManualFocus}
+            timeRemaining={manualTimeRemaining}
+            onStart={startFocus}
+            onStop={stopFocus}
+            smartFocus={day.state === 'free' ? smartFocusOption(now, day.nextEvent?.start ?? null) : null}
+          />
+          <button
+            type="button"
+            data-testid="settings-gear"
+            onClick={() => setShowSettings(true)}
+            className="fixed top-4 right-4 z-40 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+            aria-label="Settings"
+          >
+            ⚙
+          </button>
+        </div>
+      ) : null}
+
+      <Hints active={!firstOpen} chromeVisible={showChrome} revision={hintRev} />
       
       {showSettings && (
         <Settings 
