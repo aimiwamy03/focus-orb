@@ -1,58 +1,30 @@
 import { auth } from "@/lib/auth";
 import {
-  fetchGoogleCalendarList,
-  fetchMergedGoogleEvents,
-} from "@/lib/calendars";
+  googleCalendarErrorResult,
+  handleGoogleCalendarGet,
+} from "@/lib/googleCalendarRequest";
+import { connection } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
+  // Wait for the incoming request. Catching auth()/headers() during
+  // prerender used to complete the route as a static 500.
+  await connection();
+
   try {
     const session = await auth();
-
-    if (!session?.accessToken) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const url = new URL(request.url);
-    const accessToken = session.accessToken;
-
-    if (url.searchParams.get("list") === "1") {
-      const calendars = await fetchGoogleCalendarList(accessToken);
-      return NextResponse.json({ calendars });
-    }
-
-    const now = new Date();
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const calendarIds = (url.searchParams.get("calendars") ?? "primary")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean);
-
-    const events = await fetchMergedGoogleEvents(accessToken, calendarIds, {
-      timeMin: startOfDay.toISOString(),
-      timeMax: endOfDay.toISOString(),
+    const result = await handleGoogleCalendarGet({
+      session,
+      url: new URL(request.url),
     });
-
-    return NextResponse.json({
-      events: events.map((event) => ({
-        ...event,
-        start: event.start.toISOString(),
-        end: event.end.toISOString(),
-      })),
-    });
+    return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch events";
-    if (message.includes("401")) {
-      return NextResponse.json({ error: "Token expired" }, { status: 401 });
+    unstable_rethrow(error);
+    const result = googleCalendarErrorResult(error);
+    if (result.status >= 500) {
+      console.error("Failed to fetch Google Calendar events:", error);
     }
-    console.error("Failed to fetch Google Calendar events:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch events" },
-      { status: 500 }
-    );
+    return NextResponse.json(result.body, { status: result.status });
   }
 }

@@ -1,39 +1,47 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import {
+  applyGoogleAccountToToken,
+  attachGoogleAccessToSession,
+  GOOGLE_CALENDAR_SCOPES,
+  googleClientId,
+  googleClientSecret,
+  googleJwtNeedsRefresh,
+  isGoogleAuthConfigured,
+  refreshGoogleAccessToken,
+  type GoogleToken,
+} from "@/lib/googleAuth";
 
-const isConfigured = 
-  process.env.GOOGLE_CLIENT_ID && 
-  process.env.GOOGLE_CLIENT_SECRET &&
-  process.env.NEXTAUTH_SECRET;
+const googleId = googleClientId();
+const googleSecret = googleClientSecret();
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  providers: isConfigured ? [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: "openid email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly",
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    }),
-  ] : [],
+  trustHost: true,
+  providers: isGoogleAuthConfigured() && googleId && googleSecret
+    ? [
+        Google({
+          clientId: googleId,
+          clientSecret: googleSecret,
+          authorization: {
+            params: {
+              scope: GOOGLE_CALENDAR_SCOPES,
+              access_type: "offline",
+              prompt: "consent",
+            },
+          },
+        }),
+      ]
+    : [],
   callbacks: {
     async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.expiresAt = account.expires_at;
-      }
-      return token;
+      const googleToken = applyGoogleAccountToToken(token as GoogleToken, account);
+      if (account?.access_token) return { ...token, ...googleToken };
+      if (!googleJwtNeedsRefresh(googleToken)) return { ...token, ...googleToken };
+      const refreshed = await refreshGoogleAccessToken(googleToken);
+      return { ...token, ...refreshed };
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken as string;
-      session.refreshToken = token.refreshToken as string;
-      session.expiresAt = token.expiresAt as number;
-      return session;
+      return attachGoogleAccessToSession(session, token as GoogleToken);
     },
   },
   session: {
