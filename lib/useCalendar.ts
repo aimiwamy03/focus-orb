@@ -12,6 +12,7 @@ import {
   resolveSelectedCalendarIds,
   saveSelectedCalendarIds,
 } from './calendars';
+import { interpretAuthSession, shouldUseGoogleFromSession } from './onboarding';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const STORAGE_KEY = 'focusOrb:calendarUrl';
@@ -81,27 +82,47 @@ export function useCalendar() {
     }
   }, [mockCalendars]);
 
-  // Only talk to Google when the user already chose that auth method.
-  // An unauthenticated probe 401s and dirties the browser console.
+  // Sign-in redirects away before Settings can write localStorage, so a
+  // signed-in user must be detected from the NextAuth session, not only
+  // from focusOrb:authMethod.
   useEffect(() => {
     if (mockScenario || mockCalendars) return;
-    if (authMethod !== 'google') return;
 
-    const checkGoogleAuth = async () => {
+    let cancelled = false;
+
+    const syncGoogleSession = async () => {
       try {
+        const sessionResponse = await fetch('/api/auth/session');
+        if (!sessionResponse.ok) return;
+        const view = interpretAuthSession(await sessionResponse.json());
+        if (cancelled) return;
+
+        const storedMethod = localStorage.getItem(AUTH_METHOD_KEY);
+        if (shouldUseGoogleFromSession(view)) {
+          setAuthMethod('google');
+          localStorage.setItem(AUTH_METHOD_KEY, 'google');
+        } else if (storedMethod !== 'google') {
+          return;
+        }
+
         const response = await fetch('/api/calendar/google');
+        if (cancelled) return;
         setIsGoogleConnected(response.ok);
         if (!response.ok && response.status === 401) {
           setAuthMethod(null);
+          setIsGoogleConnected(false);
           localStorage.removeItem(AUTH_METHOD_KEY);
         }
       } catch {
-        setIsGoogleConnected(false);
+        if (!cancelled) setIsGoogleConnected(false);
       }
     };
-    
-    checkGoogleAuth();
-  }, [authMethod, mockScenario, mockCalendars]);
+
+    syncGoogleSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [mockScenario, mockCalendars]);
 
   // Save settings to localStorage
   useEffect(() => {

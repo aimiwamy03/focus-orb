@@ -15,6 +15,7 @@ import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
 import { Satellites } from './Satellites';
 import { Welcome } from './Welcome';
+import { isFirstOpen } from '@/lib/onboarding';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -84,12 +85,12 @@ export function Orb() {
     focusMinutes: manualTimeRemaining,
   });
 
-  const firstOpen =
-    !calendar.mockScenario &&
-    !calendar.isGoogleConnected &&
-    !calendar.calendarUrl &&
-    calendar.authMethod !== 'google' &&
-    calendar.authMethod !== 'ical';
+  const firstOpen = isFirstOpen({
+    mockScenario: calendar.mockScenario,
+    isGoogleConnected: calendar.isGoogleConnected,
+    calendarUrl: calendar.calendarUrl,
+    authMethod: calendar.authMethod,
+  });
 
   const showChrome = !firstOpen && (showOverlay || hoverParam);
 

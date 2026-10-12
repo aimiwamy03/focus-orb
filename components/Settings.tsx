@@ -49,8 +49,9 @@ export function Settings({
   const handleGoogleConnect = async () => {
     setIsConnecting(true);
     try {
-      await signInWithGoogle();
+      // Persist before redirect — signIn() never returns to this page.
       selectAuthMethod('google');
+      await signInWithGoogle();
     } catch (error) {
       console.error('Failed to connect:', error);
       setIsConnecting(false);
