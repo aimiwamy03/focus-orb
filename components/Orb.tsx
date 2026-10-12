@@ -5,8 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
-import { useTabTitle } from '@/lib/useTabTitle';
-import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
+import { useLiveTab } from '@/lib/useLiveTab';
+import { afterMeetingNudge, densityForModel, extractJoinUrl, formatClock, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
+import { collectTextClearRects, textClearAlpha } from '@/lib/textClear';
 import { Settings } from './Settings';
 import { Handbook } from './Handbook';
 import { FocusControl } from './FocusControl';
@@ -43,14 +44,18 @@ export function Orb() {
   const searchParams = useSearchParams();
   const isDemoMode = searchParams.get('demo') === '1';
   const debugScatter = searchParams.get('scatter');
+  const settingsParam = searchParams.get('settings') === '1';
+  const hoverParam = searchParams.get('hover') === '1';
   
   const [scatter, setScatter] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   
-  const { nextEvent, day, now, scatterWindow } = useCalendar();
+  const calendar = useCalendar();
+  const { nextEvent, day, now, scatterWindow } = calendar;
   const density = densityForModel(day);
   const densityRef = useRef(density);
   const inBusyRef = useRef(day.state === 'in-meeting' || day.state === 'in-run');
@@ -64,11 +69,36 @@ export function Orb() {
     stopFocus 
   } = useManualFocus();
 
-  // Update tab title based on time remaining
-  const minutesForTab = isManualFocus && manualTimeRemaining !== null
-    ? manualTimeRemaining
-    : nextEvent?.minutesToStart ?? null;
-  useTabTitle(minutesForTab, isManualFocus);
+  const tabTitle = useLiveTab({
+    model: day,
+    now,
+    scatter,
+    isManualFocus,
+    focusMinutes: manualTimeRemaining,
+  });
+
+  const nudge = !isManualFocus ? afterMeetingNudge(day, now) : null;
+  const visibleNudge = nudge && !nudgeDismissed ? nudge : null;
+
+  useEffect(() => {
+    setNudgeDismissed(false);
+  }, [nudge?.endedEvent.end.getTime(), nudge?.focus.minutes]);
+
+  useEffect(() => {
+    if (!visibleNudge) return;
+
+    const timeout = window.setTimeout(() => setNudgeDismissed(true), 3 * 60 * 1000);
+    const onClick = () => setNudgeDismissed(true);
+    const attach = window.setTimeout(() => {
+      document.addEventListener('click', onClick);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearTimeout(attach);
+      document.removeEventListener('click', onClick);
+    };
+  }, [visibleNudge]);
 
   // Generate points once (will be regenerated on resize)
   const generatePoints = useCallback((radius: number) => {
@@ -250,7 +280,8 @@ export function Orb() {
         pointsRef.current[idx].threshold = Math.random();
       }
       
-      // Draw all points
+      // Draw all points, skipping or fading any that sit under text.
+      const clearRects = collectTextClearRects();
       ctx.fillStyle = '#ffffff';
       
       for (const point of pointsRef.current) {
@@ -309,10 +340,18 @@ export function Orb() {
         
         const screenX = centerX + x;
         const screenY = centerY + y;
+        const clearAlpha = textClearAlpha(screenX / dpr, screenY / dpr, clearRects);
+        if (clearAlpha <= 0) continue;
         
         // Draw 2x2 CSS pixel dots (scaled by DPR for consistent visual size)
         const dotSize = 2 * dpr;
-        ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
+        if (clearAlpha < 1) {
+          ctx.fillStyle = `rgba(255,255,255,${clearAlpha})`;
+          ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
+          ctx.fillStyle = '#ffffff';
+        } else {
+          ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
+        }
       }
       
       // Dim during a meeting or back-to-back run
@@ -366,6 +405,10 @@ export function Orb() {
   }, [isManualFocus, startFocus, stopFocus]);
 
   useEffect(() => {
+    if (settingsParam) setShowSettings(true);
+  }, [settingsParam]);
+
+  useEffect(() => {
     const onFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFullscreen);
     return () => document.removeEventListener('fullscreenchange', onFullscreen);
@@ -391,13 +434,23 @@ export function Orb() {
         }
       }}
     >
+      <title>{tabTitle}</title>
       <canvas ref={canvasRef} className="absolute inset-0" />
 
       <StatusLine
         text={statusLineText(day, now)}
         detail={hoverDetailText(day, now)}
-        hovered={showOverlay}
+        hovered={showOverlay || hoverParam}
         joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
+        nudgeText={visibleNudge?.text ?? null}
+        nudgeButtonLabel={
+          visibleNudge ? `Focus until ${formatClock(visibleNudge.focus.end)}` : null
+        }
+        onNudgeFocus={() => {
+          if (!visibleNudge) return;
+          startFocus(visibleNudge.focus.minutes);
+          setNudgeDismissed(true);
+        }}
       />
 
       <Satellites count={day.state === 'in-run' ? day.remainingInRun.length : 0} />
@@ -422,6 +475,17 @@ export function Orb() {
         <Settings 
           onClose={() => setShowSettings(false)}
           onStartFocus={startFocus}
+          calendarUrl={calendar.calendarUrl}
+          setCalendarUrl={calendar.setCalendarUrl}
+          scatterWindow={calendar.scatterWindow}
+          setScatterWindow={calendar.setScatterWindow}
+          authMethod={calendar.authMethod}
+          selectAuthMethod={calendar.selectAuthMethod}
+          isGoogleConnected={calendar.isGoogleConnected}
+          disconnectGoogle={calendar.disconnectGoogle}
+          calendars={calendar.calendars}
+          selectedCalendarIds={calendar.selectedCalendarIds}
+          toggleCalendar={calendar.toggleCalendar}
         />
       )}
     </div>

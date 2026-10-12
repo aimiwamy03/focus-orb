@@ -1,25 +1,41 @@
 'use client';
 
 import { useState } from 'react';
-import { useCalendar } from '@/lib/useCalendar';
 import { signInWithGoogle } from '@/app/actions';
+import { CalendarInfo } from '@/lib/calendars';
+
+type AuthMethod = 'google' | 'ical' | null;
 
 interface SettingsProps {
   onClose: () => void;
   onStartFocus: (duration: number) => void;
+  calendarUrl: string;
+  setCalendarUrl: (url: string) => void;
+  scatterWindow: number;
+  setScatterWindow: (minutes: number) => void;
+  authMethod: AuthMethod;
+  selectAuthMethod: (method: AuthMethod) => void;
+  isGoogleConnected: boolean;
+  disconnectGoogle: () => Promise<void>;
+  calendars: CalendarInfo[];
+  selectedCalendarIds: string[];
+  toggleCalendar: (id: string) => void;
 }
 
-export function Settings({ onClose, onStartFocus }: SettingsProps) {
-  const { 
-    calendarUrl, 
-    setCalendarUrl, 
-    scatterWindow, 
-    setScatterWindow,
-    authMethod,
-    selectAuthMethod,
-    isGoogleConnected,
-    disconnectGoogle,
-  } = useCalendar();
+export function Settings({
+  onClose,
+  onStartFocus,
+  calendarUrl,
+  setCalendarUrl,
+  scatterWindow,
+  setScatterWindow,
+  selectAuthMethod,
+  isGoogleConnected,
+  disconnectGoogle,
+  calendars,
+  selectedCalendarIds,
+  toggleCalendar,
+}: SettingsProps) {
   const [tempUrl, setTempUrl] = useState(calendarUrl);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -67,10 +83,34 @@ export function Settings({ onClose, onStartFocus }: SettingsProps) {
             Google Calendar
           </label>
           {isGoogleConnected ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded text-white text-sm">
                 ✓ Connected
               </div>
+              {calendars.length > 0 ? (
+                <div data-testid="calendar-picker" className="space-y-2">
+                  <p className="text-xs text-zinc-500">Calendars</p>
+                  {calendars.map((calendar) => (
+                    <label
+                      key={calendar.id}
+                      className="flex items-center gap-2 text-sm text-zinc-200"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCalendarIds.includes(calendar.id)}
+                        onChange={() => toggleCalendar(calendar.id)}
+                        className="rounded border-zinc-600 bg-zinc-800"
+                      />
+                      <span>
+                        {calendar.summary}
+                        {calendar.primary ? (
+                          <span className="text-zinc-500"> (primary)</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
               <button
                 onClick={handleDisconnect}
                 className="w-full px-3 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors text-sm"

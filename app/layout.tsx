@@ -13,7 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Focus Orb",
+  title: {
+    default: "Focus Orb",
+    template: "%s",
+  },
   description: "A dithered particle sphere that visualizes focus time and upcoming meetings",
 };
 

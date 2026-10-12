@@ -4,6 +4,8 @@ export const MERGE_GAP_MINUTES = 5;
 export const HEADS_UP_MINUTES = 5;
 export const SMART_FOCUS_BUFFER_MINUTES = 5;
 export const SMART_FOCUS_MIN_MINUTES = 10;
+export const NUDGE_MIN_GAP_MINUTES = 25;
+export const NUDGE_WINDOW_MINUTES = 3;
 
 export type DayState = 'free' | 'in-meeting' | 'in-run';
 
@@ -273,6 +275,46 @@ export function smartFocusOption(now: Date, nextMeetingStart: Date | null): Smar
   return {
     end: new Date(now.getTime() + minutes * 60 * 1000),
     minutes,
+  };
+}
+
+export function formatCompactDuration(minutes: number): string {
+  const mins = Math.max(0, Math.floor(minutes));
+  const hours = Math.floor(mins / 60);
+  const rem = mins % 60;
+  if (hours > 0) return rem > 0 ? `${hours}h ${rem}m` : `${hours}h`;
+  return `${mins}m`;
+}
+
+export interface AfterMeetingNudge {
+  text: string;
+  focus: SmartFocusOption;
+  endedEvent: CalendarEvent;
+}
+
+export function afterMeetingNudge(model: DayModel, now: Date): AfterMeetingNudge | null {
+  if (model.state !== 'free') return null;
+
+  const ended = [...model.events]
+    .filter((event) => event.end.getTime() <= now.getTime())
+    .sort((a, b) => b.end.getTime() - a.end.getTime())[0];
+
+  if (!ended) return null;
+
+  const minutesSinceEnd = minutesBetween(ended.end, now);
+  if (minutesSinceEnd < 0 || minutesSinceEnd > NUDGE_WINDOW_MINUTES) return null;
+
+  const nextStart = model.nextEvent?.start ?? endOfDay(now);
+  const gap = minutesBetween(now, nextStart);
+  if (gap < NUDGE_MIN_GAP_MINUTES) return null;
+
+  const focus = smartFocusOption(now, nextStart);
+  if (!focus) return null;
+
+  return {
+    text: `Free for ${formatCompactDuration(gap)}. Start focus?`,
+    focus,
+    endedEvent: ended,
   };
 }
 
