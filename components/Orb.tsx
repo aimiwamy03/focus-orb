@@ -6,10 +6,13 @@ import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useTabTitle } from '@/lib/useTabTitle';
+import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
 import { Settings } from './Settings';
-import { Overlay } from './Overlay';
 import { Handbook } from './Handbook';
 import { FocusControl } from './FocusControl';
+import { StatusLine } from './StatusLine';
+import { Timeline } from './Timeline';
+import { Satellites } from './Satellites';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -47,7 +50,12 @@ export function Orb() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   
-  const { nextEvent, refreshCalendar } = useCalendar();
+  const { nextEvent, day, now, scatterWindow } = useCalendar();
+  const density = densityForModel(day);
+  const densityRef = useRef(density);
+  const inBusyRef = useRef(day.state === 'in-meeting' || day.state === 'in-run');
+  densityRef.current = density;
+  inBusyRef.current = day.state === 'in-meeting' || day.state === 'in-run';
   const { 
     isActive: isManualFocus, 
     timeRemaining: manualTimeRemaining,
@@ -171,10 +179,11 @@ export function Orb() {
         // Manual focus: use calculateManualScatter with total duration
         const manualScatter = calculateManualScatter(manualTimeRemaining, manualTotalDuration);
         setScatter(manualScatter);
-      } else if (nextEvent) {
-        // Calendar event
-        const scatter = calculateScatter(nextEvent.minutesToStart, nextEvent.scatterWindow);
-        setScatter(scatter);
+      } else if (day.state === 'in-meeting' || day.state === 'in-run') {
+        setScatter(1);
+      } else if (day.nextEvent) {
+        const minutesToStart = minutesBetween(now, day.nextEvent.start);
+        setScatter(calculateScatter(minutesToStart, scatterWindow));
       } else {
         // No meetings left today
         setScatter(0);
@@ -184,7 +193,7 @@ export function Orb() {
     updateScatter();
     const interval = setInterval(updateScatter, 1000);
     return () => clearInterval(interval);
-  }, [isDemoMode, debugScatter, nextEvent, isManualFocus, manualTimeRemaining, manualTotalDuration]);
+  }, [isDemoMode, debugScatter, day, now, scatterWindow, isManualFocus, manualTimeRemaining, manualTotalDuration]);
 
   // Canvas rendering with true 2D random point sampling
   useEffect(() => {
@@ -250,14 +259,16 @@ export function Orb() {
           ? 0 
           : Math.min(1, (scatter - point.escapeAt) / (1 - point.escapeAt + 1e-6));
         
-        // Keep probability based on escape state
+        // Keep probability based on escape state.
+        // Gap-aware brightness scales only the starting keep probability.
+        const startingKeep = point.shade * densityRef.current;
         let keepProb: number;
         if (progress === 0) {
           // Non-escaped: shade with gentle dimming
-          keepProb = point.shade * (1 - 0.4 * scatter);
+          keepProb = startingKeep * (1 - 0.4 * scatter);
         } else {
           // Escaped: fade as it travels
-          keepProb = point.shade * (1 - 0.75 * progress);
+          keepProb = startingKeep * (1 - 0.75 * progress);
         }
         
         // Skip if below threshold
@@ -304,8 +315,8 @@ export function Orb() {
         ctx.fillRect(Math.floor(screenX), Math.floor(screenY), dotSize, dotSize);
       }
       
-      // Dim during meeting
-      if (nextEvent && nextEvent.minutesToStart <= 0) {
+      // Dim during a meeting or back-to-back run
+      if (inBusyRef.current) {
         ctx.fillStyle = 'rgba(22, 22, 22, 0.75)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
@@ -354,9 +365,16 @@ export function Orb() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isManualFocus, startFocus, stopFocus]);
 
+  useEffect(() => {
+    const onFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFullscreen);
+    return () => document.removeEventListener('fullscreenchange', onFullscreen);
+  }, []);
+
   return (
     <div 
       className="relative w-screen h-screen overflow-hidden"
+      data-satellites={day.remainingInRun.length}
       onMouseMove={() => {
         setShowOverlay(true);
         if (overlayTimeoutRef.current) {
@@ -374,6 +392,21 @@ export function Orb() {
       }}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
+
+      <StatusLine
+        text={statusLineText(day, now)}
+        detail={hoverDetailText(day, now)}
+        hovered={showOverlay}
+        joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
+      />
+
+      <Satellites count={day.state === 'in-run' ? day.remainingInRun.length : 0} />
+
+      <Timeline
+        events={day.events}
+        now={now}
+        hidden={isFullscreen && !showOverlay}
+      />
       
       <Handbook />
       
@@ -382,13 +415,7 @@ export function Orb() {
         timeRemaining={manualTimeRemaining}
         onStart={startFocus}
         onStop={stopFocus}
-      />
-      
-      <Overlay 
-        show={showOverlay}
-        nextEvent={nextEvent}
-        isManualFocus={isManualFocus}
-        manualTimeRemaining={manualTimeRemaining}
+        smartFocus={day.state === 'free' ? smartFocusOption(now, day.nextEvent?.start ?? null) : null}
       />
       
       {showSettings && (

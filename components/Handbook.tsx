@@ -2,26 +2,29 @@
 
 import { useState, useEffect } from 'react';
 
-const STORAGE_KEY = 'focusOrb:handbookCollapsed';
+const SEEN_KEY = 'focusOrb:guideSeen';
 
 export function Handbook() {
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [isFirstVisit, setIsFirstVisit] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === null) {
-      setIsFirstVisit(true);
-      setIsCollapsed(false);
-    } else {
-      setIsCollapsed(stored === 'true');
+    const seen = localStorage.getItem(SEEN_KEY);
+    if (seen === 'true') {
+      setIsCollapsed(true);
+      return;
     }
+
+    setIsCollapsed(false);
+
+    // Remember the visit on leave so Strict Mode remounts don't close the guide
+    // during the first session. The next load starts closed.
+    const markSeen = () => localStorage.setItem(SEEN_KEY, 'true');
+    window.addEventListener('pagehide', markSeen);
+    return () => window.removeEventListener('pagehide', markSeen);
   }, []);
 
   const toggle = () => {
-    const newState = !isCollapsed;
-    setIsCollapsed(newState);
-    localStorage.setItem(STORAGE_KEY, String(newState));
+    setIsCollapsed((prev) => !prev);
   };
 
   useEffect(() => {

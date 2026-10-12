@@ -4,6 +4,13 @@ export interface CalendarEvent {
   end: Date;
   isAllDay: boolean;
   rrule?: string;
+  status?: 'confirmed' | 'tentative' | 'cancelled';
+  transparency?: 'opaque' | 'transparent';
+  declined?: boolean;
+  hangoutLink?: string;
+  location?: string;
+  description?: string;
+  conferenceUri?: string;
 }
 
 export interface NextEventInfo {
@@ -61,14 +68,31 @@ export function parseICS(icsContent: string): CalendarEvent[] {
       } else if (key.startsWith('DTEND')) {
         currentEvent.end = parseICSDate(value);
       } else if (key === 'SUMMARY') {
-        currentEvent.summary = value.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, '\n');
+        currentEvent.summary = unescapeICS(value);
       } else if (key === 'RRULE') {
         currentEvent.rrule = value;
+      } else if (key === 'TRANSP') {
+        currentEvent.transparency = value === 'TRANSPARENT' ? 'transparent' : 'opaque';
+      } else if (key === 'STATUS') {
+        const status = value.toLowerCase();
+        if (status === 'cancelled' || status === 'confirmed' || status === 'tentative') {
+          currentEvent.status = status;
+        }
+      } else if (key === 'LOCATION') {
+        currentEvent.location = unescapeICS(value);
+      } else if (key === 'DESCRIPTION') {
+        currentEvent.description = unescapeICS(value);
+      } else if (key === 'URL') {
+        currentEvent.hangoutLink = value;
       }
     }
   }
   
   return events;
+}
+
+function unescapeICS(value: string): string {
+  return value.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, '\n');
 }
 
 /**
@@ -170,9 +194,9 @@ export function findNextEvent(
   scatterWindow: number = 60,
   now: Date = new Date()
 ): NextEventInfo | null {
-  // Filter out all-day events and past events
+  // Filter out all-day, declined, free/transparent, and past events
   const upcomingEvents = events
-    .filter(e => !e.isAllDay && e.start >= now)
+    .filter(e => !e.isAllDay && !e.declined && e.status !== 'cancelled' && e.transparency !== 'transparent' && e.start >= now)
     .sort((a, b) => a.start.getTime() - b.start.getTime());
   
   if (upcomingEvents.length === 0) return null;

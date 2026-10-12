@@ -1,21 +1,47 @@
 import { useState, useEffect } from 'react';
-import { parseICS, expandRecurringEvents, findNextEvent, NextEventInfo } from './calendar';
+import { useSearchParams } from 'next/navigation';
+import { parseICS, expandRecurringEvents, findNextEvent, NextEventInfo, CalendarEvent } from './calendar';
+import { buildDayModel, DayModel, minutesBetween } from './day';
+import { getMockEvents, isMockScenario, parseNowParam } from './fixtures';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const STORAGE_KEY = 'focusOrb:calendarUrl';
 const SCATTER_WINDOW_KEY = 'focusOrb:scatterWindow';
 const AUTH_METHOD_KEY = 'focusOrb:authMethod';
+const CLOCK_INTERVAL = 30 * 1000;
 
 type AuthMethod = 'google' | 'ical' | null;
 
+function emptyDay(now: Date): DayModel {
+  return buildDayModel([], now);
+}
+
 export function useCalendar() {
+  const searchParams = useSearchParams();
+  const mockParam = searchParams.get('mock');
+  const nowParam = searchParams.get('now');
+  const mockScenario = isMockScenario(mockParam) ? mockParam : null;
+
   const [calendarUrl, setCalendarUrl] = useState<string>('');
   const [scatterWindow, setScatterWindow] = useState<number>(60);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [nextEvent, setNextEvent] = useState<NextEventInfo | null>(null);
+  const [now, setNow] = useState(() => parseNowParam(nowParam));
+  const [day, setDay] = useState<DayModel>(() => emptyDay(parseNowParam(nowParam)));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+
+  // Pin or tick the clock. Mock fixtures never depend on wall time.
+  useEffect(() => {
+    const pinned = parseNowParam(nowParam);
+    setNow(pinned);
+    if (nowParam) return;
+
+    const interval = setInterval(() => setNow(new Date()), CLOCK_INTERVAL);
+    return () => clearInterval(interval);
+  }, [nowParam]);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -28,15 +54,19 @@ export function useCalendar() {
     if (storedAuthMethod) setAuthMethod(storedAuthMethod);
   }, []);
 
-  // Check Google authentication status
+  // Only talk to Google when the user already chose that auth method.
+  // An unauthenticated probe 401s and dirties the browser console.
   useEffect(() => {
+    if (mockScenario) return;
+    if (authMethod !== 'google') return;
+
     const checkGoogleAuth = async () => {
       try {
         const response = await fetch('/api/calendar/google');
         setIsGoogleConnected(response.ok);
-        if (response.ok && !authMethod) {
-          setAuthMethod('google');
-          localStorage.setItem(AUTH_METHOD_KEY, 'google');
+        if (!response.ok && response.status === 401) {
+          setAuthMethod(null);
+          localStorage.removeItem(AUTH_METHOD_KEY);
         }
       } catch {
         setIsGoogleConnected(false);
@@ -44,7 +74,7 @@ export function useCalendar() {
     };
     
     checkGoogleAuth();
-  }, [authMethod]);
+  }, [authMethod, mockScenario]);
 
   // Save settings to localStorage
   useEffect(() => {
@@ -59,7 +89,24 @@ export function useCalendar() {
     localStorage.setItem(SCATTER_WINDOW_KEY, scatterWindow.toString());
   }, [scatterWindow]);
 
-  const fetchGoogleCalendar = async () => {
+  const applyEvents = (incoming: CalendarEvent[], clock: Date) => {
+    const model = buildDayModel(incoming, clock);
+    setEvents(incoming);
+    setDay(model);
+
+    if (model.nextEvent) {
+      setNextEvent({
+        summary: model.nextEvent.summary,
+        start: model.nextEvent.start,
+        minutesToStart: minutesBetween(clock, model.nextEvent.start),
+        scatterWindow,
+      });
+    } else {
+      setNextEvent(findNextEvent(incoming, scatterWindow, clock));
+    }
+  };
+
+  const fetchGoogleCalendar = async (clock: Date) => {
     setIsLoading(true);
     setError(null);
 
@@ -77,27 +124,32 @@ export function useCalendar() {
       }
 
       const data = await response.json();
-      const events = data.events.map((e: any) => ({
+      const mapped: CalendarEvent[] = data.events.map((e: CalendarEvent & { start: string; end: string }) => ({
         summary: e.summary,
         start: new Date(e.start),
         end: new Date(e.end),
         isAllDay: e.isAllDay || false,
+        status: e.status,
+        transparency: e.transparency,
+        declined: e.declined,
+        hangoutLink: e.hangoutLink,
+        location: e.location,
+        description: e.description,
+        conferenceUri: e.conferenceUri,
       }));
       
-      const next = findNextEvent(events, scatterWindow);
-      setNextEvent(next);
+      applyEvents(mapped, clock);
     } catch (err) {
-      console.error('Google calendar fetch error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch calendar');
-      setNextEvent(null);
+      applyEvents([], clock);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchICalCalendar = async () => {
+  const fetchICalCalendar = async (clock: Date) => {
     if (!calendarUrl) {
-      setNextEvent(null);
+      applyEvents([], clock);
       return;
     }
 
@@ -116,42 +168,51 @@ export function useCalendar() {
       }
 
       const icsContent = await response.text();
-      const events = parseICS(icsContent);
-      const expanded = expandRecurringEvents(events);
-      const next = findNextEvent(expanded, scatterWindow);
-      
-      setNextEvent(next);
+      const parsed = parseICS(icsContent);
+      const expanded = expandRecurringEvents(parsed);
+      applyEvents(expanded, clock);
     } catch (err) {
-      console.error('Calendar fetch error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch calendar');
-      setNextEvent(null);
+      applyEvents([], clock);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchCalendar = async () => {
+  const fetchCalendar = async (clock: Date = now) => {
+    if (mockScenario) {
+      applyEvents(getMockEvents(mockScenario, clock), clock);
+      return;
+    }
+
     if (authMethod === 'google' && isGoogleConnected) {
-      await fetchGoogleCalendar();
+      await fetchGoogleCalendar(clock);
     } else if (authMethod === 'ical' || calendarUrl) {
-      await fetchICalCalendar();
+      await fetchICalCalendar(clock);
     } else {
-      setNextEvent(null);
+      applyEvents([], clock);
     }
   };
 
-  // Fetch calendar on mount and when URL/window/auth changes
+  // Mock fixtures or live calendar
   useEffect(() => {
-    fetchCalendar();
-  }, [calendarUrl, scatterWindow, authMethod, isGoogleConnected]);
+    if (mockScenario) {
+      applyEvents(getMockEvents(mockScenario, now), now);
+      return;
+    }
+    fetchCalendar(now);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockScenario, now, calendarUrl, scatterWindow, authMethod, isGoogleConnected]);
 
   // Refresh calendar periodically
   useEffect(() => {
+    if (mockScenario) return;
     if (!calendarUrl && !isGoogleConnected) return;
 
-    const interval = setInterval(fetchCalendar, REFRESH_INTERVAL);
+    const interval = setInterval(() => fetchCalendar(now), REFRESH_INTERVAL);
     return () => clearInterval(interval);
-  }, [calendarUrl, scatterWindow, authMethod, isGoogleConnected]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockScenario, calendarUrl, scatterWindow, authMethod, isGoogleConnected, now]);
 
   const disconnectGoogle = async () => {
     try {
@@ -163,14 +224,14 @@ export function useCalendar() {
       if (response.ok) {
         setIsGoogleConnected(false);
         setAuthMethod(null);
-        setNextEvent(null);
+        applyEvents([], now);
         localStorage.removeItem(AUTH_METHOD_KEY);
         
         // Redirect to clear session
         window.location.href = '/';
       }
-    } catch (err) {
-      console.error('Failed to disconnect:', err);
+    } catch {
+      setError('Failed to disconnect');
     }
   };
 
@@ -188,13 +249,17 @@ export function useCalendar() {
     setCalendarUrl,
     scatterWindow,
     setScatterWindow,
+    events,
+    day,
+    now,
     nextEvent,
     isLoading,
     error,
-    refreshCalendar: fetchCalendar,
+    refreshCalendar: () => fetchCalendar(now),
     authMethod,
     selectAuthMethod,
     isGoogleConnected,
     disconnectGoogle,
+    mockScenario,
   };
 }
