@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
@@ -70,7 +70,11 @@ export function Orb() {
   const forceUnsupported = searchParams.get('unsupported') === '1';
   const miniOnlyParam = searchParams.get('minionly') === '1';
   const focusParam = searchParams.get('focus');
-  const pipSupported = canUseDocumentPip() && !forceUnsupported;
+  const pipSupported = useSyncExternalStore(
+    () => () => {},
+    () => canUseDocumentPip() && !forceUnsupported,
+    () => false
+  );
   
   const [scatter, setScatter] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);

@@ -70,6 +70,7 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
           color: 'rgba(255,255,255,0.5)',
           pointerEvents: 'none',
           letterSpacing: '0.04em',
+          zIndex: 1,
         }}
       >
         {status}
