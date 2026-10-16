@@ -8,6 +8,23 @@ import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
 import { densityForModel, extractJoinUrl, focusingLine, hoverDetailText, isHeadsUp, minutesBetween, orbClickMinutes, smartFocusOption, statusLineText } from '@/lib/day';
 import { collectTextClearRects, textClearAlpha } from '@/lib/textClear';
+import {
+  breathGlow,
+  breathPhase,
+  breathScale,
+  canUseDocumentPip,
+  CHROME_HINT,
+  FLOATING_RESTORE_LABEL,
+  formatMiniStatus,
+  LEAVE_TAB_HINT,
+  loadPopOutOnLeave,
+  MINI_ONLY_LABEL,
+  MINI_SIZE,
+  POP_OUT_LABEL,
+  savePopOutOnLeave,
+} from '@/lib/miniOrb';
+import { drawMiniOrbOnCanvas, ensureMiniCanvasSize } from '@/lib/drawMiniOrb';
+import { useMiniWindow } from '@/components/useMiniWindow';
 import { Settings } from './Settings';
 import { Hints, markHintSeen } from './Hints';
 import { FocusControl } from './FocusControl';
@@ -15,6 +32,7 @@ import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
 import { Satellites } from './Satellites';
 import { Welcome } from './Welcome';
+import { MiniOrbView } from './MiniOrbView';
 import { isFirstOpen } from '@/lib/onboarding';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
@@ -48,6 +66,11 @@ export function Orb() {
   const debugScatter = searchParams.get('scatter');
   const settingsParam = searchParams.get('settings') === '1';
   const hoverParam = searchParams.get('hover') === '1';
+  const miniPreview = searchParams.get('mini') === '1';
+  const forceUnsupported = searchParams.get('unsupported') === '1';
+  const miniOnlyParam = searchParams.get('minionly') === '1';
+  const focusParam = searchParams.get('focus');
+  const pipSupported = canUseDocumentPip() && !forceUnsupported;
   
   const [scatter, setScatter] = useState(0);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -56,7 +79,21 @@ export function Orb() {
   const [orbHovered, setOrbHovered] = useState(false);
   const [stopArmed, setStopArmed] = useState(false);
   const [hintRev, setHintRev] = useState(0);
+  const [miniOnly, setMiniOnly] = useState(miniOnlyParam);
+  const [popOutOnLeave, setPopOutOnLeave] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [leaveHint, setLeaveHint] = useState(false);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const handleOrbClickRef = useRef<() => void>(() => {});
+  const miniOnlyRef = useRef(false);
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const miniDrawRef = useRef({
+    scatter: 0,
+    density: 1,
+    dim: false,
+    focusing: false,
+    reducedMotion: false,
+  });
   const gatherUntilRef = useRef(0);
   const hoverBoostRef = useRef(1);
   const prevBusyRef = useRef(false);
@@ -92,7 +129,31 @@ export function Orb() {
     authMethod: calendar.authMethod,
   });
 
-  const showChrome = !firstOpen && (showOverlay || hoverParam);
+  const showChrome = !firstOpen && !miniOnly && (showOverlay || hoverParam);
+
+  const miniStatus = formatMiniStatus(day, now, {
+    isManualFocus,
+    focusMinutes: manualTimeRemaining,
+    stopArmed,
+  });
+
+  const miniWindow = useMiniWindow({
+    supported: pipSupported,
+    status: miniStatus,
+    onOrbClick: () => handleOrbClickRef.current(),
+    onClosed: () => {
+      setMiniOnly(false);
+    },
+  });
+
+  miniOnlyRef.current = miniOnly;
+  miniDrawRef.current = {
+    scatter,
+    density,
+    dim: day.state === 'in-meeting' || day.state === 'in-run',
+    focusing: isManualFocus,
+    reducedMotion,
+  };
 
   const line = stopArmed
     ? 'Click again to stop'
@@ -124,6 +185,32 @@ export function Orb() {
     const timeout = window.setTimeout(() => setStopArmed(false), 2000);
     return () => window.clearTimeout(timeout);
   }, [stopArmed]);
+
+  useEffect(() => {
+    setPopOutOnLeave(loadPopOutOnLeave());
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const apply = () => setReducedMotion(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+
+  const openMiniRef = useRef(miniWindow.open);
+  const pipOpenRef = useRef(miniWindow.isOpen);
+  openMiniRef.current = miniWindow.open;
+  pipOpenRef.current = miniWindow.isOpen;
+
+  useEffect(() => {
+    if (!popOutOnLeave || !pipSupported) return;
+    const onVisibility = async () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (pipOpenRef.current) return;
+      const ok = await openMiniRef.current();
+      if (!ok) setLeaveHint(true);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [popOutOnLeave, pipSupported]);
 
   // Generate points once (will be regenerated on resize)
   const generatePoints = useCallback((radius: number) => {
@@ -284,6 +371,23 @@ export function Orb() {
     
     let time = 0;
     gatherUntilRef.current = Math.max(gatherUntilRef.current, performance.now() + 2000);
+
+    const paintMini = () => {
+      const frame = miniDrawRef.current;
+      const phase = frame.focusing ? breathPhase(performance.now()) : 0;
+      const payload = {
+        scatter: frame.scatter,
+        density: frame.density,
+        dim: frame.dim,
+        scale: frame.focusing ? breathScale(phase, frame.reducedMotion) : 1,
+        glow: breathGlow(phase, frame.focusing),
+      };
+      for (const target of [miniWindow.canvasRef.current, previewCanvasRef.current]) {
+        if (!target) continue;
+        ensureMiniCanvasSize(target, MINI_SIZE);
+        drawMiniOrbOnCanvas(target, payload);
+      }
+    };
     
     const render = () => {
       time += 0.008;
@@ -301,6 +405,12 @@ export function Orb() {
       // Clear with dark background
       ctx.fillStyle = '#161616';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (miniOnlyRef.current) {
+        paintMini();
+        animationRef.current = requestAnimationFrame(render);
+        return;
+      }
       
       // Breathing: subtle scale pulse (3%) and threshold shimmer
       const breatheScale = 1 + Math.sin(time * 0.45) * breatheAmp;
@@ -386,10 +496,12 @@ export function Orb() {
       }
       
       // Dim during a meeting or back-to-back run
-      if (inBusyRef.current) {
+      if (inBusyRef.current && !miniOnlyRef.current) {
         ctx.fillStyle = 'rgba(22, 22, 22, 0.75)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
+
+      paintMini();
       
       animationRef.current = requestAnimationFrame(render);
     };
@@ -430,12 +542,17 @@ export function Orb() {
         } else {
           startFocus(25); // Default 25 min
         }
+      } else if (e.key === 'p' || e.key === 'P') {
+        if (!pipSupported) return;
+        e.preventDefault();
+        if (miniWindow.isOpen) miniWindow.close();
+        else void miniWindow.open();
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isManualFocus, startFocus, stopFocus]);
+  }, [isManualFocus, startFocus, stopFocus, pipSupported, miniWindow]);
 
   const bumpHint = (id: 'click' | 'hover' | 'fullscreen') => {
     markHintSeen(id);
@@ -468,6 +585,12 @@ export function Orb() {
     startFocus(minutes);
     bumpHint('click');
   };
+  handleOrbClickRef.current = handleOrbClick;
+
+  useEffect(() => {
+    const minutes = Number(focusParam);
+    if (Number.isFinite(minutes) && minutes > 0) startFocus(minutes);
+  }, [focusParam, startFocus]);
 
   useEffect(() => {
     if (settingsParam) setShowSettings(true);
@@ -482,7 +605,7 @@ export function Orb() {
   return (
     <div 
       className={`relative h-screen w-screen overflow-hidden ${
-        firstOpen || showChrome || orbHovered ? '' : 'cursor-none'
+        firstOpen || showChrome || orbHovered || miniOnly ? '' : 'cursor-none'
       }`}
       data-satellites={day.remainingInRun.length}
       onMouseMove={(e) => {
@@ -512,13 +635,22 @@ export function Orb() {
       <canvas
         ref={canvasRef}
         data-testid="orb-canvas"
-        className={`absolute inset-0 ${orbHovered && !firstOpen ? 'cursor-pointer' : ''}`}
+        className={`absolute inset-0 ${miniOnly ? 'opacity-0' : ''} ${orbHovered && !firstOpen && !miniOnly ? 'cursor-pointer' : ''}`}
         onClick={(e) => {
           if (isOverOrb(e.clientX, e.clientY)) handleOrbClick();
         }}
       />
 
-      {firstOpen ? (
+      {miniOnly ? (
+        <button
+          type="button"
+          data-testid="floating-restore"
+          onClick={() => setMiniOnly(false)}
+          className="absolute inset-0 z-30 flex items-center justify-center text-xs tracking-wide text-white/40 hover:text-white/60"
+        >
+          {FLOATING_RESTORE_LABEL}
+        </button>
+      ) : firstOpen ? (
         <Welcome onConnect={() => setShowSettings(true)} />
       ) : (
         <StatusLine
@@ -529,7 +661,9 @@ export function Orb() {
         />
       )}
 
-      <Satellites count={day.state === 'in-run' ? day.remainingInRun.length : 0} />
+      {miniOnly ? null : (
+        <Satellites count={day.state === 'in-run' ? day.remainingInRun.length : 0} />
+      )}
 
       {!firstOpen ? (
         <div
@@ -551,19 +685,80 @@ export function Orb() {
             onStop={stopFocus}
             smartFocus={day.state === 'free' ? smartFocusOption(now, day.nextEvent?.start ?? null) : null}
           />
-          <button
-            type="button"
-            data-testid="settings-gear"
-            onClick={() => setShowSettings(true)}
-            className="fixed top-4 right-4 z-40 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
-            aria-label="Settings"
-          >
-            ⚙
-          </button>
+          <div className="fixed top-4 right-4 z-40 flex items-center gap-1">
+            {pipSupported ? (
+              <>
+                <button
+                  type="button"
+                  data-testid="pop-out"
+                  onClick={() => {
+                    if (miniWindow.isOpen) {
+                      miniWindow.close();
+                      setMiniOnly(false);
+                    } else {
+                      void miniWindow.open();
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+                  aria-pressed={miniWindow.isOpen}
+                >
+                  {POP_OUT_LABEL}
+                </button>
+                <button
+                  type="button"
+                  data-testid="mini-only"
+                  onClick={async () => {
+                    if (miniOnly) {
+                      setMiniOnly(false);
+                      return;
+                    }
+                    const ok = miniWindow.isOpen || (await miniWindow.open());
+                    if (ok) setMiniOnly(true);
+                  }}
+                  className="px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+                  aria-pressed={miniOnly}
+                >
+                  {MINI_ONLY_LABEL}
+                </button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              data-testid="settings-gear"
+              onClick={() => setShowSettings(true)}
+              className="px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+              aria-label="Settings"
+            >
+              ⚙
+            </button>
+          </div>
         </div>
       ) : null}
 
-      <Hints active={!firstOpen} chromeVisible={showChrome} revision={hintRev} />
+      <Hints
+        active={!firstOpen}
+        chromeVisible={showChrome}
+        revision={hintRev}
+        banner={
+          !pipSupported && !firstOpen
+            ? { id: 'chrome', text: CHROME_HINT }
+            : leaveHint
+              ? { id: 'leave-tab', text: LEAVE_TAB_HINT }
+              : null
+        }
+      />
+
+      {miniWindow.portal}
+
+      {miniPreview ? (
+        <div className="pointer-events-auto fixed bottom-4 left-4 z-50">
+          <MiniOrbView
+            status={miniStatus}
+            canvasRef={previewCanvasRef}
+            onClick={() => handleOrbClickRef.current()}
+          />
+        </div>
+      ) : null}
       
       {showSettings && (
         <Settings 
@@ -580,6 +775,12 @@ export function Orb() {
           calendars={calendar.calendars}
           selectedCalendarIds={calendar.selectedCalendarIds}
           toggleCalendar={calendar.toggleCalendar}
+          pipSupported={pipSupported}
+          popOutOnLeave={popOutOnLeave}
+          setPopOutOnLeave={(value) => {
+            setPopOutOnLeave(value);
+            savePopOutOnLeave(value);
+          }}
         />
       )}
     </div>

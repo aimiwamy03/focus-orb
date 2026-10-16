@@ -20,6 +20,9 @@ interface SettingsProps {
   calendars: CalendarInfo[];
   selectedCalendarIds: string[];
   toggleCalendar: (id: string) => void;
+  pipSupported?: boolean;
+  popOutOnLeave?: boolean;
+  setPopOutOnLeave?: (value: boolean) => void;
 }
 
 export function Settings({
@@ -35,6 +38,9 @@ export function Settings({
   calendars,
   selectedCalendarIds,
   toggleCalendar,
+  pipSupported = false,
+  popOutOnLeave = false,
+  setPopOutOnLeave,
 }: SettingsProps) {
   const [tempUrl, setTempUrl] = useState(calendarUrl);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -192,6 +198,21 @@ export function Settings({
           </div>
         </div>
 
+        {pipSupported && setPopOutOnLeave ? (
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                data-testid="pop-out-on-leave"
+                checked={popOutOnLeave}
+                onChange={(event) => setPopOutOnLeave(event.target.checked)}
+                className="rounded border-zinc-600 bg-zinc-800"
+              />
+              Pop out when I leave this tab
+            </label>
+          </div>
+        ) : null}
+
         {/* Manual Focus */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-zinc-300">
@@ -220,6 +241,9 @@ export function Settings({
             <div><kbd className="bg-zinc-800 px-1.5 py-0.5 rounded">f</kbd> fullscreen</div>
             <div><kbd className="bg-zinc-800 px-1.5 py-0.5 rounded">s</kbd> settings</div>
             <div><kbd className="bg-zinc-800 px-1.5 py-0.5 rounded">space</kbd> start/stop focus</div>
+            {pipSupported ? (
+              <div><kbd className="bg-zinc-800 px-1.5 py-0.5 rounded">p</kbd> pop out</div>
+            ) : null}
           </div>
         </div>
       </div>
