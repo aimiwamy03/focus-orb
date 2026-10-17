@@ -6,7 +6,23 @@ import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
-import { densityForModel, extractJoinUrl, focusingLine, hoverDetailText, isHeadsUp, minutesBetween, orbClickMinutes, smartFocusOption, statusLineText } from '@/lib/day';
+import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
+import {
+  DurationChoice,
+  FALLBACK_TASK,
+  formatMeetingSoonCopy,
+  formatMiniFocusStatus,
+  loadLastDuration,
+  loadLastTask,
+  loadRecentTasks,
+  promptSurface,
+  rememberTask,
+  resolveDuration,
+  saveLastDuration,
+  saveLastTask,
+  saveRecentTasks,
+  untilMeetingDuration,
+} from '@/lib/focusPrompt';
 import { collectTextClearRects, textClearAlpha } from '@/lib/textClear';
 import {
   breathGlow,
@@ -28,6 +44,7 @@ import { useMiniWindow } from '@/components/useMiniWindow';
 import { Settings } from './Settings';
 import { Hints, markHintSeen } from './Hints';
 import { FocusControl } from './FocusControl';
+import { FocusPrompt } from './FocusPrompt';
 import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
 import { Satellites } from './Satellites';
@@ -70,6 +87,9 @@ export function Orb() {
   const forceUnsupported = searchParams.get('unsupported') === '1';
   const miniOnlyParam = searchParams.get('minionly') === '1';
   const focusParam = searchParams.get('focus');
+  const promptParam = searchParams.get('prompt');
+  const taskParam = searchParams.get('task');
+  const doneParam = searchParams.get('done');
   const pipSupported = useSyncExternalStore(
     () => () => {},
     () => canUseDocumentPip() && !forceUnsupported,
@@ -81,7 +101,10 @@ export function Orb() {
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [orbHovered, setOrbHovered] = useState(false);
-  const [stopArmed, setStopArmed] = useState(false);
+  const [stopConfirm, setStopConfirm] = useState(false);
+  const [taskDraft, setTaskDraft] = useState('');
+  const [recentTasks, setRecentTasks] = useState<string[]>([]);
+  const [durationChoice, setDurationChoice] = useState<DurationChoice>(50);
   const [hintRev, setHintRev] = useState(0);
   const [miniOnly, setMiniOnly] = useState(miniOnlyParam);
   const [popOutOnLeave, setPopOutOnLeave] = useState(false);
@@ -91,6 +114,7 @@ export function Orb() {
   const handleOrbClickRef = useRef<() => void>(() => {});
   const miniOnlyRef = useRef(false);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const askDimRef = useRef(false);
   const miniDrawRef = useRef({
     scatter: 0,
     density: 1,
@@ -112,10 +136,16 @@ export function Orb() {
   inBusyRef.current = day.state === 'in-meeting' || day.state === 'in-run';
   const { 
     isActive: isManualFocus, 
+    isBreak,
+    task: sessionTask,
     timeRemaining: manualTimeRemaining,
     totalDuration: manualTotalDuration,
+    completed,
     startFocus,
-    stopFocus 
+    startBreak,
+    stopFocus,
+    dismissCompleted,
+    seedCompleted,
   } = useManualFocus();
 
   const tabTitle = useLiveTab({
@@ -135,11 +165,30 @@ export function Orb() {
 
   const showChrome = !firstOpen && !miniOnly && (showOverlay || hoverParam);
 
-  const miniStatus = formatMiniStatus(day, now, {
-    isManualFocus,
-    focusMinutes: manualTimeRemaining,
-    stopArmed,
+  const surface = promptSurface({
+    firstOpen,
+    miniOnly,
+    isFocusing: isManualFocus,
+    isBreak: Boolean(isBreak),
+    stopConfirm,
+    completed: Boolean(completed),
+    headsUp: isHeadsUp(day, now),
+    dayState: day.state,
   });
+  const untilMinutes = untilMeetingDuration(day);
+  const activeTask = sessionTask || taskDraft || loadLastTask() || FALLBACK_TASK;
+
+  const miniFocusStatus = formatMiniFocusStatus({
+    surface,
+    task: activeTask,
+    minutes: manualTimeRemaining,
+  });
+  const miniStatus =
+    miniFocusStatus ??
+    formatMiniStatus(day, now, {
+      isManualFocus,
+      focusMinutes: manualTimeRemaining,
+    });
 
   const miniWindow = useMiniWindow({
     supported: pipSupported,
@@ -151,6 +200,8 @@ export function Orb() {
   });
 
   miniOnlyRef.current = miniOnly;
+  askDimRef.current =
+    surface === 'ask' || surface === 'completed' || surface === 'break';
   miniDrawRef.current = {
     scatter,
     density,
@@ -159,10 +210,9 @@ export function Orb() {
     reducedMotion,
   };
 
-  const line = stopArmed
-    ? 'Click again to stop'
-    : isManualFocus && manualTimeRemaining !== null
-      ? focusingLine(manualTimeRemaining)
+  const line =
+    surface === 'meeting-soon' && day.nextEvent
+      ? formatMeetingSoonCopy(minutesBetween(now, day.nextEvent.start))
       : statusLineText(day, now);
 
   useEffect(() => {
@@ -185,13 +235,12 @@ export function Orb() {
   }, [isManualFocus]);
 
   useEffect(() => {
-    if (!stopArmed) return;
-    const timeout = window.setTimeout(() => setStopArmed(false), 2000);
-    return () => window.clearTimeout(timeout);
-  }, [stopArmed]);
-
-  useEffect(() => {
     setPopOutOnLeave(loadPopOutOnLeave());
+    setRecentTasks(loadRecentTasks());
+    const storedTask = loadLastTask();
+    if (storedTask) setTaskDraft(storedTask);
+    const storedDuration = loadLastDuration();
+    if (storedDuration != null) setDurationChoice(storedDuration);
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const apply = () => setReducedMotion(mq.matches);
     apply();
@@ -415,9 +464,29 @@ export function Orb() {
         animationRef.current = requestAnimationFrame(render);
         return;
       }
+
+      const frame = miniDrawRef.current;
+      const focusPhase = frame.focusing ? breathPhase(performance.now()) : 0;
+      if (frame.focusing) {
+        const glow = breathGlow(focusPhase, true);
+        const gradient = ctx.createRadialGradient(
+          centerX,
+          centerY,
+          radius * 0.18,
+          centerX,
+          centerY,
+          radius * (1.15 + 0.35 * glow)
+        );
+        gradient.addColorStop(0, `rgba(255,255,255,${0.16 * glow})`);
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
       
-      // Breathing: subtle scale pulse (3%) and threshold shimmer
-      const breatheScale = 1 + Math.sin(time * 0.45) * breatheAmp;
+      // Breathing: focus uses the 5s inhale/exhale; otherwise a slight idle pulse
+      const breatheScale = frame.focusing
+        ? breathScale(focusPhase, frame.reducedMotion)
+        : 1 + Math.sin(time * 0.45) * breatheAmp;
       
       // Re-randomize a small fraction of thresholds for shimmer effect
       if (Math.random() < 0.01) {
@@ -499,9 +568,12 @@ export function Orb() {
         }
       }
       
-      // Dim during a meeting or back-to-back run
+      // Dim during a meeting, or quietly while asking
       if (inBusyRef.current && !miniOnlyRef.current) {
         ctx.fillStyle = 'rgba(22, 22, 22, 0.75)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else if (askDimRef.current && !miniOnlyRef.current) {
+        ctx.fillStyle = 'rgba(22, 22, 22, 0.42)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
@@ -541,11 +613,7 @@ export function Orb() {
         setShowSettings(prev => !prev);
       } else if (e.key === ' ') {
         e.preventDefault();
-        if (isManualFocus) {
-          stopFocus();
-        } else {
-          startFocus(25); // Default 25 min
-        }
+        handleOrbClickRef.current();
       } else if (e.key === 'p' || e.key === 'P') {
         if (!pipSupported) return;
         e.preventDefault();
@@ -556,7 +624,7 @@ export function Orb() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isManualFocus, startFocus, stopFocus, pipSupported, miniWindow]);
+  }, [pipSupported, miniWindow]);
 
   const bumpHint = (id: 'click' | 'hover' | 'fullscreen') => {
     markHintSeen(id);
@@ -573,28 +641,66 @@ export function Orb() {
     return dx * dx + dy * dy <= r * r;
   };
 
+  const beginFocus = (
+    taskName?: string,
+    choice: DurationChoice = durationChoice
+  ) => {
+    const minutes = resolveDuration(choice, untilMinutes);
+    const name = (taskName ?? taskDraft).trim() || loadLastTask() || FALLBACK_TASK;
+    const nextRecent = rememberTask(name, recentTasks);
+    setRecentTasks(nextRecent);
+    saveRecentTasks(nextRecent);
+    saveLastTask(name);
+    saveLastDuration(choice);
+    setTaskDraft(name);
+    setStopConfirm(false);
+    dismissCompleted();
+    startFocus(minutes, name);
+    bumpHint('click');
+  };
+
   const handleOrbClick = () => {
     if (firstOpen) return;
+    if (isBreak) return;
     if (isManualFocus) {
-      if (stopArmed) {
-        stopFocus();
-        setStopArmed(false);
-      } else {
-        setStopArmed(true);
-      }
+      setStopConfirm((open) => !open);
       return;
     }
-    const minutes = orbClickMinutes(day, now);
-    if (minutes == null) return;
-    startFocus(minutes);
-    bumpHint('click');
+    if (surface === 'in-meeting' || surface === 'meeting-soon') return;
+    if (completed) {
+      beginFocus(completed.task, durationChoice);
+      return;
+    }
+    beginFocus(loadLastTask() || taskDraft, loadLastDuration() ?? durationChoice);
   };
   handleOrbClickRef.current = handleOrbClick;
 
   useEffect(() => {
+    if (promptParam === 'done') {
+      seedCompleted(taskParam || 'Deep work', Number(doneParam) || 50);
+      if (taskParam) setTaskDraft(taskParam);
+      return;
+    }
+    if (promptParam === 'break') {
+      startBreak();
+      return;
+    }
     const minutes = Number(focusParam);
-    if (Number.isFinite(minutes) && minutes > 0) startFocus(minutes);
-  }, [focusParam, startFocus]);
+    if (promptParam === 'focus' || promptParam === 'stop' || (Number.isFinite(minutes) && minutes > 0)) {
+      startFocus(
+        Number.isFinite(minutes) && minutes > 0 ? minutes : 32.9,
+        taskParam || 'Deep work'
+      );
+      if (promptParam === 'stop') setStopConfirm(true);
+      if (taskParam) setTaskDraft(taskParam);
+    }
+  }, [doneParam, focusParam, promptParam, seedCompleted, startBreak, startFocus, taskParam]);
+
+  useEffect(() => {
+    if (untilMinutes != null && typeof durationChoice === 'number' && durationChoice > untilMinutes) {
+      setDurationChoice('until');
+    }
+  }, [untilMinutes, durationChoice]);
 
   useEffect(() => {
     if (settingsParam) setShowSettings(true);
@@ -609,7 +715,15 @@ export function Orb() {
   return (
     <div 
       className={`relative h-screen w-screen overflow-hidden ${
-        firstOpen || showChrome || orbHovered || miniOnly ? '' : 'cursor-none'
+        firstOpen ||
+        showChrome ||
+        orbHovered ||
+        miniOnly ||
+        surface === 'ask' ||
+        surface === 'stop-confirm' ||
+        surface === 'completed'
+          ? ''
+          : 'cursor-none'
       }`}
       data-satellites={day.remainingInRun.length}
       onMouseMove={(e) => {
@@ -656,6 +770,38 @@ export function Orb() {
         </button>
       ) : firstOpen ? (
         <Welcome onConnect={() => setShowSettings(true)} />
+      ) : surface === 'meeting-soon' || surface === 'in-meeting' ? (
+        <StatusLine
+          text={line}
+          detail={hoverDetailText(day, now)}
+          hovered={showOverlay || hoverParam}
+          joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
+        />
+      ) : surface ? (
+        <FocusPrompt
+          surface={surface}
+          contextLine={statusLineText(day, now)}
+          task={surface === 'focusing' || surface === 'stop-confirm' ? activeTask : taskDraft}
+          onTaskChange={setTaskDraft}
+          recentTasks={recentTasks}
+          choice={durationChoice}
+          onChoiceChange={(next) => {
+            setDurationChoice(next);
+            saveLastDuration(next);
+          }}
+          untilMinutes={untilMinutes}
+          focusMinutes={manualTimeRemaining}
+          completedTask={completed?.task}
+          completedMinutes={completed?.minutes}
+          onStart={() => beginFocus(taskDraft, durationChoice)}
+          onKeepGoing={() => setStopConfirm(false)}
+          onEnd={() => {
+            setStopConfirm(false);
+            stopFocus();
+          }}
+          onBreak={startBreak}
+          onAnotherRound={() => beginFocus(completed?.task || taskDraft, durationChoice)}
+        />
       ) : (
         <StatusLine
           text={line}
@@ -685,8 +831,8 @@ export function Orb() {
           <FocusControl
             isActive={isManualFocus}
             timeRemaining={manualTimeRemaining}
-            onStart={startFocus}
-            onStop={stopFocus}
+            onStart={(minutes) => beginFocus(taskDraft, minutes)}
+            onStop={() => setStopConfirm(true)}
             smartFocus={day.state === 'free' ? smartFocusOption(now, day.nextEvent?.start ?? null) : null}
           />
           <div className="fixed top-4 right-4 z-40 flex items-center gap-1">
@@ -767,7 +913,7 @@ export function Orb() {
       {showSettings && (
         <Settings 
           onClose={() => setShowSettings(false)}
-          onStartFocus={startFocus}
+          onStartFocus={(minutes) => beginFocus(taskDraft, minutes)}
           calendarUrl={calendar.calendarUrl}
           setCalendarUrl={calendar.setCalendarUrl}
           scatterWindow={calendar.scatterWindow}
