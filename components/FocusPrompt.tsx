@@ -18,6 +18,7 @@ import {
   TAKE_BREAK_LABEL,
   UNTIL_MEETING_LABEL,
 } from '@/lib/focusPrompt';
+import { ENTER_HINT, SPACE_HINT } from '@/lib/shortcuts';
 
 interface FocusPromptProps {
   surface: PromptSurface;
@@ -36,6 +37,7 @@ interface FocusPromptProps {
   onEnd: () => void;
   onBreak: () => void;
   onAnotherRound: () => void;
+  chromeVisible?: boolean;
 }
 
 function Chip({
@@ -86,6 +88,7 @@ export function FocusPrompt({
   onEnd,
   onBreak,
   onAnotherRound,
+  chromeVisible = false,
 }: FocusPromptProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -162,13 +165,24 @@ export function FocusPrompt({
               />
             ) : null}
           </div>
-          <button
-            type="submit"
-            data-testid="focus-start"
-            className="text-[12px] tracking-wide text-white/55 hover:text-white/80"
-          >
-            {START_LABEL}
-          </button>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="submit"
+              data-testid="focus-start"
+              className="text-[12px] tracking-wide text-white/55 hover:text-white/80"
+            >
+              {START_LABEL}
+            </button>
+            <span
+              data-testid="enter-hint"
+              data-text-clear
+              className={`text-[10px] tracking-wide text-white/30 transition-opacity duration-300 ${
+                chromeVisible ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              {ENTER_HINT}
+            </span>
+          </div>
         </form>
       ) : null}
 
@@ -179,6 +193,15 @@ export function FocusPrompt({
           </div>
           <div data-text-clear data-testid="focus-countdown" className="text-[12px] text-white/45">
             {focusing.countdown}
+          </div>
+          <div
+            data-testid="space-hint"
+            data-text-clear
+            className={`text-[10px] tracking-wide text-white/30 transition-opacity duration-300 ${
+              chromeVisible ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            {SPACE_HINT}
           </div>
         </div>
       ) : null}

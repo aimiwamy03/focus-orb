@@ -40,6 +40,13 @@ import {
   POP_OUT_LABEL,
   savePopOutOnLeave,
 } from '@/lib/miniOrb';
+import {
+  FULLSCREEN_LABEL,
+  isShortcutKey,
+  loadShortcutsCardSeen,
+  saveShortcutsCardSeen,
+  shouldShowShortcutsCard,
+} from '@/lib/shortcuts';
 import { drawMiniOrbOnCanvas, ensureMiniCanvasSize } from '@/lib/drawMiniOrb';
 import { useMiniWindow } from '@/components/useMiniWindow';
 import { Settings } from './Settings';
@@ -50,6 +57,8 @@ import { Timeline } from './Timeline';
 import { Satellites } from './Satellites';
 import { Welcome } from './Welcome';
 import { MiniOrbView } from './MiniOrbView';
+import { KeyHint } from './KeyHint';
+import { ShortcutsCard } from './ShortcutsCard';
 import { isFirstOpen } from '@/lib/onboarding';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
@@ -110,6 +119,7 @@ export function Orb() {
   const [popOutOnLeave, setPopOutOnLeave] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [leaveHint, setLeaveHint] = useState(false);
+  const [showShortcutsCard, setShowShortcutsCard] = useState(false);
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const handleOrbClickRef = useRef<() => void>(() => {});
   const miniOnlyRef = useRef(false);
@@ -615,6 +625,36 @@ export function Orb() {
     };
   }, [scatter, nextEvent, generatePoints, updateLayout]);
 
+  const dismissShortcutsCard = useCallback(() => {
+    saveShortcutsCardSeen();
+    setShowShortcutsCard(false);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !shouldShowShortcutsCard({
+        firstOpen,
+        miniOnly,
+        seen: loadShortcutsCardSeen(),
+      })
+    ) {
+      return;
+    }
+    setShowShortcutsCard(true);
+  }, [firstOpen, miniOnly]);
+
+  const toggleFullscreen = () => {
+    markHintSeen('fullscreen');
+    setHintRev((n) => n + 1);
+    if (!document.fullscreenElement) {
+      void document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      void document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -622,17 +662,11 @@ export function Orb() {
         return;
       }
       
-      if (e.key === 'f') {
-        markHintSeen('fullscreen');
-        setHintRev((n) => n + 1);
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen();
-          setIsFullscreen(true);
-        } else {
-          document.exitFullscreen();
-          setIsFullscreen(false);
-        }
-      } else if (e.key === 's') {
+      if (isShortcutKey(e.key)) dismissShortcutsCard();
+
+      if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      } else if (e.key === 's' || e.key === 'S') {
         setShowSettings(prev => !prev);
       } else if (e.key === ' ') {
         e.preventDefault();
@@ -647,7 +681,7 @@ export function Orb() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pipSupported, miniWindow]);
+  }, [dismissShortcutsCard, miniWindow, pipSupported]);
 
   const bumpHint = (id: 'click' | 'hover' | 'fullscreen') => {
     markHintSeen(id);
@@ -827,8 +861,12 @@ export function Orb() {
               }}
               onBreak={startBreak}
               onAnotherRound={() => beginFocus(completed?.task || taskDraft, durationChoice)}
+              chromeVisible={showChrome}
             />
           )}
+          {showShortcutsCard ? (
+            <ShortcutsCard onDismiss={dismissShortcutsCard} />
+          ) : null}
           <Timeline
             events={day.events}
             now={now}
@@ -863,10 +901,11 @@ export function Orb() {
                       void miniWindow.open();
                     }
                   }}
-                  className="px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
                   aria-pressed={miniWindow.isOpen}
                 >
                   {POP_OUT_LABEL}
+                  <KeyHint label="P" />
                 </button>
                 <button
                   type="button"
@@ -888,12 +927,24 @@ export function Orb() {
             ) : null}
             <button
               type="button"
+              data-testid="fullscreen-toggle"
+              onClick={toggleFullscreen}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+              aria-label="Full screen"
+              aria-pressed={isFullscreen}
+            >
+              {FULLSCREEN_LABEL}
+              <KeyHint label="F" />
+            </button>
+            <button
+              type="button"
               data-testid="settings-gear"
               onClick={() => setShowSettings(true)}
-              className="px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
               aria-label="Settings"
             >
               ⚙
+              <KeyHint label="S" />
             </button>
           </div>
         </div>
