@@ -16,7 +16,7 @@ export function StatusLine({
   return (
     <div
       data-testid="status-line"
-      className={`pointer-events-none absolute bottom-[5.75rem] left-1/2 z-20 w-fit max-w-[min(36rem,80vw)] -translate-x-1/2 text-center font-normal tracking-wide transition-colors duration-200 ${
+      className={`pointer-events-none z-20 w-fit max-w-[min(36rem,80vw)] shrink-0 text-center font-normal tracking-wide transition-colors duration-200 ${
         hovered ? 'text-white/[0.85]' : 'text-white/45'
       }`}
     >

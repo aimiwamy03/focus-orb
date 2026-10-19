@@ -6,7 +6,8 @@ import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
-import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, smartFocusOption, statusLineText } from '@/lib/day';
+import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, statusLineText } from '@/lib/day';
+import { orbLayout, type OrbLayout } from '@/lib/layout';
 import {
   DurationChoice,
   FALLBACK_TASK,
@@ -43,7 +44,6 @@ import { drawMiniOrbOnCanvas, ensureMiniCanvasSize } from '@/lib/drawMiniOrb';
 import { useMiniWindow } from '@/components/useMiniWindow';
 import { Settings } from './Settings';
 import { Hints, markHintSeen } from './Hints';
-import { FocusControl } from './FocusControl';
 import { FocusPrompt } from './FocusPrompt';
 import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
@@ -114,6 +114,13 @@ export function Orb() {
   const handleOrbClickRef = useRef<() => void>(() => {});
   const miniOnlyRef = useRef(false);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stackRef = useRef<HTMLDivElement | null>(null);
+  const layoutRef = useRef<OrbLayout>({
+    radius: 160,
+    centerX: 640,
+    centerY: 400,
+    availableH: 400,
+  });
   const askDimRef = useRef(false);
   const miniDrawRef = useRef({
     scatter: 0,
@@ -215,9 +222,27 @@ export function Orb() {
       ? formatMeetingSoonCopy(minutesBetween(now, day.nextEvent.start))
       : statusLineText(day, now);
 
+  const updateLayout = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const stackH = stackRef.current?.getBoundingClientRect().height ?? 0;
+    layoutRef.current = orbLayout(window.innerWidth, window.innerHeight, stackH);
+  }, []);
+
   useEffect(() => {
     gatherUntilRef.current = performance.now() + 2000;
   }, []);
+
+  useEffect(() => {
+    updateLayout();
+    const node = stackRef.current;
+    const observer = node ? new ResizeObserver(() => updateLayout()) : null;
+    if (node && observer) observer.observe(node);
+    window.addEventListener('resize', updateLayout);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateLayout);
+    };
+  }, [updateLayout, surface, miniOnly, firstOpen]);
 
   useEffect(() => {
     const busy = day.state === 'in-meeting' || day.state === 'in-run';
@@ -401,21 +426,13 @@ export function Orb() {
     let dpr = 1;
     
     const resize = () => {
-      // Fix aspect ratio with devicePixelRatio for perfect circle
       dpr = window.devicePixelRatio || 1;
-      
-      // Use physical pixels for canvas backing store
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
-      
-      // CSS size is logical pixels
       canvas.style.width = `${window.innerWidth}px`;
       canvas.style.height = `${window.innerHeight}px`;
-      
-      // Regenerate points when canvas resizes  
-      // Use physical pixels for radius
-      // radius 0.20 × 1.35 stray extension × 2 = 54% visual diameter
-      const physicalRadius = Math.min(canvas.width, canvas.height) * 0.20;
+      updateLayout();
+      const physicalRadius = layoutRef.current.radius * dpr;
       pointsRef.current = generatePoints(physicalRadius);
     };
     
@@ -423,6 +440,7 @@ export function Orb() {
     window.addEventListener('resize', resize);
     
     let time = 0;
+    let lastPhysicalRadius = 0;
     gatherUntilRef.current = Math.max(gatherUntilRef.current, performance.now() + 2000);
 
     const paintMini = () => {
@@ -437,7 +455,7 @@ export function Orb() {
       };
       for (const target of [miniWindow.canvasRef.current, previewCanvasRef.current]) {
         if (!target) continue;
-        ensureMiniCanvasSize(target, MINI_SIZE);
+        ensureMiniCanvasSize(target);
         drawMiniOrbOnCanvas(target, payload);
       }
     };
@@ -445,10 +463,15 @@ export function Orb() {
     const render = () => {
       time += 0.008;
       
-      // Work in physical pixels (canvas backing store coordinates)
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const radius = Math.min(canvas.width, canvas.height) * 0.20;
+      const layout = layoutRef.current;
+      const physicalRadius = layout.radius * dpr;
+      if (Math.abs(physicalRadius - lastPhysicalRadius) > 1) {
+        pointsRef.current = generatePoints(physicalRadius);
+        lastPhysicalRadius = physicalRadius;
+      }
+      const centerX = layout.centerX * dpr;
+      const centerY = layout.centerY * dpr;
+      const radius = physicalRadius;
       const gatherLeft = gatherUntilRef.current - performance.now();
       const gatherT = gatherLeft <= 0 ? 0 : (gatherLeft / 2000) ** 2;
       const visualScatter = gatherT + (1 - gatherT) * scatter;
@@ -590,7 +613,7 @@ export function Orb() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [scatter, nextEvent, generatePoints]);
+  }, [scatter, nextEvent, generatePoints, updateLayout]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -632,13 +655,10 @@ export function Orb() {
   };
 
   const isOverOrb = (clientX: number, clientY: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return false;
-    const rect = canvas.getBoundingClientRect();
-    const dx = clientX - (rect.left + rect.width / 2);
-    const dy = clientY - (rect.top + rect.height / 2);
-    const r = Math.min(rect.width, rect.height) * 0.2;
-    return dx * dx + dy * dy <= r * r;
+    const layout = layoutRef.current;
+    const dx = clientX - layout.centerX;
+    const dy = clientY - layout.centerY;
+    return dx * dx + dy * dy <= layout.radius * layout.radius;
   };
 
   const beginFocus = (
@@ -770,45 +790,51 @@ export function Orb() {
         </button>
       ) : firstOpen ? (
         <Welcome onConnect={() => setShowSettings(true)} />
-      ) : surface === 'meeting-soon' || surface === 'in-meeting' ? (
-        <StatusLine
-          text={line}
-          detail={hoverDetailText(day, now)}
-          hovered={showOverlay || hoverParam}
-          joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
-        />
-      ) : surface ? (
-        <FocusPrompt
-          surface={surface}
-          contextLine={statusLineText(day, now)}
-          task={surface === 'focusing' || surface === 'stop-confirm' ? activeTask : taskDraft}
-          onTaskChange={setTaskDraft}
-          recentTasks={recentTasks}
-          choice={durationChoice}
-          onChoiceChange={(next) => {
-            setDurationChoice(next);
-            saveLastDuration(next);
-          }}
-          untilMinutes={untilMinutes}
-          focusMinutes={manualTimeRemaining}
-          completedTask={completed?.task}
-          completedMinutes={completed?.minutes}
-          onStart={() => beginFocus(taskDraft, durationChoice)}
-          onKeepGoing={() => setStopConfirm(false)}
-          onEnd={() => {
-            setStopConfirm(false);
-            stopFocus();
-          }}
-          onBreak={startBreak}
-          onAnotherRound={() => beginFocus(completed?.task || taskDraft, durationChoice)}
-        />
       ) : (
-        <StatusLine
-          text={line}
-          detail={hoverDetailText(day, now)}
-          hovered={showOverlay || hoverParam}
-          joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
-        />
+        <div
+          ref={stackRef}
+          data-testid="bottom-stack"
+          className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2.5 px-4 pb-4 pt-1"
+        >
+          {surface === 'meeting-soon' || surface === 'in-meeting' || !surface ? (
+            <StatusLine
+              text={line}
+              detail={hoverDetailText(day, now)}
+              hovered={showOverlay || hoverParam}
+              joinUrl={isHeadsUp(day, now) ? extractJoinUrl(day.nextEvent) : null}
+            />
+          ) : (
+            <FocusPrompt
+              surface={surface}
+              contextLine={statusLineText(day, now)}
+              task={surface === 'focusing' || surface === 'stop-confirm' ? activeTask : taskDraft}
+              onTaskChange={setTaskDraft}
+              recentTasks={recentTasks}
+              choice={durationChoice}
+              onChoiceChange={(next) => {
+                setDurationChoice(next);
+                saveLastDuration(next);
+              }}
+              untilMinutes={untilMinutes}
+              focusMinutes={manualTimeRemaining}
+              completedTask={completed?.task}
+              completedMinutes={completed?.minutes}
+              onStart={() => beginFocus(taskDraft, durationChoice)}
+              onKeepGoing={() => setStopConfirm(false)}
+              onEnd={() => {
+                setStopConfirm(false);
+                stopFocus();
+              }}
+              onBreak={startBreak}
+              onAnotherRound={() => beginFocus(completed?.task || taskDraft, durationChoice)}
+            />
+          )}
+          <Timeline
+            events={day.events}
+            now={now}
+            hidden={surface === 'ask' || (isFullscreen && !showOverlay)}
+          />
+        </div>
       )}
 
       {miniOnly ? null : (
@@ -823,18 +849,6 @@ export function Orb() {
               : 'invisible pointer-events-none opacity-0'
           }`}
         >
-          <Timeline
-            events={day.events}
-            now={now}
-            hidden={isFullscreen && !showOverlay}
-          />
-          <FocusControl
-            isActive={isManualFocus}
-            timeRemaining={manualTimeRemaining}
-            onStart={(minutes) => beginFocus(taskDraft, minutes)}
-            onStop={() => setStopConfirm(true)}
-            smartFocus={day.state === 'free' ? smartFocusOption(now, day.nextEvent?.start ?? null) : null}
-          />
           <div className="fixed top-4 right-4 z-40 flex items-center gap-1">
             {pipSupported ? (
               <>
@@ -901,7 +915,11 @@ export function Orb() {
       {miniWindow.portal}
 
       {miniPreview ? (
-        <div className="pointer-events-auto fixed bottom-4 left-4 z-50">
+        <div
+          data-testid="mini-preview"
+          className="pointer-events-auto fixed bottom-4 left-4 z-50 overflow-hidden"
+          style={{ width: MINI_SIZE, height: MINI_SIZE }}
+        >
           <MiniOrbView
             status={miniStatus}
             canvasRef={previewCanvasRef}

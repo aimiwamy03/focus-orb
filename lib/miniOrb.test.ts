@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildDayModel } from './day';
 import { getMockEvents, parseNowParam } from './fixtures';
 import {
+  applyPipDocumentStyle,
   breathGlow,
   breathPhase,
   breathScale,
@@ -11,7 +12,9 @@ import {
   formatMiniStatus,
   LEAVE_TAB_HINT,
   loadPopOutOnLeave,
+  MINI_STATUS_BAND,
   miniOrbKind,
+  miniOrbLayout,
   miniVisualState,
   POP_OUT_ON_LEAVE_KEY,
   savePopOutOnLeave,
@@ -187,5 +190,31 @@ describe('hint copy', () => {
   it('has no em dashes', () => {
     expect(CHROME_HINT).not.toMatch(/[—–]/);
     expect(LEAVE_TAB_HINT).not.toMatch(/[—–]/);
+  });
+});
+
+describe('miniOrbLayout centers in any PiP size', () => {
+  it.each([
+    [180, 180],
+    [240, 180],
+    [320, 240],
+  ])('centers the orb in %i x %i above the status band', (width, height) => {
+    const layout = miniOrbLayout(width, height);
+    expect(layout.centerX).toBeCloseTo(width / 2);
+    expect(layout.centerY).toBeCloseTo((height - MINI_STATUS_BAND) / 2);
+    expect(layout.centerX / width).toBeCloseTo(0.5);
+    expect(layout.centerY).toBeLessThan(height / 2);
+  });
+});
+
+describe('applyPipDocumentStyle', () => {
+  it('clears html/body margin and fills the window', () => {
+    applyPipDocumentStyle(document);
+    expect(document.documentElement.style.margin.replace('px', '')).toBe('0');
+    expect(document.documentElement.style.width).toBe('100%');
+    expect(document.documentElement.style.height).toBe('100%');
+    expect(document.body.style.margin.replace('px', '')).toBe('0');
+    expect(document.body.style.width).toBe('100%');
+    expect(document.body.style.height).toBe('100%');
   });
 });

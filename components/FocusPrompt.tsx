@@ -103,17 +103,20 @@ export function FocusPrompt({
     <div
       data-testid="focus-prompt"
       data-surface={surface}
-      className="absolute left-1/2 z-20 flex w-[min(22rem,86vw)] -translate-x-1/2 flex-col items-center gap-3 text-center"
-      style={{ top: 'calc(50% + 26vmin + 28px)' }}
+      className="relative z-20 flex w-[min(22rem,86vw)] shrink-0 flex-col items-center gap-2.5 text-center"
     >
       {surface === 'ask' && contextLine ? (
-        <div data-text-clear className="text-[11px] leading-5 text-white/40">
+        <div
+          data-testid="prompt-context"
+          data-text-clear
+          className="text-[11px] leading-5 text-white/40"
+        >
           {contextLine}
         </div>
       ) : null}
 
       {surface === 'ask' ? (
-        <form onSubmit={onSubmit} className="flex w-full flex-col items-center gap-3">
+        <form onSubmit={onSubmit} className="flex w-full flex-col items-center gap-2.5">
           <label data-text-clear className="text-[13px] tracking-wide text-white/55">
             {ASK_PROMPT}
           </label>
@@ -141,7 +144,7 @@ export function FocusPrompt({
               ))}
             </div>
           ) : null}
-          <div className="flex flex-wrap justify-center gap-1">
+          <div data-testid="duration-chips" className="flex flex-wrap justify-center gap-1">
             {DURATION_CHIPS.map((minutes) => (
               <Chip
                 key={minutes}
