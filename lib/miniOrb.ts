@@ -3,9 +3,47 @@ import { calculateManualScatter, calculateScatter } from './scatter';
 import { formatCompactDuration } from './tab';
 
 export const MINI_SIZE = 180;
+export const MINI_STATUS_PAD_Y = 10;
+export const MINI_STATUS_PAD_X = 12;
+export const MINI_STATUS_LINE = 14;
+export const MINI_STATUS_BAND = MINI_STATUS_PAD_Y * 2 + MINI_STATUS_LINE;
 export const BREATH_PERIOD_MS = 5000;
 export const POP_OUT_ON_LEAVE_KEY = 'focusOrb:popOutOnLeave';
 export const MINI_BG = '#000000';
+
+export interface MiniOrbLayout {
+  centerX: number;
+  centerY: number;
+  radius: number;
+  availableH: number;
+}
+
+export function miniOrbLayout(
+  viewW: number,
+  viewH: number,
+  statusBand: number = MINI_STATUS_BAND
+): MiniOrbLayout {
+  const availableH = Math.max(1, viewH - Math.max(0, statusBand));
+  return {
+    centerX: viewW / 2,
+    centerY: availableH / 2,
+    radius: Math.min(viewW, availableH) * 0.28,
+    availableH,
+  };
+}
+
+export function applyPipDocumentStyle(doc: Document) {
+  const html = doc.documentElement;
+  const body = doc.body;
+  html.style.margin = '0';
+  html.style.width = '100%';
+  html.style.height = '100%';
+  body.style.margin = '0';
+  body.style.width = '100%';
+  body.style.height = '100%';
+  body.style.background = MINI_BG;
+  body.style.overflow = 'hidden';
+}
 
 export type MiniOrbKind = 'free' | 'focus' | 'meeting-soon' | 'in-meeting';
 

@@ -1,5 +1,5 @@
 import { collectTextClearRects, textClearAlpha, type ClearRect } from './textClear';
-import { MINI_BG, MINI_SIZE } from './miniOrb';
+import { MINI_BG, MINI_SIZE, miniOrbLayout } from './miniOrb';
 
 export interface MiniDrawFrame {
   scatter: number;
@@ -73,23 +73,44 @@ function pointsFor(radius: number): MiniPoint[] {
   return cached.points;
 }
 
-export function sizeMiniCanvas(canvas: HTMLCanvasElement, cssSize: number = MINI_SIZE): number {
-  const dpr = (canvas.ownerDocument?.defaultView?.devicePixelRatio || 1);
-  canvas.width = Math.round(cssSize * dpr);
-  canvas.height = Math.round(cssSize * dpr);
-  canvas.style.width = `${cssSize}px`;
-  canvas.style.height = `${cssSize}px`;
+export function readMiniCssSize(canvas: HTMLCanvasElement): {
+  width: number;
+  height: number;
+  dpr: number;
+} {
+  const win = canvas.ownerDocument?.defaultView;
+  const dpr = win?.devicePixelRatio || 1;
+  const parent = canvas.parentElement;
+  const width = canvas.clientWidth || parent?.clientWidth || 0;
+  const height = canvas.clientHeight || parent?.clientHeight || 0;
+  return {
+    width: Math.max(1, width || MINI_SIZE),
+    height: Math.max(1, height || MINI_SIZE),
+    dpr,
+  };
+}
+
+export function sizeMiniCanvas(
+  canvas: HTMLCanvasElement,
+  size?: { width: number; height: number; dpr?: number }
+): number {
+  const measured = size ?? readMiniCssSize(canvas);
+  const dpr = measured.dpr ?? 1;
+  const width = Math.max(1, measured.width);
+  const height = Math.max(1, measured.height);
+  canvas.width = Math.max(1, Math.round(width * dpr));
+  canvas.height = Math.max(1, Math.round(height * dpr));
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
   return dpr;
 }
 
-export function ensureMiniCanvasSize(
-  canvas: HTMLCanvasElement,
-  cssSize: number = MINI_SIZE
-): number {
-  const dpr = canvas.ownerDocument?.defaultView?.devicePixelRatio || 1;
-  const next = Math.round(cssSize * dpr);
-  if (canvas.width !== next || canvas.height !== next) {
-    return sizeMiniCanvas(canvas, cssSize);
+export function ensureMiniCanvasSize(canvas: HTMLCanvasElement): number {
+  const { width, height, dpr } = readMiniCssSize(canvas);
+  const nextW = Math.max(1, Math.round(width * dpr));
+  const nextH = Math.max(1, Math.round(height * dpr));
+  if (canvas.width !== nextW || canvas.height !== nextH) {
+    return sizeMiniCanvas(canvas, { width, height, dpr });
   }
   return dpr;
 }
@@ -103,9 +124,10 @@ export function drawMiniOrb(
   const dpr = options.dpr ?? 1;
   const width = canvas.width;
   const height = canvas.height;
-  const cx = width / 2;
-  const cy = height / 2 - 6 * dpr;
-  const radius = Math.min(width, height) * 0.28;
+  const layout = miniOrbLayout(width / dpr, height / dpr);
+  const cx = layout.centerX * dpr;
+  const cy = layout.centerY * dpr;
+  const radius = layout.radius * dpr;
   const points = pointsFor(radius);
   const scatter = frame.scatter;
   const scale = frame.scale;
@@ -180,7 +202,8 @@ export function drawMiniOrbOnCanvas(
 ): void {
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) return;
-  const dpr = canvas.width / MINI_SIZE || 1;
+  const cssWidth = canvas.clientWidth || MINI_SIZE;
+  const dpr = canvas.width / cssWidth || 1;
   const clearRects = collectTextClearRects(root);
   drawMiniOrb(ctx, frame, {
     dpr,

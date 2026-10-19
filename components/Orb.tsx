@@ -455,7 +455,7 @@ export function Orb() {
       };
       for (const target of [miniWindow.canvasRef.current, previewCanvasRef.current]) {
         if (!target) continue;
-        ensureMiniCanvasSize(target, MINI_SIZE);
+        ensureMiniCanvasSize(target);
         drawMiniOrbOnCanvas(target, payload);
       }
     };
@@ -915,7 +915,11 @@ export function Orb() {
       {miniWindow.portal}
 
       {miniPreview ? (
-        <div className="pointer-events-auto fixed bottom-4 left-4 z-50">
+        <div
+          data-testid="mini-preview"
+          className="pointer-events-auto fixed bottom-4 left-4 z-50 overflow-hidden"
+          style={{ width: MINI_SIZE, height: MINI_SIZE }}
+        >
           <MiniOrbView
             status={miniStatus}
             canvasRef={previewCanvasRef}

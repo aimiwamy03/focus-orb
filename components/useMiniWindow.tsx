@@ -3,16 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MiniOrbView } from '@/components/MiniOrbView';
-import { canUseDocumentPip, MINI_SIZE } from '@/lib/miniOrb';
-
-function stylePipDocument(doc: Document) {
-  doc.documentElement.style.height = '100%';
-  doc.body.style.margin = '0';
-  doc.body.style.background = '#000';
-  doc.body.style.overflow = 'hidden';
-  doc.body.style.width = `${MINI_SIZE}px`;
-  doc.body.style.height = `${MINI_SIZE}px`;
-}
+import { sizeMiniCanvas } from '@/lib/drawMiniOrb';
+import { applyPipDocumentStyle, canUseDocumentPip, MINI_SIZE } from '@/lib/miniOrb';
 
 export function useMiniWindow(options: {
   supported: boolean;
@@ -28,6 +20,19 @@ export function useMiniWindow(options: {
   onClosedRef.current = options.onClosed;
   onOrbClickRef.current = options.onOrbClick;
 
+  const measurePip = useCallback(() => {
+    const win = winRef.current;
+    if (!win || win.closed) return;
+    applyPipDocumentStyle(win.document);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    sizeMiniCanvas(canvas, {
+      width: win.innerWidth,
+      height: win.innerHeight,
+      dpr: win.devicePixelRatio || 1,
+    });
+  }, []);
+
   const close = useCallback(() => {
     const win = winRef.current;
     winRef.current = null;
@@ -42,10 +47,12 @@ export function useMiniWindow(options: {
   }, []);
 
   const handlePageHide = useCallback(() => {
+    const win = winRef.current;
+    if (win) win.removeEventListener('resize', measurePip);
     winRef.current = null;
     setContainer(null);
     onClosedRef.current();
-  }, []);
+  }, [measurePip]);
 
   const open = useCallback(async (): Promise<boolean> => {
     if (!options.supported || !canUseDocumentPip()) return false;
@@ -54,23 +61,33 @@ export function useMiniWindow(options: {
       const pip = window.documentPictureInPicture;
       if (!pip) return false;
       const win = await pip.requestWindow({ width: MINI_SIZE, height: MINI_SIZE });
-      stylePipDocument(win.document);
+      applyPipDocumentStyle(win.document);
       const root = win.document.createElement('div');
+      root.style.width = '100%';
+      root.style.height = '100%';
       win.document.body.appendChild(root);
       winRef.current = win;
       setContainer(root);
       win.addEventListener('pagehide', handlePageHide);
+      win.addEventListener('resize', measurePip);
+      measurePip();
       return true;
     } catch {
       return false;
     }
-  }, [handlePageHide, options.supported]);
+  }, [handlePageHide, measurePip, options.supported]);
+
+  useEffect(() => {
+    if (!container) return;
+    measurePip();
+  }, [container, measurePip, options.status]);
 
   useEffect(() => {
     return () => {
       const win = winRef.current;
       if (win) {
         win.removeEventListener('pagehide', handlePageHide);
+        win.removeEventListener('resize', measurePip);
         try {
           win.close();
         } catch {
@@ -78,7 +95,7 @@ export function useMiniWindow(options: {
         }
       }
     };
-  }, [handlePageHide]);
+  }, [handlePageHide, measurePip]);
 
   const portal =
     container &&

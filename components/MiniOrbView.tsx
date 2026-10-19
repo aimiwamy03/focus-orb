@@ -1,7 +1,13 @@
 'use client';
 
 import { CSSProperties, MutableRefObject, useEffect, useRef } from 'react';
-import { MINI_BG, MINI_SIZE } from '@/lib/miniOrb';
+import { sizeMiniCanvas } from '@/lib/drawMiniOrb';
+import {
+  MINI_BG,
+  MINI_STATUS_LINE,
+  MINI_STATUS_PAD_X,
+  MINI_STATUS_PAD_Y,
+} from '@/lib/miniOrb';
 
 interface MiniOrbViewProps {
   status: string;
@@ -28,15 +34,25 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
     if (!node) return;
     const handler = () => onClickRef.current();
     node.addEventListener('click', handler);
-    return () => node.removeEventListener('click', handler);
+    const measure = () => sizeMiniCanvas(node);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    const win = node.ownerDocument.defaultView;
+    win?.addEventListener('resize', measure);
+    return () => {
+      node.removeEventListener('click', handler);
+      observer.disconnect();
+      win?.removeEventListener('resize', measure);
+    };
   }, []);
 
   return (
     <div
       data-testid="mini-orb"
       style={{
-        width: MINI_SIZE,
-        height: MINI_SIZE,
+        width: '100%',
+        height: '100%',
         background: MINI_BG,
         position: 'relative',
         overflow: 'hidden',
@@ -61,16 +77,21 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
         data-text-clear
         style={{
           position: 'absolute',
-          bottom: 10,
-          left: 8,
-          right: 8,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          boxSizing: 'border-box',
+          padding: `${MINI_STATUS_PAD_Y}px ${MINI_STATUS_PAD_X}px`,
           textAlign: 'center',
           fontSize: 11,
-          lineHeight: '14px',
+          lineHeight: `${MINI_STATUS_LINE}px`,
           color: 'rgba(255,255,255,0.5)',
           pointerEvents: 'none',
           letterSpacing: '0.04em',
           zIndex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
       >
         {status}
