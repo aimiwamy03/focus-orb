@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { SHORTCUT_ROWS, SHORTCUTS_LABEL } from '@/lib/shortcuts';
+import { KeyHint } from './KeyHint';
 
 const HINTS_KEY = 'focusOrb:hints';
 const HINT_MS = 8000;
@@ -92,7 +94,8 @@ export function Hints({
             ? 'visible opacity-100'
             : 'invisible pointer-events-none opacity-0'
         }`}
-        aria-label="Show hints"
+        aria-label={SHORTCUTS_LABEL}
+        title={SHORTCUTS_LABEL}
       >
         ?
       </button>
@@ -103,8 +106,11 @@ export function Hints({
           data-text-clear
           className="fixed top-14 left-4 z-40 max-w-xs space-y-1.5 text-[11px] leading-5 text-white/55"
         >
-          {HINTS.map((hint) => (
-            <div key={hint.id}>{hint.text}</div>
+          {SHORTCUT_ROWS.map((row) => (
+            <div key={row.key} className="flex items-center gap-2">
+              <KeyHint label={row.key} />
+              <span>{row.action}</span>
+            </div>
           ))}
         </div>
       ) : next && ready && (chromeVisible || Boolean(bannerNext)) ? (
