@@ -11,7 +11,7 @@ export const HINTS = [
   { id: 'fullscreen', text: 'Press F for full screen' },
 ] as const;
 
-type HintId = (typeof HINTS)[number]['id'];
+export type HintId = (typeof HINTS)[number]['id'] | 'chrome' | 'leave-tab';
 
 function loadSeen(): Record<string, boolean> {
   if (typeof localStorage === 'undefined') return {};
@@ -31,9 +31,15 @@ interface HintsProps {
   active: boolean;
   chromeVisible: boolean;
   revision?: number;
+  banner?: { id: HintId; text: string } | null;
 }
 
-export function Hints({ active, chromeVisible, revision = 0 }: HintsProps) {
+export function Hints({
+  active,
+  chromeVisible,
+  revision = 0,
+  banner = null,
+}: HintsProps) {
   const [seen, setSeen] = useState<Record<string, boolean>>({});
   const [ready, setReady] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -43,7 +49,9 @@ export function Hints({ active, chromeVisible, revision = 0 }: HintsProps) {
     setReady(true);
   }, [revision]);
 
-  const next = HINTS.find((hint) => !seen[hint.id]);
+  const bannerNext =
+    banner && !seen[banner.id] ? banner : null;
+  const next = bannerNext ?? HINTS.find((hint) => !seen[hint.id]);
 
   useEffect(() => {
     if (!active || !ready || !next || helpOpen) return;
@@ -99,7 +107,7 @@ export function Hints({ active, chromeVisible, revision = 0 }: HintsProps) {
             <div key={hint.id}>{hint.text}</div>
           ))}
         </div>
-      ) : next && ready && chromeVisible ? (
+      ) : next && ready && (chromeVisible || Boolean(bannerNext)) ? (
         <div
           data-testid="hint"
           data-text-clear
