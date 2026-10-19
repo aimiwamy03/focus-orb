@@ -832,7 +832,7 @@ export function Orb() {
           <Timeline
             events={day.events}
             now={now}
-            hidden={isFullscreen && !showOverlay}
+            hidden={surface === 'ask' || (isFullscreen && !showOverlay)}
           />
         </div>
       )}

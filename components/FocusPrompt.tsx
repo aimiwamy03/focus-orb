@@ -106,7 +106,11 @@ export function FocusPrompt({
       className="relative z-20 flex w-[min(22rem,86vw)] shrink-0 flex-col items-center gap-2.5 text-center"
     >
       {surface === 'ask' && contextLine ? (
-        <div data-text-clear className="text-[11px] leading-5 text-white/40">
+        <div
+          data-testid="prompt-context"
+          data-text-clear
+          className="text-[11px] leading-5 text-white/40"
+        >
           {contextLine}
         </div>
       ) : null}

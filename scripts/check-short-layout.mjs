@@ -98,9 +98,13 @@ async function assertNoOverlap(page, viewport) {
     }
   }
 
-  const duplicate = page.getByText('Start focus', { exact: true });
-  if ((await duplicate.count()) > 0) {
-    throw new Error('Duplicate Start focus pill is still on screen');
+  await assertNoCornerPicker(page, viewport);
+
+  const startVisible =
+    (await start.count()) > 0 && (await start.isVisible());
+  const timeline = page.locator('[data-testid="timeline"]');
+  if (startVisible && (await timeline.count()) > 0 && (await timeline.isVisible())) {
+    throw new Error(`timeline is still under Start at ${viewport.width}x${viewport.height}`);
   }
 
   const overflow = await page.evaluate(() => ({
@@ -109,6 +113,29 @@ async function assertNoOverlap(page, viewport) {
   }));
   if (overflow.scrollHeight > overflow.innerHeight + 1) {
     throw new Error(`page scrolls at ${viewport.width}x${viewport.height}: ${overflow.scrollHeight} > ${overflow.innerHeight}`);
+  }
+}
+
+async function assertNoCornerPicker(page, viewport) {
+  const forbidden = ['Start focus', '25 min', '50 min', '90 min', 'Focus until'];
+  for (const text of forbidden) {
+    const count = await page.getByText(text, { exact: true }).count();
+    if (count > 0) {
+      throw new Error(`corner picker text "${text}" rendered at ${viewport.width}x${viewport.height}`);
+    }
+  }
+  if ((await page.locator('[data-testid="smart-focus"]').count()) > 0) {
+    throw new Error(`smart-focus picker rendered at ${viewport.width}x${viewport.height}`);
+  }
+  if ((await page.locator('[data-testid="focus-control"]').count()) > 0) {
+    throw new Error(`focus-control rendered at ${viewport.width}x${viewport.height}`);
+  }
+  const chips = page.locator('[data-testid="duration-chips"]');
+  if ((await chips.count()) > 0 && (await chips.isVisible())) {
+    const box = await chips.boundingBox();
+    if (box && box.x + box.width / 2 > viewport.width * 0.7) {
+      throw new Error(`duration chips are in the corner at ${viewport.width}x${viewport.height}`);
+    }
   }
 }
 
@@ -133,6 +160,51 @@ async function open(browser, viewport, search) {
   return page;
 }
 
+const STATES = [
+  {
+    name: 'ask',
+    path: ASK_PATH,
+    wait: '[data-testid="focus-start"]',
+    shot: null,
+  },
+  {
+    name: 'after-meeting',
+    path: '/?mock=back-to-back&now=15:00',
+    wait: '[data-testid="prompt-context"]',
+    shot: 'layout_after_meeting_no_corner_1280x640',
+  },
+  {
+    name: 'focusing',
+    path: FOCUS_PATH,
+    wait: '[data-testid="focus-countdown"]',
+    shot: 'layout_focusing_no_corner_1280x640',
+  },
+  {
+    name: 'stop',
+    path: '/?mock=open-afternoon&now=13:00&prompt=stop&focus=32.9&task=Deep%20work',
+    wait: '[data-testid="keep-going"]',
+    shot: null,
+  },
+  {
+    name: 'completed',
+    path: '/?mock=open-afternoon&now=13:00&prompt=done&task=Deep%20work&done=50',
+    wait: '[data-testid="focus-completed"]',
+    shot: null,
+  },
+  {
+    name: 'meeting-soon',
+    path: '/?mock=pre-meeting&now=13:25',
+    wait: '[data-testid="status-line"]',
+    shot: null,
+  },
+  {
+    name: 'in-meeting',
+    path: '/?mock=in-meeting&now=13:45',
+    wait: '[data-testid="status-line"]',
+    shot: null,
+  },
+];
+
 const shots = [];
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
@@ -147,22 +219,35 @@ try {
     await page.waitForSelector('[data-testid="focus-prompt"]');
     await page.waitForSelector('[data-testid="duration-chips"]');
     await page.waitForSelector('[data-testid="focus-start"]');
-    await page.waitForSelector('[data-testid="timeline"]');
     await page.getByText(/Free until/).waitFor({ timeout: 15000 });
     await waitForPaintedOrb(page);
     await assertNoOverlap(page, viewport);
-    shots.push(await shot(page, `layout_idle_${viewport.width}x${viewport.height}`));
+    shots.push(await shot(page, `layout_ask_no_corner_${viewport.width}x${viewport.height}`));
     await page.close();
   }
 
-  const focusViewport = { width: 1280, height: 640 };
-  const focusPage = await open(browser, focusViewport, FOCUS_PATH);
-  await focusPage.waitForSelector('[data-testid="focus-countdown"]', { timeout: 15000 });
-  await focusPage.waitForSelector('[data-testid="timeline"]');
-  await waitForPaintedOrb(focusPage);
-  await assertNoOverlap(focusPage, focusViewport);
-  shots.push(await shot(focusPage, 'layout_focusing_1280x640'));
-  await focusPage.close();
+  const typedViewport = { width: 1280, height: 640 };
+  const typed = await open(browser, typedViewport, ASK_PATH);
+  await typed.waitForSelector('[data-testid="focus-task"]');
+  await typed.getByText(/Free until/).waitFor({ timeout: 15000 });
+  await typed.fill('[data-testid="focus-task"]', 'Write the spec');
+  await typed.click('[data-testid="duration-50m"]');
+  await waitForPaintedOrb(typed);
+  await assertNoOverlap(typed, typedViewport);
+  shots.push(await shot(typed, 'layout_typed_no_corner_1280x640'));
+  await typed.close();
+
+  const short = { width: 1280, height: 640 };
+  for (const state of STATES) {
+    const page = await open(browser, short, state.path);
+    await page.waitForSelector(state.wait, { timeout: 15000 });
+    await assertNoOverlap(page, short);
+    if (state.shot) {
+      await waitForPaintedOrb(page);
+      shots.push(await shot(page, state.shot));
+    }
+    await page.close();
+  }
 
   console.log(JSON.stringify({ ok: true, shots }, null, 2));
 } finally {
