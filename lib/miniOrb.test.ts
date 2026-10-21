@@ -198,23 +198,31 @@ describe('miniOrbLayout centers in any PiP size', () => {
     [180, 180],
     [240, 180],
     [320, 240],
+    [600, 600],
   ])('centers the orb in %i x %i above the status band', (width, height) => {
     const layout = miniOrbLayout(width, height);
     expect(layout.centerX).toBeCloseTo(width / 2);
     expect(layout.centerY).toBeCloseTo((height - MINI_STATUS_BAND) / 2);
     expect(layout.centerX / width).toBeCloseTo(0.5);
     expect(layout.centerY).toBeLessThan(height / 2);
+    expect(layout.centerY + layout.radius).toBeLessThanOrEqual(height - MINI_STATUS_BAND + 1);
+  });
+
+  it('centers inside a canvas that is already the area above the status line', () => {
+    const layout = miniOrbLayout(600, 600 - MINI_STATUS_BAND, 0);
+    expect(layout.centerX).toBeCloseTo(300);
+    expect(layout.centerY).toBeCloseTo((600 - MINI_STATUS_BAND) / 2);
   });
 });
 
 describe('applyPipDocumentStyle', () => {
-  it('clears html/body margin and fills the window', () => {
-    applyPipDocumentStyle(document);
+  it('clears html/body margin and pins the window to pixel size', () => {
+    applyPipDocumentStyle(document, { width: 600, height: 600 });
     expect(document.documentElement.style.margin.replace('px', '')).toBe('0');
-    expect(document.documentElement.style.width).toBe('100%');
-    expect(document.documentElement.style.height).toBe('100%');
+    expect(document.documentElement.style.width).toBe('600px');
+    expect(document.documentElement.style.height).toBe('600px');
     expect(document.body.style.margin.replace('px', '')).toBe('0');
-    expect(document.body.style.width).toBe('100%');
-    expect(document.body.style.height).toBe('100%');
+    expect(document.body.style.width).toBe('600px');
+    expect(document.body.style.height).toBe('600px');
   });
 });

@@ -38,12 +38,16 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
+    const stage = node.parentElement;
+    if (stage) observer.observe(stage);
     const win = node.ownerDocument.defaultView;
     win?.addEventListener('resize', measure);
+    win?.visualViewport?.addEventListener('resize', measure);
     return () => {
       node.removeEventListener('click', handler);
       observer.disconnect();
       win?.removeEventListener('resize', measure);
+      win?.visualViewport?.removeEventListener('resize', measure);
     };
   }, []);
 
@@ -57,29 +61,38 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
         position: 'relative',
         overflow: 'hidden',
         fontFamily: 'system-ui, sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
         ...style,
       }}
     >
-      <canvas
-        data-testid="mini-orb-canvas"
-        ref={setRefs}
+      <div
+        data-testid="mini-orb-stage"
         style={{
-          position: 'absolute',
-          inset: 0,
+          flex: '1 1 auto',
+          minHeight: 0,
           width: '100%',
-          height: '100%',
-          cursor: 'pointer',
-          display: 'block',
+          position: 'relative',
         }}
-      />
+      >
+        <canvas
+          data-testid="mini-orb-canvas"
+          ref={setRefs}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            cursor: 'pointer',
+            display: 'block',
+          }}
+        />
+      </div>
       <div
         data-testid="mini-status"
         data-text-clear
         style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
+          flex: '0 0 auto',
           boxSizing: 'border-box',
           padding: `${MINI_STATUS_PAD_Y}px ${MINI_STATUS_PAD_X}px`,
           textAlign: 'center',

@@ -48,7 +48,9 @@ import {
   shouldShowShortcutsCard,
 } from '@/lib/shortcuts';
 import { drawMiniOrbOnCanvas, ensureMiniCanvasSize } from '@/lib/drawMiniOrb';
+import { sizeOrbCanvas } from '@/lib/orbCanvas';
 import { useMiniWindow } from '@/components/useMiniWindow';
+import { StackBoundary } from '@/components/StackBoundary';
 import { Settings } from './Settings';
 import { Hints, markHintSeen } from './Hints';
 import { FocusPrompt } from './FocusPrompt';
@@ -143,6 +145,8 @@ export function Orb() {
   const hoverBoostRef = useRef(1);
   const prevBusyRef = useRef(false);
   const prevFocusRef = useRef(false);
+  const scatterRef = useRef(scatter);
+  scatterRef.current = scatter;
   
   const calendar = useCalendar();
   const { nextEvent, day, now, scatterWindow } = calendar;
@@ -234,8 +238,11 @@ export function Orb() {
 
   const updateLayout = useCallback(() => {
     if (typeof window === 'undefined') return;
+    const canvas = canvasRef.current;
+    const viewW = canvas?.clientWidth || window.innerWidth;
+    const viewH = canvas?.clientHeight || window.innerHeight;
     const stackH = stackRef.current?.getBoundingClientRect().height ?? 0;
-    layoutRef.current = orbLayout(window.innerWidth, window.innerHeight, stackH);
+    layoutRef.current = orbLayout(viewW, viewH, stackH);
   }, []);
 
   useEffect(() => {
@@ -243,14 +250,18 @@ export function Orb() {
   }, []);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) sizeOrbCanvas(canvas);
     updateLayout();
     const node = stackRef.current;
     const observer = node ? new ResizeObserver(() => updateLayout()) : null;
     if (node && observer) observer.observe(node);
     window.addEventListener('resize', updateLayout);
+    window.visualViewport?.addEventListener('resize', updateLayout);
     return () => {
       observer?.disconnect();
       window.removeEventListener('resize', updateLayout);
+      window.visualViewport?.removeEventListener('resize', updateLayout);
     };
   }, [updateLayout, surface, miniOnly, firstOpen]);
 
@@ -434,20 +445,28 @@ export function Orb() {
     if (!ctx) return;
     
     let dpr = 1;
+    let lastBox = { width: 0, height: 0, dpr: 0 };
     
     const resize = () => {
-      dpr = window.devicePixelRatio || 1;
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+      const sized = sizeOrbCanvas(canvas);
+      const boxChanged =
+        Math.abs(sized.width - lastBox.width) > 0.5 ||
+        Math.abs(sized.height - lastBox.height) > 0.5 ||
+        sized.dpr !== lastBox.dpr;
+      dpr = sized.dpr;
       updateLayout();
+      if (!boxChanged && pointsRef.current.length > 0) return;
+      lastBox = sized;
       const physicalRadius = layoutRef.current.radius * dpr;
       pointsRef.current = generatePoints(physicalRadius);
     };
     
     resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    if (canvas.parentElement) observer.observe(canvas.parentElement);
     window.addEventListener('resize', resize);
+    window.visualViewport?.addEventListener('resize', resize);
     
     let time = 0;
     let lastPhysicalRadius = 0;
@@ -484,7 +503,7 @@ export function Orb() {
       const radius = physicalRadius;
       const gatherLeft = gatherUntilRef.current - performance.now();
       const gatherT = gatherLeft <= 0 ? 0 : (gatherLeft / 2000) ** 2;
-      const visualScatter = gatherT + (1 - gatherT) * scatter;
+      const visualScatter = gatherT + (1 - gatherT) * scatterRef.current;
       const hoverBoost = hoverBoostRef.current;
       const breatheAmp = visualScatter < 0.05 ? 0.05 : 0.03;
       
@@ -618,12 +637,14 @@ export function Orb() {
     render();
     
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', resize);
+      window.visualViewport?.removeEventListener('resize', resize);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [scatter, nextEvent, generatePoints, updateLayout]);
+  }, [generatePoints, updateLayout]);
 
   const dismissShortcutsCard = useCallback(() => {
     saveShortcutsCardSeen();
@@ -865,7 +886,9 @@ export function Orb() {
             />
           )}
           {showShortcutsCard ? (
-            <ShortcutsCard onDismiss={dismissShortcutsCard} />
+            <StackBoundary>
+              <ShortcutsCard onDismiss={dismissShortcutsCard} />
+            </StackBoundary>
           ) : null}
           <Timeline
             events={day.events}
