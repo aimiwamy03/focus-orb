@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { calculateScatter, calculateManualScatter } from '@/lib/scatter';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
@@ -39,7 +38,12 @@ import {
   MINI_SIZE,
   POP_OUT_LABEL,
   savePopOutOnLeave,
+  scatterFromVisualInput,
 } from '@/lib/miniOrb';
+import {
+  shouldRegeneratePoints,
+  stepVisualScatter,
+} from '@/lib/orbMotion';
 import {
   FULLSCREEN_LABEL,
   isShortcutKey,
@@ -141,11 +145,9 @@ export function Orb() {
     focusing: false,
     reducedMotion: false,
   });
-  const gatherUntilRef = useRef(0);
   const hoverBoostRef = useRef(1);
-  const prevBusyRef = useRef(false);
-  const prevFocusRef = useRef(false);
   const scatterRef = useRef(scatter);
+  const visualScatterRef = useRef(scatter);
   scatterRef.current = scatter;
   
   const calendar = useCalendar();
@@ -246,10 +248,6 @@ export function Orb() {
   }, []);
 
   useEffect(() => {
-    gatherUntilRef.current = performance.now() + 2000;
-  }, []);
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) sizeOrbCanvas(canvas);
     updateLayout();
@@ -264,21 +262,6 @@ export function Orb() {
       window.visualViewport?.removeEventListener('resize', updateLayout);
     };
   }, [updateLayout, surface, miniOnly, firstOpen]);
-
-  useEffect(() => {
-    const busy = day.state === 'in-meeting' || day.state === 'in-run';
-    if (prevBusyRef.current && !busy) {
-      gatherUntilRef.current = performance.now() + 2000;
-    }
-    prevBusyRef.current = busy;
-  }, [day.state]);
-
-  useEffect(() => {
-    if (prevFocusRef.current && !isManualFocus) {
-      gatherUntilRef.current = performance.now() + 2000;
-    }
-    prevFocusRef.current = isManualFocus;
-  }, [isManualFocus]);
 
   useEffect(() => {
     setPopOutOnLeave(loadPopOutOnLeave());
@@ -416,19 +399,15 @@ export function Orb() {
     if (isDemoMode || debugScatter !== null) return;
     
     const updateScatter = () => {
-      if (isManualFocus && manualTimeRemaining !== null && manualTotalDuration !== null) {
-        // Manual focus: use calculateManualScatter with total duration
-        const manualScatter = calculateManualScatter(manualTimeRemaining, manualTotalDuration);
-        setScatter(manualScatter);
-      } else if (day.state === 'in-meeting' || day.state === 'in-run') {
-        setScatter(1);
-      } else if (day.nextEvent) {
-        const minutesToStart = minutesBetween(now, day.nextEvent.start);
-        setScatter(calculateScatter(minutesToStart, scatterWindow));
-      } else {
-        // No meetings left today
-        setScatter(0);
-      }
+      const next = scatterFromVisualInput({
+        isManualFocus,
+        focusMinutes: manualTimeRemaining,
+        totalMinutes: manualTotalDuration,
+        model: day,
+        now,
+        scatterWindow,
+      });
+      setScatter((prev) => (Math.abs(prev - next) < 1e-6 ? prev : next));
     };
     
     updateScatter();
@@ -446,6 +425,7 @@ export function Orb() {
     
     let dpr = 1;
     let lastBox = { width: 0, height: 0, dpr: 0 };
+    let lastPhysicalRadius = 0;
     
     const resize = () => {
       const sized = sizeOrbCanvas(canvas);
@@ -455,10 +435,22 @@ export function Orb() {
         sized.dpr !== lastBox.dpr;
       dpr = sized.dpr;
       updateLayout();
-      if (!boxChanged && pointsRef.current.length > 0) return;
-      lastBox = sized;
       const physicalRadius = layoutRef.current.radius * dpr;
-      pointsRef.current = generatePoints(physicalRadius);
+      if (
+        pointsRef.current.length > 0 &&
+        !boxChanged &&
+        !shouldRegeneratePoints(lastPhysicalRadius, physicalRadius)
+      ) {
+        return;
+      }
+      lastBox = sized;
+      if (
+        pointsRef.current.length === 0 ||
+        shouldRegeneratePoints(lastPhysicalRadius, physicalRadius)
+      ) {
+        pointsRef.current = generatePoints(physicalRadius);
+        lastPhysicalRadius = physicalRadius;
+      }
     };
     
     resize();
@@ -469,14 +461,13 @@ export function Orb() {
     window.visualViewport?.addEventListener('resize', resize);
     
     let time = 0;
-    let lastPhysicalRadius = 0;
-    gatherUntilRef.current = Math.max(gatherUntilRef.current, performance.now() + 2000);
+    let lastTs = 0;
 
-    const paintMini = () => {
+    const paintMini = (visualScatter: number) => {
       const frame = miniDrawRef.current;
       const phase = frame.focusing ? breathPhase(performance.now()) : 0;
       const payload = {
-        scatter: frame.scatter,
+        scatter: visualScatter,
         density: frame.density,
         dim: frame.dim,
         scale: frame.focusing ? breathScale(phase, frame.reducedMotion) : 1,
@@ -489,21 +480,34 @@ export function Orb() {
       }
     };
     
-    const render = () => {
+    const render = (ts: number) => {
+      const dt = lastTs === 0 ? 16 : Math.min(64, ts - lastTs);
+      lastTs = ts;
       time += 0.008;
+
+      visualScatterRef.current = stepVisualScatter(
+        visualScatterRef.current,
+        scatterRef.current,
+        dt
+      );
+      const visualScatter = visualScatterRef.current;
+      const debug = window as Window & {
+        __orbScatter?: { target: number; visual: number };
+      };
+      debug.__orbScatter = {
+        target: scatterRef.current,
+        visual: visualScatter,
+      };
       
       const layout = layoutRef.current;
       const physicalRadius = layout.radius * dpr;
-      if (Math.abs(physicalRadius - lastPhysicalRadius) > 1) {
+      if (shouldRegeneratePoints(lastPhysicalRadius, physicalRadius)) {
         pointsRef.current = generatePoints(physicalRadius);
         lastPhysicalRadius = physicalRadius;
       }
       const centerX = layout.centerX * dpr;
       const centerY = layout.centerY * dpr;
       const radius = physicalRadius;
-      const gatherLeft = gatherUntilRef.current - performance.now();
-      const gatherT = gatherLeft <= 0 ? 0 : (gatherLeft / 2000) ** 2;
-      const visualScatter = gatherT + (1 - gatherT) * scatterRef.current;
       const hoverBoost = hoverBoostRef.current;
       const breatheAmp = visualScatter < 0.05 ? 0.05 : 0.03;
       
@@ -512,7 +516,7 @@ export function Orb() {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       if (miniOnlyRef.current) {
-        paintMini();
+        paintMini(visualScatter);
         animationRef.current = requestAnimationFrame(render);
         return;
       }
@@ -629,12 +633,12 @@ export function Orb() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      paintMini();
+      paintMini(visualScatter);
       
       animationRef.current = requestAnimationFrame(render);
     };
     
-    render();
+    animationRef.current = requestAnimationFrame(render);
     
     return () => {
       observer.disconnect();
@@ -644,6 +648,9 @@ export function Orb() {
         cancelAnimationFrame(animationRef.current);
       }
     };
+    // Scatter and nextEvent must stay out of these deps. On production main
+    // they remounted this effect, restarted a 2s gather, and slammed the
+    // dots to fully scattered every calendar poll or scatter tick.
   }, [generatePoints, updateLayout]);
 
   const dismissShortcutsCard = useCallback(() => {

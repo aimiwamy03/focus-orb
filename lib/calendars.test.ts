@@ -7,6 +7,7 @@ import {
   parseGoogleCalendarList,
   parseGoogleEvents,
   resolveSelectedCalendarIds,
+  sameCalendarIds,
 } from './calendars';
 
 const personalEvent = {
@@ -114,5 +115,13 @@ describe('resolveSelectedCalendarIds', () => {
     expect(resolveSelectedCalendarIds(calendars, ['work@company.com'])).toEqual([
       'work@company.com',
     ]);
+  });
+
+  it('treats the same id list as unchanged so a poll cannot retrigger fetch', () => {
+    const first = resolveSelectedCalendarIds(calendars, ['primary']);
+    const second = resolveSelectedCalendarIds(calendars, ['primary']);
+    expect(first).not.toBe(second);
+    expect(sameCalendarIds(first, second)).toBe(true);
+    expect(sameCalendarIds(first, ['work@company.com'])).toBe(false);
   });
 });

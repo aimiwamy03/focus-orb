@@ -10,6 +10,7 @@ import {
   mergeEventsFromCalendars,
   MOCK_GOOGLE_CALENDARS,
   resolveSelectedCalendarIds,
+  sameCalendarIds,
   saveSelectedCalendarIds,
 } from './calendars';
 import { interpretAuthSession, shouldUseGoogleFromSession } from './onboarding';
@@ -74,11 +75,13 @@ export function useCalendar() {
       setAuthMethod('google');
       setIsGoogleConnected(true);
       setCalendars(MOCK_GOOGLE_CALENDARS);
-      setSelectedCalendarIds((current) =>
-        current.length > 0
-          ? resolveSelectedCalendarIds(MOCK_GOOGLE_CALENDARS, current)
-          : resolveSelectedCalendarIds(MOCK_GOOGLE_CALENDARS, loadSelectedCalendarIds())
-      );
+      setSelectedCalendarIds((current) => {
+        const resolved = resolveSelectedCalendarIds(
+          MOCK_GOOGLE_CALENDARS,
+          current.length > 0 ? current : loadSelectedCalendarIds()
+        );
+        return sameCalendarIds(current, resolved) ? current : resolved;
+      });
     }
   }, [mockCalendars]);
 
@@ -178,8 +181,11 @@ export function useCalendar() {
         listed,
         calendarIds.length > 0 ? calendarIds : loadSelectedCalendarIds()
       );
-      setSelectedCalendarIds(resolved);
-      saveSelectedCalendarIds(resolved);
+      setSelectedCalendarIds((current) => {
+        if (sameCalendarIds(current, resolved)) return current;
+        saveSelectedCalendarIds(resolved);
+        return resolved;
+      });
 
       const params = new URLSearchParams({ calendars: resolved.join(',') });
       const response = await fetch(`/api/calendar/google?${params}`);

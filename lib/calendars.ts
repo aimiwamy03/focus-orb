@@ -69,6 +69,10 @@ export function resolveSelectedCalendarIds(
   return defaultSelectedCalendarIds(calendars);
 }
 
+export function sameCalendarIds(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
 export function parseGoogleCalendarList(payload: {
   items?: GoogleCalendarListItem[];
 }): CalendarInfo[] {
