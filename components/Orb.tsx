@@ -100,8 +100,13 @@ import {
   savePlayIntro,
   shouldPlayIntro,
 } from '@/lib/intro';
+import {
+  loadShowBackdrop,
+  saveShowBackdrop,
+} from '@/lib/backdrop';
 import { SAMPLE_DAY_LABEL } from '@/lib/fixtures';
 import { signInWithGoogle } from '@/app/actions';
+import { StarDustBackdrop } from './StarDustBackdrop';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -171,6 +176,7 @@ export function Orb() {
   const [leaveHint, setLeaveHint] = useState(false);
   const [showShortcutsCard, setShowShortcutsCard] = useState(false);
   const [showAgenda, setShowAgenda] = useState(true);
+  const [showBackdrop, setShowBackdrop] = useState(true);
   const [showIntro, setShowIntro] = useState(false);
   const [playIntro, setPlayIntro] = useState(true);
   const [introSound, setIntroSound] = useState(false);
@@ -183,6 +189,7 @@ export function Orb() {
   const settingsOpenRef = useRef(false);
   const logOpenRef = useRef(false);
   const introOpenRef = useRef(false);
+  const showBackdropRef = useRef(true);
   const surfaceRef = useRef<PromptSurface | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
@@ -542,7 +549,7 @@ export function Orb() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    const ctx = canvas.getContext('2d', { alpha: false });
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
     
     let dpr = 1;
@@ -633,9 +640,12 @@ export function Orb() {
       const hoverBoost = hoverBoostRef.current;
       const breatheAmp = visualScatter < 0.05 ? 0.05 : 0.03;
       
-      // Clear with dark background
-      ctx.fillStyle = '#161616';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (showBackdropRef.current) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
       if (miniOnlyRef.current) {
         paintMini(visualScatter);
@@ -750,12 +760,24 @@ export function Orb() {
         }
       }
       
-      // Dim during a meeting, or quietly while asking
-      if (inBusyRef.current && !miniOnlyRef.current) {
-        ctx.fillStyle = 'rgba(22, 22, 22, 0.75)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else if (askDimRef.current && !miniOnlyRef.current) {
-        ctx.fillStyle = 'rgba(22, 22, 22, 0.42)';
+      // Dim the orb disk during a meeting, or quietly while asking.
+      // Keep it radial so star-dust corners stay visible.
+      if (
+        (inBusyRef.current || askDimRef.current) &&
+        !miniOnlyRef.current
+      ) {
+        const alpha = inBusyRef.current ? 0.75 : 0.42;
+        const veil = ctx.createRadialGradient(
+          centerX,
+          centerY,
+          radius * 0.7,
+          centerX,
+          centerY,
+          radius * 1.28
+        );
+        veil.addColorStop(0, `rgba(0, 0, 0, ${alpha})`);
+        veil.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = veil;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
@@ -955,6 +977,7 @@ export function Orb() {
 
   useEffect(() => {
     setShowAgenda(loadShowAgenda());
+    setShowBackdrop(loadShowBackdrop());
   }, []);
 
   useEffect(() => {
@@ -970,6 +993,7 @@ export function Orb() {
   settingsOpenRef.current = showSettings;
   logOpenRef.current = showLog;
   introOpenRef.current = showIntro;
+  showBackdropRef.current = showBackdrop;
   surfaceRef.current = surface;
   miniOnlyRef.current = miniOnly;
 
@@ -1007,8 +1031,9 @@ export function Orb() {
     <div 
       data-testid="orb-root"
       data-log-open={showLog ? 'true' : 'false'}
+      data-backdrop={showBackdrop ? 'true' : 'false'}
       data-cursor-hidden={hideCursor ? 'true' : 'false'}
-      className={`relative h-screen w-screen overflow-hidden ${hideCursor ? 'cursor-none' : ''}`}
+      className={`relative h-screen w-screen overflow-hidden bg-black ${hideCursor ? 'cursor-none' : ''}`}
       data-satellites={day.remainingInRun.length}
       onMouseMove={(e) => {
         const over = isOverOrb(e.clientX, e.clientY);
@@ -1034,10 +1059,11 @@ export function Orb() {
       }}
     >
       <title>{tabTitle}</title>
+      <StarDustBackdrop enabled={showBackdrop} />
       <canvas
         ref={canvasRef}
         data-testid="orb-canvas"
-        className={`absolute inset-0 ${miniOnly ? 'opacity-0' : ''} ${orbHovered && !firstOpen && !miniOnly ? 'cursor-pointer' : ''}`}
+        className={`absolute inset-0 z-[1] ${miniOnly ? 'opacity-0' : ''} ${orbHovered && !firstOpen && !miniOnly ? 'cursor-pointer' : ''}`}
         onClick={(e) => {
           if (isOverOrb(e.clientX, e.clientY)) handleOrbClick();
         }}
@@ -1298,6 +1324,11 @@ export function Orb() {
           setShowAgenda={(value) => {
             setShowAgenda(value);
             saveShowAgenda(value);
+          }}
+          showBackdrop={showBackdrop}
+          setShowBackdrop={(value) => {
+            setShowBackdrop(value);
+            saveShowBackdrop(value);
           }}
           onClearLog={() => setFocusLog(clearFocusLog(logKey))}
           playIntro={playIntro}

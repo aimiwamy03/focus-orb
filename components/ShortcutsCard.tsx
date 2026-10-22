@@ -22,7 +22,7 @@ export function ShortcutsCard({ onDismiss }: ShortcutsCardProps) {
     <div
       data-testid="shortcuts-card"
       data-text-clear
-      className="fixed top-4 left-4 z-40 max-w-xs space-y-2 text-[length:var(--type-hint)] leading-5 text-orb-dim"
+      className="fixed top-4 left-4 z-40 max-w-xs space-y-2 text-[length:var(--type-hint)] leading-5 text-orb-dim [text-shadow:0_0_14px_rgba(0,0,0,0.9),0_1px_2px_rgba(0,0,0,0.8)]"
     >
       <ul className="space-y-2">
         {SHORTCUT_ROWS.map((row) => (

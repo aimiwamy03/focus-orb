@@ -33,10 +33,49 @@
 body {
   margin: 0;
   padding: 0;
-  background: #161616;
+  background: #000;
   color: #e8e8e8;
   font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
+}
+
+.star-dust {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: #000;
+}
+
+.star-dust picture,
+.star-dust img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.star-dust img {
+  object-fit: cover;
+  object-position: center;
+  filter: brightness(0.5);
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .star-dust img {
+    object-position: left top;
+  }
+}
+
+.star-dust-dim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 22rem 16rem at 0 0, rgba(0, 0, 0, 0.8), transparent 72%),
+    radial-gradient(ellipse 40% 36% at 100% 100%, rgba(0, 0, 0, 0.22), transparent 70%),
+    rgba(0, 0, 0, 0.12);
 }
 
 * {

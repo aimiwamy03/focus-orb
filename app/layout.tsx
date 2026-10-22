@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ICON_HREFS } from "@/lib/backdrop";
 import { TYPE_CSS } from "@/lib/typeCss";
 import "./globals.css";
 
@@ -19,6 +20,15 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description: "A dithered particle sphere that visualizes focus time and upcoming meetings",
+  icons: {
+    icon: [
+      { url: ICON_HREFS.svg, type: "image/svg+xml" },
+      { url: ICON_HREFS.png32, sizes: "32x32", type: "image/png" },
+      { url: ICON_HREFS.ico, sizes: "any" },
+    ],
+    apple: [{ url: ICON_HREFS.apple, sizes: "180x180" }],
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

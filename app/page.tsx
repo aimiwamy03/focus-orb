@@ -9,7 +9,7 @@ function OrbWrapper() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="w-screen h-screen bg-[#161616]" />}>
+    <Suspense fallback={<div className="w-screen h-screen bg-black" />}>
       <OrbWrapper />
     </Suspense>
   );
