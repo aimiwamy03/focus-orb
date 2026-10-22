@@ -75,6 +75,14 @@ await stills.waitForTimeout(400);
 await publish(stills, 'intro_mid_turn.png');
 await stills.goto(`${BASE}/?mock=empty&intro=1&t=3.2`, { waitUntil: 'networkidle' });
 await stills.waitForTimeout(400);
+const hintStyle = await stills.getByTestId('focus-intro-hint').evaluate((el) => {
+  const style = getComputedStyle(el);
+  return { color: style.color, size: parseFloat(style.fontSize) };
+});
+if (hintStyle.size < 15) fail(`Skip hint should be at least 15px, got ${hintStyle.size}`);
+if (hintStyle.color !== 'rgb(161, 161, 166)') {
+  fail(`Skip hint should be #a1a1a6, got ${hintStyle.color}`);
+}
 await publish(stills, 'intro_caption_rest.png');
 await stills.goto(`${BASE}/?mock=empty&intro=1&t=7.2`, { waitUntil: 'networkidle' });
 await stills.waitForTimeout(400);
@@ -108,17 +116,47 @@ await mobile.goto(`${BASE}/?mock=empty&intro=1&t=1.8`, { waitUntil: 'networkidle
 await mobile.waitForTimeout(400);
 const fit = await mobile.evaluate(() => {
   const caption = document.querySelector('[data-testid="focus-intro-caption"]');
-  if (!caption) return { ok: false };
-  const rect = caption.getBoundingClientRect();
+  const art = document.querySelector('[data-testid="focus-intro-art"]');
+  if (!caption || !art) return { ok: false };
+  const style = getComputedStyle(caption);
+  const fontSize = parseFloat(style.fontSize);
+  const cap = caption.getBoundingClientRect();
+  const artBox = art.getBoundingClientRect();
+  const nw = art.naturalWidth || 2400;
+  const nh = art.naturalHeight || 1347;
+  const ir = nw / nh;
+  const er = artBox.width / artBox.height;
+  let w;
+  let h;
+  if (er > ir) {
+    h = artBox.height;
+    w = h * ir;
+  } else {
+    w = artBox.width;
+    h = w / ir;
+  }
+  const paper = {
+    left: artBox.left + (artBox.width - w) / 2,
+    top: artBox.top + (artBox.height - h) / 2,
+    right: artBox.left + (artBox.width - w) / 2 + w,
+    bottom: artBox.top + (artBox.height - h) / 2 + h,
+  };
+  const wrapped = cap.height >= fontSize * 1.6;
+  const fits = cap.width <= window.innerWidth + 1 && cap.right <= window.innerWidth + 2;
+  const overArt = cap.top >= paper.top - 8 && cap.bottom <= paper.bottom + 8;
   return {
-    ok: caption.scrollWidth <= window.innerWidth + 1,
+    ok: fontSize >= 24 && wrapped && fits && overArt,
+    fontSize,
+    wrapped,
+    fits,
+    overArt,
+    lines: cap.height / fontSize,
     text: caption.textContent,
-    scrollWidth: caption.scrollWidth,
-    fontSize: getComputedStyle(caption).fontSize,
-    width: rect.width,
+    wrap: style.textWrap || style.overflowWrap,
+    whiteSpace: style.whiteSpace,
   };
 });
-if (!fit.ok) fail(`First caption should fit at 375px, got ${JSON.stringify(fit)}`);
+if (!fit.ok) fail(`First caption should wrap at 24px+ over the art at 375px, got ${JSON.stringify(fit)}`);
 await publish(mobile, 'intro_mobile_375.png');
 await mobile.close();
 

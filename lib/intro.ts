@@ -6,6 +6,11 @@ export const INTRO_SOUND_KEY = 'focusOrb:introSound';
 export const PLAY_INTRO_LABEL = 'Play intro';
 export const INTRO_SOUND_LABEL = 'Intro sound';
 export const INTRO_SKIP_HINT = 'Esc to skip';
+export const INTRO_HINT_COLOR = '#a1a1a6';
+export const INTRO_HINT_SIZE_PX = 16;
+export const INTRO_MIN_CAPTION_PX = 24;
+export const INTRO_NARROW_PX = 520;
+export const INTRO_NARROW_ART_ZOOM = 1.45;
 export const INTRO_ART_SRC = '/intro/intro-brain.webp';
 export const INTRO_ART_FALLBACK = '/intro/intro-brain.jpg';
 export const INTRO_FONT_SRC = '/intro/cormorant.woff2';
@@ -86,6 +91,14 @@ export const INTRO_TIMELINE = introTimeline();
 
 export function introClockSpeed(reduced: boolean): number {
   return reduced ? INTRO_TIMELINE.total / INTRO_REDUCED_TOTAL : 1;
+}
+
+export function introNarrow(width: number): boolean {
+  return width <= INTRO_NARROW_PX;
+}
+
+export function introArtZoom(width: number): number {
+  return introNarrow(width) ? INTRO_NARROW_ART_ZOOM : 1;
 }
 
 export function clamp(value: number, min = 0, max = 1): number {

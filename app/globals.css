@@ -407,6 +407,13 @@ body {
   transition: opacity 300ms ease;
 }
 
+.focus-intro-art-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .focus-intro-art {
   position: absolute;
   inset: 0;
@@ -417,6 +424,13 @@ body {
   will-change: transform, opacity, filter;
   transform-origin: 50% 48%;
   pointer-events: none;
+}
+
+@media (max-width: 520px) {
+  .focus-intro-art-frame {
+    transform: scale(1.45);
+    transform-origin: 50% 48%;
+  }
 }
 
 .focus-intro-vignette {
@@ -443,23 +457,40 @@ body {
 }
 
 .focus-intro-face,
-.focus-intro-rest {
+.focus-intro-rest,
+.focus-intro-copy {
   font-family: 'Intro Cormorant', 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   font-weight: 600;
-  font-size: clamp(18px, 3.2vw, 40px);
+  font-size: clamp(24px, 3.2vw, 40px);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   white-space: nowrap;
   color: #fff;
   text-shadow: 0 0 18px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.85);
+}
+
+.focus-intro-copy {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   padding-left: 0.3em;
+  text-align: center;
+  text-wrap: balance;
 }
 
 @media (max-width: 520px) {
   .focus-intro-face,
-  .focus-intro-rest {
-    letter-spacing: 0.12em;
-    padding-left: 0.12em;
+  .focus-intro-rest,
+  .focus-intro-copy {
+    white-space: normal;
+    text-wrap: balance;
+    letter-spacing: 0.14em;
+    line-height: 1.28;
+  }
+
+  .focus-intro-copy {
+    padding-left: 0.14em;
   }
 }
 
@@ -488,6 +519,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
   backface-visibility: hidden;
 }
 
@@ -532,8 +564,8 @@ body {
   right: 24px;
   bottom: 24px;
   margin: 0;
-  color: #8a8a90;
-  font: 15px -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: #a1a1a6;
+  font: 16px -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   opacity: 0;
   pointer-events: none;
 }

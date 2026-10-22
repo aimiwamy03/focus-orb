@@ -6,6 +6,7 @@ import {
   INTRO_ART_SRC,
   INTRO_AUDIO,
   INTRO_LINES,
+  INTRO_MIN_CAPTION_PX,
   INTRO_SKIP_HINT,
   INTRO_SKIP_MS,
   INTRO_TIMELINE,
@@ -39,6 +40,7 @@ export function FocusIntro({
   const sceneRef = useRef<HTMLDivElement>(null);
   const cubeRef = useRef<HTMLDivElement>(null);
   const restRef = useRef<HTMLDivElement>(null);
+  const copyRef = useRef<HTMLSpanElement>(null);
   const fuseRef = useRef<HTMLDivElement>(null);
   const fuseFillRef = useRef<HTMLSpanElement>(null);
   const hintRef = useRef<HTMLParagraphElement>(null);
@@ -56,12 +58,17 @@ export function FocusIntro({
 
   const layout = useCallback(() => {
     const rest = restRef.current;
+    const copy = copyRef.current;
     const scene = sceneRef.current;
     const fuse = fuseRef.current;
-    if (!rest || !scene || !fuse) return;
-    const fs = parseFloat(getComputedStyle(rest).fontSize) || 34;
-    const height = Math.round(fs * 1.8);
-    const width = Math.round(window.innerWidth * 0.94);
+    if (!rest || !copy || !scene || !fuse) return;
+    copy.style.fontSize = '';
+    copy.style.letterSpacing = '';
+    const fs = Math.max(INTRO_MIN_CAPTION_PX, parseFloat(getComputedStyle(copy).fontSize) || INTRO_MIN_CAPTION_PX);
+    const width = Math.round(window.innerWidth * 0.92);
+    const shown = copy.textContent;
+    copy.textContent = INTRO_LINES[1];
+    const height = Math.max(Math.round(fs * 1.85), Math.round(copy.scrollHeight));
     const depth = height / 2;
     depthRef.current = depth;
     const root = overlayRef.current;
@@ -74,29 +81,8 @@ export function FocusIntro({
       if (!face) return;
       face.style.transform = `rotateX(${-i * 90}deg) translateZ(${depth}px)`;
     });
-    fuse.style.marginTop = `${Math.round(height * 0.62)}px`;
-    const longest = INTRO_LINES[1];
-    rest.style.fontSize = '';
-    rest.style.letterSpacing = '';
-    rest.textContent = longest;
-    const available = Math.max(200, window.innerWidth - 24);
-    let spacing = parseFloat(getComputedStyle(rest).letterSpacing) || fs * 0.3;
-    while (rest.scrollWidth > available && spacing > fs * 0.06) {
-      spacing -= 0.4;
-      rest.style.letterSpacing = `${Math.max(fs * 0.06, spacing)}px`;
-    }
-    if (rest.scrollWidth > available && rest.scrollWidth > 0) {
-      const next = Math.max(11, fs * (available / rest.scrollWidth));
-      rest.style.fontSize = `${next}px`;
-    }
-    const fittedSize = rest.style.fontSize;
-    const fittedSpacing = rest.style.letterSpacing;
-    faceRefs.current.forEach((face) => {
-      if (!face) return;
-      if (fittedSize) face.style.fontSize = fittedSize;
-      if (fittedSpacing) face.style.letterSpacing = fittedSpacing;
-    });
-    rest.textContent = '';
+    fuse.style.marginTop = `${Math.round(height / 2 + 8)}px`;
+    copy.textContent = shown;
   }, []);
 
   const applyFrame = useCallback(
@@ -107,6 +93,7 @@ export function FocusIntro({
       const scene = sceneRef.current;
       const cube = cubeRef.current;
       const rest = restRef.current;
+      const copy = copyRef.current;
       const fuse = fuseRef.current;
       const fill = fuseFillRef.current;
       const hint = hintRef.current;
@@ -125,10 +112,12 @@ export function FocusIntro({
           : 'none';
       }
       if (rest) {
-        rest.textContent = frame.restText;
         rest.style.opacity = String(frame.restOpacity);
         rest.style.transform = frame.restScale === 1 ? 'none' : `scale(${frame.restScale})`;
-        rest.style.textShadow =
+      }
+      if (copy) {
+        copy.textContent = frame.restText;
+        copy.style.textShadow =
           frame.restGlow > 0
             ? `0 0 ${14 * frame.restGlow}px rgba(255,255,255,${0.45 * frame.restGlow}), 0 0 18px rgba(0,0,0,.9), 0 0 4px rgba(0,0,0,.85)`
             : '';
@@ -291,19 +280,21 @@ export function FocusIntro({
       onPointerDown={skip}
     >
       <link rel="preload" as="image" href={INTRO_ART_SRC} />
-      <img
-        ref={artRef}
-        data-testid="focus-intro-art"
-        className="focus-intro-art"
-        src={INTRO_ART_SRC}
-        alt=""
-        width={2400}
-        height={1347}
-        fetchPriority="high"
-        onError={(event) => {
-          event.currentTarget.src = INTRO_ART_FALLBACK;
-        }}
-      />
+      <div className="focus-intro-art-frame">
+        <img
+          ref={artRef}
+          data-testid="focus-intro-art"
+          className="focus-intro-art"
+          src={INTRO_ART_SRC}
+          alt=""
+          width={2400}
+          height={1347}
+          fetchPriority="high"
+          onError={(event) => {
+            event.currentTarget.src = INTRO_ART_FALLBACK;
+          }}
+        />
+      </div>
       <div ref={vigRef} className="focus-intro-vignette" aria-hidden />
       <div className="focus-intro-captions">
         <div ref={sceneRef} className="focus-intro-scene">
@@ -316,12 +307,14 @@ export function FocusIntro({
                 }}
                 className="focus-intro-face"
               >
-                {line}
+                <span className="focus-intro-copy">{line}</span>
               </div>
             ))}
           </div>
         </div>
-        <div ref={restRef} data-testid="focus-intro-caption" className="focus-intro-rest" />
+        <div ref={restRef} className="focus-intro-rest">
+          <span ref={copyRef} data-testid="focus-intro-caption" className="focus-intro-copy" />
+        </div>
         <div ref={fuseRef} className="focus-intro-fuse" aria-hidden>
           <span ref={fuseFillRef} />
         </div>

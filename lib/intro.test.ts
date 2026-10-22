@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  INTRO_HINT_COLOR,
   INTRO_LINES,
+  INTRO_MIN_CAPTION_PX,
   INTRO_SKIP_HINT,
   INTRO_SOUND_LABEL,
   INTRO_TIMELINE,
   PLAY_INTRO_LABEL,
+  introArtZoom,
   introClockSpeed,
   introFrame,
+  introNarrow,
   introSoundEvents,
   isIntroSkipKey,
   isStoredFocusRunning,
@@ -162,5 +166,11 @@ describe('intro timeline', () => {
     expect(parseIntroFreeze(null)).toBeNull();
     const copy = [...INTRO_LINES, INTRO_SKIP_HINT, PLAY_INTRO_LABEL, INTRO_SOUND_LABEL].join(' ');
     expect(copy).not.toMatch(/[—–]/);
+    expect(INTRO_MIN_CAPTION_PX).toBeGreaterThanOrEqual(24);
+    expect(INTRO_HINT_COLOR).toBe('#a1a1a6');
+    expect(introNarrow(375)).toBe(true);
+    expect(introNarrow(1280)).toBe(false);
+    expect(introArtZoom(375)).toBeGreaterThan(1);
+    expect(introArtZoom(1280)).toBe(1);
   });
 });
