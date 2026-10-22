@@ -117,6 +117,7 @@ export function Orb() {
   const promptParam = searchParams.get('prompt');
   const taskParam = searchParams.get('task');
   const doneParam = searchParams.get('done');
+  const plannedParam = searchParams.get('planned');
   const pipSupported = useSyncExternalStore(
     () => () => {},
     () => canUseDocumentPip() && !forceUnsupported,
@@ -807,7 +808,11 @@ export function Orb() {
 
   useEffect(() => {
     if (promptParam === 'done') {
-      seedCompleted(taskParam || 'Deep work', Number(doneParam) || 50);
+      seedCompleted(
+        taskParam || 'Deep work',
+        Number(doneParam) || 50,
+        Number(plannedParam) || Number(doneParam) || 50
+      );
       if (taskParam) setTaskDraft(taskParam);
       return;
     }
@@ -824,7 +829,7 @@ export function Orb() {
       if (promptParam === 'stop') setStopConfirm(true);
       if (taskParam) setTaskDraft(taskParam);
     }
-  }, [doneParam, focusParam, promptParam, seedCompleted, startBreak, startFocus, taskParam]);
+  }, [doneParam, focusParam, plannedParam, promptParam, seedCompleted, startBreak, startFocus, taskParam]);
 
   useEffect(() => {
     if (untilMinutes != null && typeof durationChoice === 'number' && durationChoice > untilMinutes) {
@@ -966,6 +971,7 @@ export function Orb() {
               focusMinutes={manualTimeRemaining}
               completedTask={completed?.task}
               completedMinutes={completed?.minutes}
+              completedPlanned={completed?.planned}
               joinUrl={extractJoinUrl(day.nextEvent)}
               onStart={() => beginFocus(taskDraft, durationChoice)}
               onKeepGoing={() => setStopConfirm(false)}
@@ -1130,6 +1136,9 @@ export function Orb() {
             setPopOutOnLeave(value);
             savePopOutOnLeave(value);
           }}
+          defaultDuration={durationChoice}
+          setDefaultDuration={setDurationChoice}
+          userEmail={calendar.userEmail}
           showAgenda={showAgenda}
           setShowAgenda={(value) => {
             setShowAgenda(value);

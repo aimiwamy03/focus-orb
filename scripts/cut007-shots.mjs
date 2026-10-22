@@ -74,8 +74,14 @@ if (phase === 'after') {
   );
   await shot(page, 'completed_1280x800');
 
-  await open(page, '/?mock=empty&settings=1');
+  await open(page, '/?mockCalendars=1&settings=1');
   await shot(page, 'settings_1280x800');
+
+  await open(
+    page,
+    '/?mock=empty&prompt=done&done=18&planned=50&task=Write%20the%20spec'
+  );
+  await shot(page, 'ended_early_1280x800');
 
   await open(page, '/?mock=empty');
   await shot(page, 'ask_empty_suggestions_1280x800');

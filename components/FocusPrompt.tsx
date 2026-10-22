@@ -39,6 +39,7 @@ interface FocusPromptProps {
   focusMinutes: number | null;
   completedTask?: string;
   completedMinutes?: number;
+  completedPlanned?: number;
   joinUrl?: string | null;
   onStart: () => void;
   onKeepGoing: () => void;
@@ -85,7 +86,7 @@ function itemsFor(
   }
   if (surface === 'completed') {
     return [
-      { id: 'take-break', label: TAKE_BREAK_LABEL },
+      { id: 'take-break', label: DONE_LABEL },
       { id: 'another-round', label: ANOTHER_ROUND_LABEL },
     ];
   }
@@ -122,6 +123,7 @@ export function FocusPrompt({
   focusMinutes,
   completedTask,
   completedMinutes,
+  completedPlanned,
   joinUrl = null,
   onStart,
   onKeepGoing,
@@ -408,7 +410,7 @@ export function FocusPrompt({
             data-testid="focus-completed"
             className="text-[length:var(--type-heading)] leading-tight text-orb-text"
           >
-            {formatCompleted(completedMinutes, completedTask)}
+            {formatCompleted(completedMinutes, completedTask, completedPlanned)}
           </div>
           <ChoiceRow
             testId="completed-row"
