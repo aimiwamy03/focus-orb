@@ -152,8 +152,17 @@ await page.screenshot({ path: path.join(OUT, 'after_ask_started.png') });
 
 await page.locator('[data-testid="orb-canvas"]').click({ position: { x: 640, y: 160 }, force: true });
 await page.waitForTimeout(400);
+if ((await page.getByTestId('keep-going').count()) !== 0) {
+  fail('Clicking the orb during focus should not open End early');
+}
+if ((await page.getByTestId('focus-task-name').count()) !== 1) {
+  fail('Clicking the orb during focus should leave the session running');
+}
+
+await page.keyboard.press(' ');
+await page.waitForTimeout(400);
 if ((await highlighted(page, 'keep-going')) !== 'true') {
-  fail('End-early did not open on Keep going');
+  fail('Space did not open End-early on Keep going');
 }
 await page.screenshot({ path: path.join(OUT, 'after_confirm.png') });
 
@@ -244,12 +253,55 @@ if (chipHit.height < 44) fail(`Duration hit area should be at least 44px tall, g
 if (chipHit.cursor !== 'pointer') fail(`Duration chip cursor should be pointer, got ${chipHit.cursor}`);
 await clickPage.getByTestId('duration-50m').click();
 await clickPage.waitForTimeout(400);
+if ((await clickPage.getByTestId('focus-task-name').count()) !== 0) {
+  fail('Clicking 50m should select it, not start a session');
+}
+if ((await highlighted(clickPage, 'duration-50m')) !== 'true') {
+  fail('Clicking 50m should keep 50m selected');
+}
+await publish(clickPage, 'duration_click_50m_selected.png');
+await clickPage.getByTestId('focus-start').click();
+await clickPage.waitForTimeout(400);
 const started = await clickPage.getByTestId('focus-countdown').textContent();
 if (!started || !started.includes('50m')) {
-  fail(`Clicking 50m while 90m was highlighted should start a 50m block, got ${started}`);
+  fail(`Start after clicking 50m should begin a 50m block, got ${started}`);
 }
-await publish(clickPage, 'duration_click_50m_started.png');
+await publish(clickPage, 'duration_start_50m.png');
 await clickPage.close();
+
+const orbPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await open(orbPage, '/?mock=empty');
+const orbCursor = await orbPage.locator('[data-testid="orb-canvas"]').evaluate((el) => {
+  el.dispatchEvent(new MouseEvent('mousemove', { clientX: 640, clientY: 220, bubbles: true }));
+  return getComputedStyle(el).cursor;
+});
+if (orbCursor === 'pointer') fail(`Orb cursor should not be pointer, got ${orbCursor}`);
+await orbPage.locator('[data-testid="orb-canvas"]').click({ position: { x: 640, y: 160 }, force: true });
+await orbPage.waitForTimeout(400);
+if ((await orbPage.getByTestId('focus-task').count()) !== 1) {
+  fail('Clicking the orb on Ask should not start focus');
+}
+if ((await orbPage.getByTestId('focus-task-name').count()) !== 0) {
+  fail('Clicking the orb on Ask started a session');
+}
+await orbPage.keyboard.press('Enter');
+await orbPage.waitForTimeout(400);
+if ((await orbPage.getByTestId('focus-task-name').count()) !== 1) {
+  fail('Enter should still start focus');
+}
+await orbPage.locator('[data-testid="orb-canvas"]').click({ position: { x: 640, y: 160 }, force: true });
+await orbPage.waitForTimeout(400);
+if ((await orbPage.getByTestId('keep-going').count()) !== 0) {
+  fail('Clicking the orb during focus should not stop the session');
+}
+if ((await orbPage.getByTestId('end-session-prompt').count()) !== 0) {
+  fail('Clicking the orb during focus should not open End session');
+}
+if ((await orbPage.getByTestId('focus-task-name').count()) !== 1) {
+  fail('Session should still be running after an orb click');
+}
+await publish(orbPage, 'orb_click_does_nothing.png');
+await orbPage.close();
 
 await browser.close();
 

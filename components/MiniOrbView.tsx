@@ -7,15 +7,12 @@ import { MINI_BG, miniStatusType } from '@/lib/miniOrb';
 interface MiniOrbViewProps {
   status: string;
   canvasRef: React.Ref<HTMLCanvasElement>;
-  onClick: () => void;
   style?: CSSProperties;
 }
 
-export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewProps) {
+export function MiniOrbView({ status, canvasRef, style }: MiniOrbViewProps) {
   const localRef = useRef<HTMLCanvasElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const onClickRef = useRef(onClick);
-  onClickRef.current = onClick;
   const [type, setType] = useState(() => miniStatusType());
 
   const setRefs = (node: HTMLCanvasElement | null) => {
@@ -30,8 +27,6 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
     const node = localRef.current;
     const root = rootRef.current;
     if (!node) return;
-    const handler = () => onClickRef.current();
-    node.addEventListener('click', handler);
     const measure = () => {
       sizeMiniCanvas(node);
       const box = root ?? node.parentElement?.parentElement;
@@ -49,7 +44,6 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
     win?.addEventListener('resize', measure);
     win?.visualViewport?.addEventListener('resize', measure);
     return () => {
-      node.removeEventListener('click', handler);
       observer.disconnect();
       win?.removeEventListener('resize', measure);
       win?.visualViewport?.removeEventListener('resize', measure);
@@ -89,7 +83,6 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
             inset: 0,
             width: '100%',
             height: '100%',
-            cursor: 'pointer',
             display: 'block',
           }}
         />

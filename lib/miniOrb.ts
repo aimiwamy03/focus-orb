@@ -180,10 +180,8 @@ export function formatMiniStatus(
   options: {
     isManualFocus?: boolean;
     focusMinutes?: number | null;
-    stopArmed?: boolean;
   } = {}
 ): string {
-  if (options.stopArmed) return 'Click to stop';
   if (options.isManualFocus && options.focusMinutes != null) {
     return `Focus ${formatCompactDuration(options.focusMinutes)}`;
   }

@@ -9,16 +9,13 @@ import { applyPipDocumentStyle, canUseDocumentPip, MINI_SIZE } from '@/lib/miniO
 export function useMiniWindow(options: {
   supported: boolean;
   status: string;
-  onOrbClick: () => void;
   onClosed: () => void;
 }) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const winRef = useRef<Window | null>(null);
   const onClosedRef = useRef(options.onClosed);
-  const onOrbClickRef = useRef(options.onOrbClick);
   onClosedRef.current = options.onClosed;
-  onOrbClickRef.current = options.onOrbClick;
 
   const measurePip = useCallback(() => {
     const win = winRef.current;
@@ -114,7 +111,6 @@ export function useMiniWindow(options: {
       <MiniOrbView
         status={options.status}
         canvasRef={canvasRef}
-        onClick={() => onOrbClickRef.current()}
       />,
       container
     );

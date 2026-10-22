@@ -162,7 +162,6 @@ export function Orb() {
   const [showOverlay, setShowOverlay] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [orbHovered, setOrbHovered] = useState(false);
   const [stopConfirm, setStopConfirm] = useState(false);
   const [sessionConfirm, setSessionConfirm] = useState(false);
   const [hideCursor, setHideCursor] = useState(false);
@@ -298,7 +297,6 @@ export function Orb() {
   const miniWindow = useMiniWindow({
     supported: pipSupported,
     status: miniStatus,
-    onOrbClick: () => handleOrbClickRef.current(),
     onClosed: () => {
       setMiniOnly(false);
     },
@@ -1047,7 +1045,6 @@ export function Orb() {
       data-satellites={day.remainingInRun.length}
       onMouseMove={(e) => {
         const over = isOverOrb(e.clientX, e.clientY);
-        setOrbHovered(over);
         hoverBoostRef.current = over ? 1.12 : 1;
         if (!firstOpen) {
           setShowOverlay(true);
@@ -1061,7 +1058,6 @@ export function Orb() {
       }}
       onMouseLeave={() => {
         setShowOverlay(false);
-        setOrbHovered(false);
         hoverBoostRef.current = 1;
         if (overlayTimeoutRef.current) {
           clearTimeout(overlayTimeoutRef.current);
@@ -1072,10 +1068,7 @@ export function Orb() {
       <canvas
         ref={canvasRef}
         data-testid="orb-canvas"
-        className={`absolute inset-0 z-[1] ${miniOnly ? 'opacity-0' : ''} ${orbHovered && !firstOpen && !miniOnly ? 'cursor-pointer' : ''}`}
-        onClick={(e) => {
-          if (isOverOrb(e.clientX, e.clientY)) handleOrbClick();
-        }}
+        className={`absolute inset-0 z-[1] ${miniOnly ? 'opacity-0' : ''}`}
       />
 
       {mountAgenda ? <Agenda sections={agendaSections} faded={agendaFaded} /> : null}
@@ -1305,7 +1298,6 @@ export function Orb() {
           <MiniOrbView
             status={miniStatus}
             canvasRef={previewCanvasRef}
-            onClick={() => handleOrbClickRef.current()}
           />
         </div>
       ) : null}

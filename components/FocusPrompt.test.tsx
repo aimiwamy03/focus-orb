@@ -161,7 +161,7 @@ describe('game-menu rows', () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it('starts the clicked duration even when another chip is highlighted', () => {
+  it('selects the clicked duration without starting', () => {
     const { onChoiceChange, onStart } = renderPrompt('ask');
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(screen.getByTestId('duration-90m').getAttribute('data-highlighted')).toBe('true');
@@ -170,7 +170,17 @@ describe('game-menu rows', () => {
     expect(onStart).not.toHaveBeenCalled();
     screen.getByTestId('duration-50m').click();
     expect(onChoiceChange).toHaveBeenCalledWith(50);
-    expect(onStart).toHaveBeenCalledWith(undefined, 50);
+    expect(onStart).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts from the Start button after a duration click', () => {
+    const { onStart } = renderPrompt('ask');
+    screen.getByTestId('duration-25m').click();
+    expect(onStart).not.toHaveBeenCalled();
+    screen.getByTestId('focus-start').click();
+    expect(onStart).toHaveBeenCalledTimes(1);
   });
 
   it('gives duration chips a pointer cursor and a 44px hit area', () => {
