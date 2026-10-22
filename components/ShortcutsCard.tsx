@@ -22,14 +22,11 @@ export function ShortcutsCard({ onDismiss }: ShortcutsCardProps) {
     <div
       data-testid="shortcuts-card"
       data-text-clear
-      className="relative z-20 w-[min(16rem,86vw)] shrink-0 rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-center"
+      className="fixed top-4 left-4 z-40 max-w-xs space-y-2 text-[length:var(--type-hint)] leading-5 text-orb-dim"
     >
-      <ul className="space-y-1">
+      <ul className="space-y-2">
         {SHORTCUT_ROWS.map((row) => (
-          <li
-            key={row.key}
-            className="flex items-center justify-center gap-2 text-[length:var(--type-hint)] leading-5 text-orb-dim"
-          >
+          <li key={row.key} className="flex items-center gap-2">
             <KeyHint label={row.key} />
             <span>{row.action}</span>
           </li>
@@ -39,7 +36,7 @@ export function ShortcutsCard({ onDismiss }: ShortcutsCardProps) {
         type="button"
         data-testid="shortcuts-got-it"
         onClick={onDismiss}
-        className="mt-2 text-[length:var(--type-hint)] tracking-wide text-orb-quiet hover:text-orb-dim"
+        className="text-[length:var(--type-hint)] tracking-wide text-orb-quiet hover:text-orb-dim"
       >
         {GOT_IT_LABEL}
       </button>

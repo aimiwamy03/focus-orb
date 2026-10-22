@@ -83,6 +83,9 @@ if (hintStyle.size < 15) fail(`Skip hint should be at least 15px, got ${hintStyl
 if (hintStyle.color !== 'rgb(161, 161, 166)') {
   fail(`Skip hint should be #a1a1a6, got ${hintStyle.color}`);
 }
+if ((await stills.locator('.focus-intro-fuse').count()) !== 0) {
+  fail('Desktop rest caption should not show a fuse hairline');
+}
 await publish(stills, 'intro_caption_rest.png');
 await stills.goto(`${BASE}/?mock=empty&intro=1&t=7.2`, { waitUntil: 'networkidle' });
 await stills.waitForTimeout(400);
@@ -103,6 +106,9 @@ const turning = await reduced.evaluate(() => {
   return scene ? getComputedStyle(scene).visibility : 'missing';
 });
 if (turning !== 'hidden') fail(`Reduced motion should hide the cube, got ${turning}`);
+if ((await reduced.locator('.focus-intro-fuse').count()) !== 0) {
+  fail('Reduced motion should not show a fuse hairline');
+}
 await publish(reduced, 'intro_reduced.png');
 await reduced.close();
 
@@ -157,6 +163,9 @@ const fit = await mobile.evaluate(() => {
   };
 });
 if (!fit.ok) fail(`First caption should wrap at 24px+ over the art at 375px, got ${JSON.stringify(fit)}`);
+if ((await mobile.locator('.focus-intro-fuse').count()) !== 0) {
+  fail('375px caption should not show a fuse hairline');
+}
 await publish(mobile, 'intro_mobile_375.png');
 await mobile.close();
 

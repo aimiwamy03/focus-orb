@@ -41,8 +41,6 @@ export function FocusIntro({
   const cubeRef = useRef<HTMLDivElement>(null);
   const restRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLSpanElement>(null);
-  const fuseRef = useRef<HTMLDivElement>(null);
-  const fuseFillRef = useRef<HTMLSpanElement>(null);
   const hintRef = useRef<HTMLParagraphElement>(null);
   const faceRefs = useRef<Array<HTMLDivElement | null>>([]);
   const rafRef = useRef(0);
@@ -60,8 +58,7 @@ export function FocusIntro({
     const rest = restRef.current;
     const copy = copyRef.current;
     const scene = sceneRef.current;
-    const fuse = fuseRef.current;
-    if (!rest || !copy || !scene || !fuse) return;
+    if (!rest || !copy || !scene) return;
     copy.style.fontSize = '';
     copy.style.letterSpacing = '';
     const fs = Math.max(INTRO_MIN_CAPTION_PX, parseFloat(getComputedStyle(copy).fontSize) || INTRO_MIN_CAPTION_PX);
@@ -81,7 +78,6 @@ export function FocusIntro({
       if (!face) return;
       face.style.transform = `rotateX(${-i * 90}deg) translateZ(${depth}px)`;
     });
-    fuse.style.marginTop = `${Math.round(height / 2 + 8)}px`;
     copy.textContent = shown;
   }, []);
 
@@ -94,8 +90,6 @@ export function FocusIntro({
       const cube = cubeRef.current;
       const rest = restRef.current;
       const copy = copyRef.current;
-      const fuse = fuseRef.current;
-      const fill = fuseFillRef.current;
       const hint = hintRef.current;
       const overlay = overlayRef.current;
       if (art) {
@@ -122,8 +116,6 @@ export function FocusIntro({
             ? `0 0 ${14 * frame.restGlow}px rgba(255,255,255,${0.45 * frame.restGlow}), 0 0 18px rgba(0,0,0,.9), 0 0 4px rgba(0,0,0,.85)`
             : '';
       }
-      if (fuse) fuse.style.opacity = String(frame.fuseOpacity);
-      if (fill) fill.style.transform = `scaleX(${frame.fuseScale})`;
       if (hint) hint.style.opacity = String(frame.hintOpacity);
       if (overlay && !skippingRef.current) overlay.style.opacity = String(frame.overlayOpacity);
       return frame.done;
@@ -314,9 +306,6 @@ export function FocusIntro({
         </div>
         <div ref={restRef} className="focus-intro-rest">
           <span ref={copyRef} data-testid="focus-intro-caption" className="focus-intro-copy" />
-        </div>
-        <div ref={fuseRef} className="focus-intro-fuse" aria-hidden>
-          <span ref={fuseFillRef} />
         </div>
       </div>
       <p ref={hintRef} data-testid="focus-intro-hint" className="focus-intro-hint">

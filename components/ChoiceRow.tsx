@@ -12,6 +12,12 @@ function keepButtonUnfocused(event: MouseEvent<HTMLButtonElement>) {
   event.preventDefault();
 }
 
+function hitClass(disabled: boolean): string {
+  return `inline-flex min-h-[44px] items-center justify-center bg-transparent ${
+    disabled ? 'cursor-default' : 'cursor-pointer'
+  }`;
+}
+
 export function ChoiceRow({
   items,
   highlighted,
@@ -19,7 +25,6 @@ export function ChoiceRow({
   onConfirm,
   testId,
   tone = 'button',
-  confirmOnClick = true,
 }: {
   items: ChoiceItem[];
   highlighted: number;
@@ -27,7 +32,6 @@ export function ChoiceRow({
   onConfirm: (index: number) => void;
   testId: string;
   tone?: 'button' | 'chip' | 'quiet';
-  confirmOnClick?: boolean;
 }) {
   return (
     <div
@@ -55,11 +59,11 @@ export function ChoiceRow({
             onClick={() => {
               if (item.disabled) return;
               onHighlight(index);
-              if (confirmOnClick) onConfirm(index);
+              onConfirm(index);
             }}
-            className={choiceClass(tone, active, Boolean(item.disabled))}
+            className={hitClass(Boolean(item.disabled))}
           >
-            {item.label}
+            <span className={choiceClass(tone, active, Boolean(item.disabled))}>{item.label}</span>
           </button>
         );
       })}

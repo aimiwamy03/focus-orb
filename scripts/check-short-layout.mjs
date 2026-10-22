@@ -231,7 +231,6 @@ try {
   await typed.waitForSelector('[data-testid="focus-task"]');
   await typed.getByText(/Free until/).waitFor({ timeout: 15000 });
   await typed.fill('[data-testid="focus-task"]', 'Write the spec');
-  await typed.click('[data-testid="duration-50m"]');
   await waitForPaintedOrb(typed);
   await assertNoOverlap(typed, typedViewport);
   shots.push(await shot(typed, 'layout_typed_no_corner_1280x640'));

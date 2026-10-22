@@ -100,6 +100,22 @@ describe('Ask task field', () => {
     expect(screen.getByTestId('menu-hint').getAttribute('aria-label')).toBe(MENU_ASK_HINT);
     expect(screen.getByTestId('duration-50m').getAttribute('data-highlighted')).toBe('true');
   });
+
+  it('anchors the empty caret to a start-aligned Focus placeholder', () => {
+    renderAsk('');
+    const input = screen.getByTestId('focus-task') as HTMLInputElement;
+    expect(screen.getByTestId('focus-task-placeholder').textContent).toBe(FALLBACK_TASK);
+    expect(screen.getByTestId('ask-task-field').getAttribute('data-value')).toBe(FALLBACK_TASK);
+    expect(input.className).toBe('ask-task');
+    expect(input.className).not.toMatch(/text-center/);
+    expect(input.size).toBe(1);
+  });
+
+  it('hides the Focus placeholder once she types', () => {
+    renderAsk('write the spec');
+    expect(screen.queryByTestId('focus-task-placeholder')).toBeNull();
+    expect((screen.getByTestId('focus-task') as HTMLInputElement).value).toBe('write the spec');
+  });
 });
 
 describe('game-menu rows', () => {
@@ -143,6 +159,33 @@ describe('game-menu rows', () => {
     expect(onChoiceChange).toHaveBeenCalledWith(90);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the clicked duration even when another chip is highlighted', () => {
+    const { onChoiceChange, onStart } = renderPrompt('ask');
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(screen.getByTestId('duration-90m').getAttribute('data-highlighted')).toBe('true');
+    fireEvent.mouseEnter(screen.getByTestId('duration-50m'));
+    expect(screen.getByTestId('duration-50m').getAttribute('data-highlighted')).toBe('true');
+    expect(onStart).not.toHaveBeenCalled();
+    screen.getByTestId('duration-50m').click();
+    expect(onChoiceChange).toHaveBeenCalledWith(50);
+    expect(onStart).toHaveBeenCalledWith(undefined, 50);
+  });
+
+  it('gives duration chips a pointer cursor and a 44px hit area', () => {
+    renderAsk('');
+    const chip = screen.getByTestId('duration-50m');
+    expect(chip.className).toMatch(/min-h-\[44px\]/);
+    expect(chip.className).toMatch(/cursor-pointer/);
+  });
+
+  it('confirms a non-highlighted stop-confirm option on click', () => {
+    const { onEnd, onKeepGoing } = renderPrompt('stop-confirm');
+    expect(screen.getByTestId('keep-going').getAttribute('data-highlighted')).toBe('true');
+    screen.getByTestId('end-focus').click();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(onKeepGoing).not.toHaveBeenCalled();
   });
 
   it('fills the input when Enter confirms a highlighted suggestion', () => {
