@@ -7,12 +7,15 @@ export const SPACE_HINT = 'Space to pause';
 export const FULLSCREEN_LABEL = 'Fullscreen';
 
 export const SHORTCUT_ROWS = [
-  { key: 'F', action: 'fullscreen' },
-  { key: 'S', action: 'settings' },
-  { key: 'Space', action: 'start/stop focus' },
-  { key: 'P', action: 'pop out' },
-  { key: 'L', action: 'log' },
+  { id: 'fullscreen', key: 'F', action: 'fullscreen', testId: 'fullscreen-toggle' },
+  { id: 'settings', key: 'S', action: 'settings', testId: 'settings-gear' },
+  { id: 'focus', key: 'Space', action: 'start/stop focus', testId: 'chrome-focus' },
+  { id: 'pop-out', key: 'P', action: 'pop out', testId: 'pop-out' },
+  { id: 'mini-only', key: 'M', action: 'mini only', testId: 'mini-only' },
+  { id: 'log', key: 'L', action: 'log', testId: 'focus-log-open' },
 ] as const;
+
+export type ShortcutId = (typeof SHORTCUT_ROWS)[number]['id'];
 
 export function isShortcutKey(key: string): boolean {
   return (
@@ -23,6 +26,8 @@ export function isShortcutKey(key: string): boolean {
     key === ' ' ||
     key === 'p' ||
     key === 'P' ||
+    key === 'm' ||
+    key === 'M' ||
     key === 'l' ||
     key === 'L'
   );

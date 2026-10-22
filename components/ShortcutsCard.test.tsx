@@ -6,13 +6,14 @@ import { GOT_IT_LABEL } from '@/lib/shortcuts';
 afterEach(() => cleanup());
 
 describe('ShortcutsCard', () => {
-  it('sits in the top left like live chrome help and dismisses with Got it', () => {
+  it('sits in the top right like live chrome help and dismisses with Got it', () => {
     const onDismiss = vi.fn();
     render(<ShortcutsCard onDismiss={onDismiss} />);
     const card = screen.getByTestId('shortcuts-card');
     expect(card.className).toMatch(/fixed/);
     expect(card.className).toMatch(/top-4/);
-    expect(card.className).toMatch(/left-4/);
+    expect(card.className).toMatch(/right-4/);
+    expect(card.className).not.toMatch(/left-4/);
     expect(card.className).not.toMatch(/text-center/);
     screen.getByTestId('shortcuts-got-it').click();
     expect(onDismiss).toHaveBeenCalledTimes(1);

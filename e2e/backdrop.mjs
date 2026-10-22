@@ -287,7 +287,10 @@ await focus.close();
 const logPage = await open(browser, '/?mock=empty', { width: 1280, height: 800 }, { log: logFixture() });
 await logPage.mouse.move(1100, 24);
 await logPage.waitForTimeout(200);
-await logPage.getByTestId('focus-log-open').click();
+if ((await logPage.getByTestId('focus-task').count()) === 1) {
+  await logPage.getByTestId('focus-task').blur();
+}
+await logPage.keyboard.press('l');
 await logPage.waitForSelector('[data-testid="focus-log"]');
 await publish(logPage, 'backdrop_log_1280.png');
 await copyFile(
