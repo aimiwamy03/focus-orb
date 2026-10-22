@@ -29,18 +29,28 @@ describe('rectsOverlap', () => {
 });
 
 describe('orbLayout fits the bottom stack', () => {
-  const stackAsk = 236;
+  const stackAsk = 280;
 
   it.each([
     [1280, 640],
     [1280, 800],
     [1440, 900],
+    [1024, 768],
     [1280, MIN_FIT_HEIGHT],
   ])('keeps the orb above a %i x %i ask stack', (width, height) => {
     const layout = orbLayout(width, height, stackAsk);
     expect(contentFits(height, layout, stackAsk)).toBe(true);
     expect(layout.centerY + layout.radius).toBeLessThanOrEqual(height - stackAsk + 1);
     expect(layout.radius).toBeGreaterThanOrEqual(52);
+  });
+
+  it('shrinks the orb to fit Amy\'s 686x386 window', () => {
+    const stack = 240;
+    const layout = orbLayout(686, 386, stack);
+    expect(contentFits(386, layout, stack)).toBe(true);
+    expect(layout.centerY + layout.radius).toBeLessThanOrEqual(386 - stack + 1);
+    expect(layout.radius).toBeGreaterThanOrEqual(28);
+    expect(layout.radius).toBeLessThan(orbLayout(1280, 800, stackAsk).radius);
   });
 
   it('treats a vertical stack as non overlapping', () => {

@@ -865,7 +865,7 @@ export function Orb() {
           type="button"
           data-testid="floating-restore"
           onClick={() => setMiniOnly(false)}
-          className="absolute inset-0 z-30 flex items-center justify-center text-xs tracking-wide text-orb-quiet hover:text-orb-dim"
+          className="absolute inset-0 z-30 flex items-center justify-center text-[length:var(--type-status)] tracking-wide text-orb-quiet hover:text-orb-dim"
         >
           {FLOATING_RESTORE_LABEL}
         </button>
@@ -885,7 +885,7 @@ export function Orb() {
         <div
           ref={stackRef}
           data-testid="bottom-stack"
-          className={`absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2.5 px-4 pb-4 pt-1 ${
+          className={`absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-[length:var(--stack-gap)] px-4 pb-[length:var(--stack-pad)] pt-1 ${
             showSettings ? 'invisible pointer-events-none' : ''
           }`}
         >
@@ -972,31 +972,36 @@ export function Orb() {
                       void miniWindow.open();
                     }
                   }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-orb-quiet hover:text-orb-dim"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
                   aria-pressed={miniWindow.isOpen}
                 >
                   {POP_OUT_LABEL}
                   <KeyHint label="P" />
                 </button>
-                {miniWindow.isOpen ? (
-                  <button
-                    type="button"
-                    data-testid="mini-only"
-                    onClick={() => setMiniOnly((open) => !open)}
-                    className="px-3 py-1.5 text-xs text-orb-quiet hover:text-orb-dim"
-                    aria-pressed={miniOnly}
-                  >
-                    {MINI_ONLY_LABEL}
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  data-testid="mini-only"
+                  onClick={async () => {
+                    if (miniOnly) {
+                      setMiniOnly(false);
+                      return;
+                    }
+                    const ok = miniWindow.isOpen || (await miniWindow.open());
+                    if (ok) setMiniOnly(true);
+                  }}
+                  className="px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
+                  aria-pressed={miniOnly}
+                >
+                  {MINI_ONLY_LABEL}
+                </button>
               </>
             ) : null}
             <button
               type="button"
               data-testid="fullscreen-toggle"
               onClick={toggleFullscreen}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-orb-quiet hover:text-orb-dim"
-              aria-label="Fullscreen"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
+              aria-label="Full screen"
               aria-pressed={isFullscreen}
             >
               {FULLSCREEN_LABEL}
@@ -1006,7 +1011,7 @@ export function Orb() {
               type="button"
               data-testid="settings-gear"
               onClick={() => setShowSettings(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-orb-quiet hover:text-orb-dim"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
               aria-label="Settings"
             >
               ⚙

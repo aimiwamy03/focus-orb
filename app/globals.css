@@ -3,10 +3,26 @@
 @theme {
   --color-orb-bg: #161616;
   --color-orb-text: #e8e8e8;
-  --color-orb-dim: #c8c8c8;
+  --color-orb-dim: #d0d0d0;
   --color-orb-quiet: #b4b4b4;
   --color-orb-placeholder: #a3a3a3;
   --color-orb-sheet: #18181b;
+  --color-orb-muted: #a1a1aa;
+}
+
+:root {
+  --type-heading: clamp(22px, 1.4vw + 12px, 30px);
+  --type-input: clamp(18px, 1.1vw + 10px, 24px);
+  --type-status: clamp(15px, 0.55vw + 11px, 18px);
+  --type-chip: clamp(15px, 0.55vw + 11px, 18px);
+  --type-button: clamp(15px, 0.55vw + 11px, 18px);
+  --type-hint: clamp(14px, 0.2vw + 13px, 15px);
+  --type-chrome: clamp(15px, 0.15vw + 13.5px, 16px);
+  --type-key: 14px;
+  --stack-gap: clamp(0.35rem, 1.1vh, 0.7rem);
+  --stack-pad: clamp(0.4rem, 1.2vh, 1rem);
+  --btn-px: clamp(1rem, 1.2vw, 1.35rem);
+  --btn-py: clamp(0.4rem, 0.9vh, 0.65rem);
 }
 
 body {
@@ -21,4 +37,3 @@ body {
 * {
   box-sizing: border-box;
 }
-

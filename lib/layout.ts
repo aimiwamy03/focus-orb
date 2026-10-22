@@ -17,6 +17,16 @@ export const MIN_FIT_HEIGHT = 600;
 export const STACK_TOP_PAD = 56;
 export const STACK_GAP = 20;
 export const MIN_RADIUS = 52;
+export const MIN_RADIUS_COMPACT = 28;
+export const STACK_TOP_PAD_COMPACT = 24;
+export const STACK_GAP_COMPACT = 10;
+
+export function stackInsets(viewH: number): { topPad: number; gap: number } {
+  if (viewH < MIN_FIT_HEIGHT) {
+    return { topPad: STACK_TOP_PAD_COMPACT, gap: STACK_GAP_COMPACT };
+  }
+  return { topPad: STACK_TOP_PAD, gap: STACK_GAP };
+}
 
 export function rectsOverlap(a: Rect, b: Rect, slop = 0.5): boolean {
   return (
@@ -41,15 +51,24 @@ export function orbLayout(
   viewH: number,
   stackH: number
 ): OrbLayout {
-  const reserved = Math.max(0, stackH) + STACK_TOP_PAD + STACK_GAP;
-  const availableH = Math.max(120, viewH - reserved);
+  const { topPad, gap } = stackInsets(viewH);
+  const reserved = Math.max(0, stackH) + topPad + gap;
+  const availableH = Math.max(80, viewH - reserved);
   const maxFromViewport = ORB_RADIUS_RATIO * Math.min(viewW, viewH);
   const maxFromStack = availableH * 0.42;
-  const radius = Math.max(MIN_RADIUS, Math.min(maxFromViewport, maxFromStack));
+  const floor = viewH < MIN_FIT_HEIGHT ? MIN_RADIUS_COMPACT : MIN_RADIUS;
+  let radius = Math.max(floor, Math.min(maxFromViewport, maxFromStack));
+  let centerY = topPad + availableH / 2;
+  const stackTop = viewH - Math.max(0, stackH);
+  const maxUp = Math.max(floor, centerY - 4);
+  const maxDown = Math.max(floor, stackTop - centerY - 1);
+  radius = Math.min(radius, maxUp, maxDown);
+  if (centerY - radius < 4) centerY = radius + 4;
+  if (centerY + radius > stackTop) centerY = Math.max(radius + 4, stackTop - radius);
   return {
     radius,
     centerX: viewW / 2,
-    centerY: STACK_TOP_PAD + availableH / 2,
+    centerY,
     availableH,
   };
 }
@@ -59,9 +78,10 @@ export function contentFits(
   layout: OrbLayout,
   stackH: number
 ): boolean {
+  const { topPad } = stackInsets(viewH);
   const orbBottom = layout.centerY + layout.radius;
   const stackTop = viewH - stackH;
-  return orbBottom <= stackTop + 1 && stackH + STACK_TOP_PAD <= viewH;
+  return orbBottom <= stackTop + 1 && stackH + topPad <= viewH;
 }
 
 export function fullyInsideViewport(

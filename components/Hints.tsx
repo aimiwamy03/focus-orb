@@ -94,7 +94,7 @@ export function Hints({
         type="button"
         data-testid="help-toggle"
         onClick={() => setHelpOpen((open) => !open)}
-        className={`fixed top-4 left-4 z-40 rounded-full px-3 py-1.5 text-xs text-orb-quiet transition-opacity duration-300 hover:text-orb-dim ${
+        className={`fixed top-4 left-4 z-40 rounded-full px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet transition-opacity duration-300 hover:text-orb-dim ${
           chromeVisible
             ? 'visible opacity-100'
             : 'invisible pointer-events-none opacity-0'
@@ -109,7 +109,7 @@ export function Hints({
         <div
           data-testid="short-help"
           data-text-clear
-          className="fixed top-14 left-4 z-40 max-w-xs space-y-1.5 text-[11px] leading-5 text-orb-dim"
+          className="fixed top-14 left-4 z-40 max-w-xs space-y-2 text-[length:var(--type-hint)] leading-5 text-orb-dim"
         >
           {SHORTCUT_ROWS.map((row) => (
             <div key={row.key} className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export function Hints({
         <div
           data-testid="hint"
           data-text-clear
-          className="fixed top-14 left-4 z-40 text-[11px] leading-5 text-orb-quiet"
+          className="fixed top-14 left-4 z-40 text-[length:var(--type-hint)] leading-5 text-orb-quiet"
         >
           {next.text}
         </div>

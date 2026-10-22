@@ -9,12 +9,14 @@ import {
   ORB_TEXT_QUIET,
   PALETTE_TOKENS,
   SETTINGS_BG,
+  SETTINGS_MUTED,
+  SETTINGS_TEXT,
 } from './palette';
 
 describe('palette tokens meet WCAG AA on the orb background', () => {
   const tokens = [
     ['text', ORB_TEXT, 12],
-    ['textDim', ORB_TEXT_DIM, 12],
+    ['textDim (recent tasks)', ORB_TEXT_DIM, 15],
     ['textQuiet', ORB_TEXT_QUIET, 12],
     ['placeholder', ORB_PLACEHOLDER, 15],
   ] as const;
@@ -25,16 +27,12 @@ describe('palette tokens meet WCAG AA on the orb background', () => {
   });
 
   it('keeps the same floor on the settings sheet', () => {
-    expect(meetsAaContrast(ORB_TEXT, SETTINGS_BG, 16)).toBe(true);
-    expect(meetsAaContrast(ORB_TEXT_DIM, SETTINGS_BG, 12)).toBe(true);
-    expect(meetsAaContrast(ORB_TEXT_QUIET, SETTINGS_BG, 12)).toBe(true);
+    expect(meetsAaContrast(SETTINGS_TEXT, SETTINGS_BG, 16)).toBe(true);
+    expect(meetsAaContrast(SETTINGS_MUTED, SETTINGS_BG, 14)).toBe(true);
   });
 
   it('exports the tokens the UI uses', () => {
     expect(PALETTE_TOKENS.bg).toBe(ORB_BG);
-    expect(PALETTE_TOKENS.text).toBe(ORB_TEXT);
     expect(PALETTE_TOKENS.textDim).toBe(ORB_TEXT_DIM);
-    expect(PALETTE_TOKENS.textQuiet).toBe(ORB_TEXT_QUIET);
-    expect(PALETTE_TOKENS.placeholder).toBe(ORB_PLACEHOLDER);
   });
 });

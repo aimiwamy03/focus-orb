@@ -1,9 +1,11 @@
 export const ORB_BG = '#161616';
 export const ORB_TEXT = '#e8e8e8';
-export const ORB_TEXT_DIM = '#c8c8c8';
+export const ORB_TEXT_DIM = '#d0d0d0';
 export const ORB_TEXT_QUIET = '#b4b4b4';
 export const ORB_PLACEHOLDER = '#a3a3a3';
 export const SETTINGS_BG = '#18181b';
+export const SETTINGS_TEXT = '#e4e4e7';
+export const SETTINGS_MUTED = '#a1a1aa';
 
 const AA_NORMAL = 4.5;
 const AA_LARGE = 3;
@@ -15,6 +17,8 @@ export const PALETTE_TOKENS = {
   textQuiet: ORB_TEXT_QUIET,
   placeholder: ORB_PLACEHOLDER,
   settingsBg: SETTINGS_BG,
+  settingsText: SETTINGS_TEXT,
+  settingsMuted: SETTINGS_MUTED,
 } as const;
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {

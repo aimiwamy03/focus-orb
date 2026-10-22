@@ -6,7 +6,26 @@ export const MINI_SIZE = 180;
 export const MINI_STATUS_PAD_Y = 10;
 export const MINI_STATUS_PAD_X = 12;
 export const MINI_STATUS_LINE = 14;
-export const MINI_STATUS_BAND = MINI_STATUS_PAD_Y * 2 + MINI_STATUS_LINE;
+
+export function miniStatusType(
+  viewW: number = MINI_SIZE,
+  viewH: number = MINI_SIZE
+): {
+  fontSize: number;
+  lineHeight: number;
+  padY: number;
+  padX: number;
+  band: number;
+} {
+  const minSide = Math.min(viewW, viewH);
+  const fontSize = Math.round(Math.min(18, Math.max(12, minSide * 0.072)));
+  const lineHeight = Math.round(fontSize * 1.25);
+  const padY = Math.round(Math.max(6, fontSize * 0.55));
+  const padX = Math.round(Math.max(8, fontSize * 0.7));
+  return { fontSize, lineHeight, padY, padX, band: padY * 2 + lineHeight };
+}
+
+export const MINI_STATUS_BAND = miniStatusType(MINI_SIZE, MINI_SIZE).band;
 export const BREATH_PERIOD_MS = 5000;
 export const POP_OUT_ON_LEAVE_KEY = 'focusOrb:popOutOnLeave';
 export const MINI_BG = '#000000';
@@ -21,7 +40,7 @@ export interface MiniOrbLayout {
 export function miniOrbLayout(
   viewW: number,
   viewH: number,
-  statusBand: number = MINI_STATUS_BAND
+  statusBand: number = miniStatusType(viewW, viewH).band
 ): MiniOrbLayout {
   const availableH = Math.max(1, viewH - Math.max(0, statusBand));
   return {

@@ -15,6 +15,7 @@ import {
   MINI_STATUS_BAND,
   miniOrbKind,
   miniOrbLayout,
+  miniStatusType,
   miniVisualState,
   POP_OUT_ON_LEAVE_KEY,
   savePopOutOnLeave,
@@ -200,18 +201,26 @@ describe('miniOrbLayout centers in any PiP size', () => {
     [320, 240],
     [600, 600],
   ])('centers the orb in %i x %i above the status band', (width, height) => {
+    const band = miniStatusType(width, height).band;
     const layout = miniOrbLayout(width, height);
     expect(layout.centerX).toBeCloseTo(width / 2);
-    expect(layout.centerY).toBeCloseTo((height - MINI_STATUS_BAND) / 2);
+    expect(layout.centerY).toBeCloseTo((height - band) / 2);
     expect(layout.centerX / width).toBeCloseTo(0.5);
     expect(layout.centerY).toBeLessThan(height / 2);
-    expect(layout.centerY + layout.radius).toBeLessThanOrEqual(height - MINI_STATUS_BAND + 1);
+    expect(layout.centerY + layout.radius).toBeLessThanOrEqual(height - band + 1);
+    expect(miniStatusType(width, height).fontSize).toBeGreaterThanOrEqual(12);
   });
 
   it('centers inside a canvas that is already the area above the status line', () => {
     const layout = miniOrbLayout(600, 600 - MINI_STATUS_BAND, 0);
     expect(layout.centerX).toBeCloseTo(300);
     expect(layout.centerY).toBeCloseTo((600 - MINI_STATUS_BAND) / 2);
+  });
+
+  it('grows the label on a larger PiP', () => {
+    expect(miniStatusType(320, 240).fontSize).toBeGreaterThan(
+      miniStatusType(180, 180).fontSize
+    );
   });
 });
 
