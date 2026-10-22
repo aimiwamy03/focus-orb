@@ -61,7 +61,3 @@ Try these URLs to see different states without connecting a calendar:
 - `?mock=sample-day` - Full sample day
 
 Click "Try a sample day" on the home page for an interactive demo.
-
-## License
-
-MIT
