@@ -94,27 +94,27 @@ async function open(page, search, extra = {}) {
 }
 
 const LINES = {
-  green: 'Recovery 82%. Good day for deep work.',
-  yellow: 'Recovery 51%. Steady blocks today.',
-  red: 'Recovery 28%. Shorter blocks today.',
-  sleep: 'Sleep 62%. Start with something light.',
-  debt: 'Short on sleep. Take real breaks today.',
-  strain: 'Big day yesterday. Pace yourself.',
-  workout: 'Fresh off a workout. Ease in with 20 minutes.',
-  late: 'Late in your day. One short block?',
+  green: 'Recovery 82%, slept 7h 20m (90%), so 50m blocks today.',
+  yellow: 'Recovery 51%, slept 6h 10m (80%), so 40m blocks today.',
+  red: 'Recovery 28%, slept 5h 50m (72%), so 25m blocks today.',
+  sleep: 'Recovery 75%, slept 6h (62%), so 30m blocks today.',
+  debt: 'Recovery 78%, slept 5h (90%), so 30m blocks today.',
+  strain: 'Recovery 80%, slept 7h 20m (90%), so 50m blocks today.',
+  workout: 'Recovery 80%, slept 7h 20m (90%), so 20m blocks today.',
+  late: 'Recovery 80%, slept 7h 20m (90%), so 25m blocks today.',
   pending: 'Recovery not ready yet.',
   calibrating: 'Recovery not ready yet.',
 };
 
 const OFFERS = {
-  green: 'WHOOP suggests 50m',
-  yellow: 'WHOOP suggests 40m',
-  red: 'WHOOP suggests 25m',
-  sleep: 'WHOOP suggests 30m',
-  debt: 'WHOOP suggests 30m',
-  strain: 'WHOOP suggests 50m',
-  workout: 'WHOOP suggests 20m',
-  late: 'WHOOP suggests 25m',
+  green: '50m today',
+  yellow: '40m today',
+  red: '25m today',
+  sleep: '30m today',
+  debt: '30m today',
+  strain: '50m today',
+  workout: '20m today',
+  late: '25m today',
 };
 
 const browser = await chromium.launch({ args: ['--use-gl=angle'] });
@@ -128,8 +128,33 @@ for (const [key, line] of Object.entries(LINES)) {
   if ((await prompt.count()) !== 1) fail(`Ask did not load for whoop=${key}`);
   const whoopLine = page.getByTestId('whoop-line');
   if ((await whoopLine.count()) !== 1) fail(`Missing WHOOP line for ${key}`);
-  const text = (await whoopLine.textContent())?.trim();
-  if (text !== line) fail(`whoop=${key} line: expected "${line}", got "${text}"`);
+  const text = (await whoopLine.textContent())?.trim() ?? '';
+  if (!text.startsWith('WHOOP') || !text.includes(line)) {
+    fail(`whoop=${key} line: expected WHOOP + "${line}", got "${text}"`);
+  }
+  if (/[—–]/.test(text)) fail(`whoop=${key} line has an em dash`);
+  const link = whoopLine.getByTestId('whoop-link');
+  if ((await link.count()) !== 1) fail(`Missing WHOOP dashboard link for ${key}`);
+  if ((await link.getAttribute('href')) !== 'https://app.whoop.com') {
+    fail(`WHOOP link href for ${key}`);
+  }
+  if ((await link.getAttribute('target')) !== '_blank') fail(`WHOOP link should open a new tab for ${key}`);
+  if ((await link.getAttribute('rel')) !== 'noopener noreferrer') {
+    fail(`WHOOP link rel for ${key}`);
+  }
+  const expectWindow = key !== 'late';
+  const windowLine = whoopLine.getByTestId('whoop-window');
+  const windowCount = await windowLine.count();
+  if (expectWindow && windowCount !== 1) {
+    fail(`Expected a best-focus window for ${key} on an empty day`);
+  } else if (!expectWindow && windowCount !== 0) {
+    fail(`whoop=${key} should omit the best-focus window`);
+  } else if (windowCount === 1) {
+    const windowText = (await windowLine.textContent()) ?? '';
+    if (!windowText.startsWith('Best focus window ') || /[—–]/.test(windowText)) {
+      fail(`whoop=${key} window: "${windowText}"`);
+    }
+  }
   const lineMeasure = await measureMutedType(whoopLine, `whoop=${key} line`);
   console.log(
     `whoop=${key} line ${lineMeasure.fontSize}px ${lineMeasure.ratio.toFixed(2)}:1 ${lineMeasure.color}`
@@ -158,16 +183,31 @@ if ((await page.getByTestId('whoop-line').count()) !== 0) {
   fail('Disconnected mock should not show a WHOOP line');
 }
 
+await open(page, '/?whoop=nodata');
+await assertNoIssueBadge(page, 'whoop=nodata');
+if ((await page.getByTestId('whoop-line').count()) !== 0) {
+  fail('No-data mock should fall back to no WHOOP line');
+}
+
+await open(page, '/?whoop=red', { 'focusOrb:whoopShowNumbers': '0' });
+const quiet = (await page.getByTestId('whoop-line').textContent()) ?? '';
+if (!quiet.includes('Recovery is low, sleep was short, so shorter blocks today.')) {
+  fail(`Numbers off should keep the reason without figures, got "${quiet}"`);
+}
+if (/\d+%/.test(quiet) || /\d+h \d+m/.test(quiet) || /\d+m blocks/.test(quiet)) {
+  fail(`Numbers off still showed figures: "${quiet}"`);
+}
+
 await open(page, '/?whoop=red');
 await page.keyboard.press('ArrowRight');
 await page.keyboard.press('ArrowRight');
 if ((await page.getByTestId('whoop-offer').getAttribute('data-highlighted')) !== 'true') {
-  fail('Right arrow should reach WHOOP suggests 25m');
+  fail('Right arrow should reach 25m today');
 }
 await page.keyboard.press('Enter');
 await page.waitForTimeout(150);
 if ((await page.getByTestId('whoop-offer').getAttribute('data-highlighted')) !== 'true') {
-  fail('Enter on WHOOP suggests 25m should keep the offer selected');
+  fail('Enter on 25m today should keep the offer selected');
 }
 if ((await page.getByTestId('focus-start').getAttribute('data-highlighted')) === 'true') {
   fail('Picking the WHOOP offer should not jump to Start');
@@ -177,11 +217,11 @@ await open(page, '/?whoop=yellow');
 await page.getByTestId('whoop-offer').click();
 await page.waitForTimeout(150);
 if ((await page.getByTestId('whoop-offer').getAttribute('data-highlighted')) !== 'true') {
-  fail('Clicking WHOOP suggests 40m should highlight the offer');
+  fail('Clicking 40m today should highlight the offer');
 }
 
 await open(page, '/?mock=back-to-back&whoop=red');
-if ((await page.getByTestId('whoop-line').textContent()) !== LINES.red) {
+if (!((await page.getByTestId('whoop-line').textContent()) ?? '').includes(LINES.red)) {
   fail('Sample day should combine with whoop=red');
 }
 if ((await page.getByTestId('sample-day-label').count()) !== 1) {
@@ -231,6 +271,8 @@ if ((await page.getByTestId('whoop-status').textContent()) !== 'WHOOP is still l
 const shots = [
   ['/?whoop=green', 'whoop_home_green_1280.png', {}],
   ['/?whoop=red', 'whoop_home_red_1280.png', {}],
+  ['/?whoop=red', 'whoop_home_red_numbers_off_1280.png', { 'focusOrb:whoopShowNumbers': '0' }],
+  ['/?whoop=nodata', 'whoop_home_nodata_1280.png', {}],
   ['/?whoop=workout', 'whoop_home_workout_1280.png', {}],
   ['/?whoop=disconnected&settings=1', 'whoop_settings_disconnected_1280.png', {}],
   ['/?whoop=green&settings=1', 'whoop_settings_suggest_1280.png', {}],

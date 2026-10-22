@@ -21,8 +21,13 @@ export const WHOOP_MODE_HINTS: Record<WhoopMode, string> = {
 };
 
 export function whoopOfferLabel(minutes: number): string {
-  return `WHOOP suggests ${minutes}m`;
+  return `${minutes}m today`;
 }
+
+export const WHOOP_APP_URL = 'https://app.whoop.com';
+export const WHOOP_PEAK_START_HOURS = 2;
+export const WHOOP_PEAK_END_HOURS = 6;
+export const WHOOP_WINDOW_MIN_MINUTES = 60;
 
 export const DEFAULT_WHOOP_MODE: WhoopMode = 'suggest';
 
@@ -99,6 +104,7 @@ export interface WhoopFacts {
   recovery: number | null;
   recoveryState: WhoopRecoveryState;
   sleepPerformance: number | null;
+  sleepMinutes: number | null;
   sleepDebtMinutes: number | null;
   yesterdayStrain: number | null;
   lastWorkoutEndedAt: number | null;
@@ -306,6 +312,133 @@ export function whoopQuietLine(
   }
 }
 
+export function formatSleepDuration(totalMinutes: number): string {
+  const rounded = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(rounded / 60);
+  const minutes = rounded % 60;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+function qualitativeRecovery(band: 'green' | 'yellow' | 'red'): string {
+  if (band === 'green') return 'Recovery is strong';
+  if (band === 'yellow') return 'Recovery is okay';
+  return 'Recovery is low';
+}
+
+function qualitativeSleep(sleepMinutes: number): string {
+  if (sleepMinutes < 6 * 60) return 'sleep was short';
+  if (sleepMinutes < 7 * 60) return 'sleep was fair';
+  return 'sleep was solid';
+}
+
+function qualitativeBlocks(minutes: number): string {
+  if (minutes <= 25) return 'shorter blocks';
+  if (minutes <= 35) return 'lighter blocks';
+  if (minutes <= 45) return 'steady blocks';
+  return 'full blocks';
+}
+
+export function whoopWhyLine(
+  facts: WhoopFacts | null,
+  blockMinutes: number | null,
+  showNumbers: boolean
+): string | null {
+  if (!facts) return null;
+  if (facts.recoveryState === 'pending' || facts.recoveryState === 'calibrating') {
+    return WHOOP_PENDING_LINE;
+  }
+
+  const parts: string[] = [];
+  if (showNumbers) {
+    if (facts.recovery != null) parts.push(`Recovery ${Math.round(facts.recovery)}%`);
+    if (facts.sleepMinutes != null) {
+      const slept = `slept ${formatSleepDuration(facts.sleepMinutes)}`;
+      parts.push(
+        facts.sleepPerformance != null ? `${slept} (${Math.round(facts.sleepPerformance)}%)` : slept
+      );
+    }
+  } else {
+    const band = facts.recovery != null ? recoveryBand(facts.recovery) : null;
+    if (band) parts.push(qualitativeRecovery(band));
+    if (facts.sleepMinutes != null) parts.push(qualitativeSleep(facts.sleepMinutes));
+  }
+
+  const so =
+    blockMinutes != null
+      ? showNumbers
+        ? `so ${blockMinutes}m blocks today`
+        : `so ${qualitativeBlocks(blockMinutes)} today`
+      : null;
+
+  if (parts.length === 0) {
+    return whoopQuietLine(whoopLineKey(detectWhoopStates(facts)), facts, showNumbers);
+  }
+  if (so) return `${parts.join(', ')}, ${so}.`;
+  return `${parts.join(', ')}.`;
+}
+
+export interface WhoopWindowGap {
+  start: Date;
+  end: Date | null;
+}
+
+function hourParts(date: Date): { hour: number; minutes: number; meridiem: 'AM' | 'PM' } {
+  const hours = date.getHours();
+  return {
+    hour: hours % 12 || 12,
+    minutes: date.getMinutes(),
+    meridiem: hours >= 12 ? 'PM' : 'AM',
+  };
+}
+
+function formatHourPart(parts: { hour: number; minutes: number; meridiem: 'AM' | 'PM' }): string {
+  const clock = parts.minutes ? `${parts.hour}:${String(parts.minutes).padStart(2, '0')}` : `${parts.hour}`;
+  return `${clock} ${parts.meridiem}`;
+}
+
+export function formatHourRange(start: Date, end: Date): string {
+  const a = hourParts(start);
+  const b = hourParts(end);
+  if (a.meridiem === b.meridiem && a.minutes === 0 && b.minutes === 0 && a.hour !== 12) {
+    return `${a.hour} to ${b.hour} ${b.meridiem}`;
+  }
+  return `${formatHourPart(a)} to ${formatHourPart(b)}`;
+}
+
+export function formatWhoopWindow(start: Date, end: Date): string {
+  return `Best focus window ${formatHourRange(start, end)}.`;
+}
+
+export function whoopBestWindow(
+  facts: WhoopFacts,
+  gaps: WhoopWindowGap[],
+  now: Date = new Date(facts.now)
+): { start: Date; end: Date } | null {
+  if (facts.wakeAt == null || gaps.length === 0) return null;
+  const peakStart = facts.wakeAt + WHOOP_PEAK_START_HOURS * 60 * 60 * 1000;
+  const peakEnd = facts.wakeAt + WHOOP_PEAK_END_HOURS * 60 * 60 * 1000;
+  const nowMs = now.getTime();
+  let best: { start: Date; end: Date; minutes: number } | null = null;
+  for (const gap of gaps) {
+    const gapEndMs = gap.end ? gap.end.getTime() : endOfLocalDay(now).getTime();
+    const startMs = Math.max(gap.start.getTime(), peakStart, nowMs);
+    const endMs = Math.min(gapEndMs, peakEnd);
+    const minutes = (endMs - startMs) / 60_000;
+    if (minutes < WHOOP_WINDOW_MIN_MINUTES) continue;
+    if (!best || minutes > best.minutes) {
+      best = { start: new Date(startMs), end: new Date(endMs), minutes };
+    }
+  }
+  return best ? { start: best.start, end: best.end } : null;
+}
+
+function endOfLocalDay(now: Date): Date {
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
 export function suggestWhoop(
   facts: WhoopFacts,
   showNumbers: boolean,
@@ -313,11 +446,12 @@ export function suggestWhoop(
 ): WhoopSuggestion {
   const states = detectWhoopStates(facts);
   const lineKey = whoopLineKey(states);
+  const rhythm = combineWhoopRhythms(states, usual);
   return {
-    rhythm: combineWhoopRhythms(states, usual),
+    rhythm,
     states,
     lineKey,
-    line: whoopQuietLine(lineKey, facts, showNumbers),
+    line: whoopWhyLine(facts, rhythm.firstBlockMinutes, showNumbers),
   };
 }
 

@@ -28,7 +28,7 @@ import {
 } from '@/lib/focusPrompt';
 import { createMenuState, reduceMenu, type MenuState } from '@/lib/menuKey';
 import { SPACE_HINT } from '@/lib/shortcuts';
-import { whoopOfferLabel } from '@/lib/whoop';
+import { WHOOP_APP_URL, whoopOfferLabel } from '@/lib/whoop';
 import { ChoiceItem, ChoiceRow, choiceClass } from './ChoiceRow';
 import { KeyHint } from './KeyHint';
 
@@ -36,6 +36,7 @@ interface FocusPromptProps {
   surface: PromptSurface;
   contextLine?: string | null;
   whoopLine?: string | null;
+  whoopWindow?: string | null;
   whoopOfferMinutes?: number | null;
   whoopAdapt?: boolean;
   onHideWhoopLine?: () => void;
@@ -179,6 +180,7 @@ export function FocusPrompt({
   surface,
   contextLine,
   whoopLine = null,
+  whoopWindow = null,
   whoopOfferMinutes = null,
   whoopAdapt = false,
   onHideWhoopLine,
@@ -437,9 +439,25 @@ export function FocusPrompt({
         <div
           data-testid="whoop-line"
           data-text-clear
-          className="text-[length:var(--type-whoop)] leading-snug text-orb-quiet"
+          className="flex max-w-[min(32rem,92vw)] flex-col items-center gap-1 text-[length:var(--type-whoop)] leading-snug text-orb-quiet"
         >
-          {whoopLine}
+          <p className="m-0">
+            <a
+              data-testid="whoop-link"
+              href={WHOOP_APP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orb-text underline decoration-1 underline-offset-[3px]"
+            >
+              WHOOP
+            </a>
+            {` ${whoopLine}`}
+          </p>
+          {whoopWindow ? (
+            <p data-testid="whoop-window" className="m-0">
+              {whoopWindow}
+            </p>
+          ) : null}
         </div>
       ) : surface === 'ask' && contextLine ? (
         <div
