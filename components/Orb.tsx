@@ -41,14 +41,35 @@ import {
   focusLogKey,
   loadFocusLog,
   recordFocusLog,
+  updateFocusLogEntry,
   type FocusLogEntry,
 } from '@/lib/focusLog';
+import {
+  ORB_BLOOM_MS,
+  ORB_BLOOM_PREVIEW_BEFORE,
+  ORB_BLOOM_PREVIEW_SESSION,
+  ORB_SETTLE_MS,
+  attachGrowthFields,
+  countedMinutesToday,
+  formatFocusedToday,
+  growthPointScale,
+  isOrbPreviewKey,
+  loadSettlePlayed,
+  markSettlePlayed,
+  orbVisualState,
+  parseOrbFreeze,
+  resolveDisplayMinutes,
+  shouldPlaySettle,
+  stageById,
+  stageForMinutes,
+  type OrbLook,
+  type OrbMoment,
+  type OrbPreviewKey,
+  type OrbStage,
+} from '@/lib/orbGrowth';
 import { FocusLog } from './FocusLog';
 import { collectTextClearRects, textClearAlpha, textClearRectsOnDisk } from '@/lib/textClear';
 import {
-  breathGlow,
-  breathPhase,
-  breathScale,
   canUseDocumentPip,
   CHROME_HINT,
   FLOATING_RESTORE_LABEL,
@@ -81,6 +102,7 @@ import { Timeline } from './Timeline';
 import { Satellites } from './Satellites';
 import { Welcome } from './Welcome';
 import { FocusIntro } from './FocusIntro';
+import { FocusSettle } from './FocusSettle';
 import { MiniOrbView } from './MiniOrbView';
 import { ShortcutsCard } from './ShortcutsCard';
 import { isFirstOpen, isGoogleConfigured } from '@/lib/onboarding';
@@ -150,6 +172,17 @@ export function Orb() {
   const introParam = searchParams.get('intro');
   const introFreeze = parseIntroFreeze(searchParams.get('t'));
   const voiceMock = parseVoiceQuery(searchParams.get('voice'));
+  const orbParam = searchParams.get('orb');
+  const mockOrb = searchParams.get('mock');
+  const orbFromMock = mockOrb?.startsWith('orb-') ? mockOrb.slice(4) : null;
+  const orbPreview: OrbPreviewKey | null = isOrbPreviewKey(orbParam)
+    ? orbParam
+    : isOrbPreviewKey(orbFromMock)
+      ? orbFromMock
+      : null;
+  const settleParam = searchParams.get('settle');
+  const orbFreeze = parseOrbFreeze(searchParams.get('orbT'));
+  const orbMinutesParam = searchParams.get('orbMinutes');
   const whoop = useWhoop();
   const pipSupported = useSyncExternalStore(
     () => () => {},
@@ -179,6 +212,11 @@ export function Orb() {
   const [showAgenda, setShowAgenda] = useState(true);
   const [showBackdrop, setShowBackdrop] = useState(true);
   const [showIntro, setShowIntro] = useState(false);
+  const [showSettle, setShowSettle] = useState(false);
+  const [bloomDone, setBloomDone] = useState(true);
+  const [nextStep, setNextStep] = useState('');
+  const [distracted, setDistracted] = useState<boolean | null>(null);
+  const [focusRating, setFocusRating] = useState<number | null>(null);
   const [playIntro, setPlayIntro] = useState(true);
   const [introSound, setIntroSound] = useState(true);
   const [viewSize, setViewSize] = useState({ w: 1280, h: 800 });
@@ -190,6 +228,23 @@ export function Orb() {
   const settingsOpenRef = useRef(false);
   const logOpenRef = useRef(false);
   const introOpenRef = useRef(false);
+  const settleOpenRef = useRef(false);
+  const settleSkippedRef = useRef(false);
+  const lastLogIdRef = useRef<string | null>(null);
+  const nowRef = useRef(new Date());
+  const sessionFromRef = useRef<OrbStage | null>(null);
+  const bloomFromRef = useRef<OrbStage | null>(null);
+  const bloomToRef = useRef<OrbStage | null>(null);
+  const growthClockRef = useRef({ moment: 'still' as OrbMoment, startedAt: 0 });
+  const growthRef = useRef({
+    moment: 'still' as OrbMoment,
+    minutes: 0,
+    fromStage: stageForMinutes(0),
+    toStage: stageForMinutes(0),
+    freezeMs: null as number | null,
+    reducedMotion: false,
+    startedAt: 0,
+  });
   const showBackdropRef = useRef(true);
   const startedByVoiceRef = useRef(false);
   const surfaceRef = useRef<PromptSurface | null>(null);
@@ -216,6 +271,7 @@ export function Orb() {
   
   const calendar = useCalendar();
   const { nextEvent, day, now, scatterWindow } = calendar;
+  nowRef.current = now;
   const logKey = focusLogKey({
     email: calendar.userEmail,
     mock: Boolean(calendar.mockScenario),
@@ -246,7 +302,20 @@ export function Orb() {
     seedCompleted,
   } = useManualFocus({
     onFocusEnded: (draft) => {
-      setFocusLog(recordFocusLog(logKeyRef.current, draft));
+      const enriched = attachGrowthFields(draft, {
+        entries: loadFocusLog(logKeyRef.current),
+        now: nowRef.current,
+        settleSkipped: settleSkippedRef.current,
+      });
+      const next = recordFocusLog(logKeyRef.current, enriched);
+      lastLogIdRef.current = next[0]?.id ?? null;
+      bloomFromRef.current = stageById(enriched.stageBefore ?? 0);
+      bloomToRef.current = stageById(enriched.stageAfter ?? 0);
+      setBloomDone(false);
+      setNextStep('');
+      setDistracted(null);
+      setFocusRating(null);
+      setFocusLog(next);
       if (draft.ended === 'ended-session') return;
       track({
         name: 'block_completed',
@@ -268,6 +337,7 @@ export function Orb() {
     calendarUrl: calendar.calendarUrl,
     authMethod: calendar.authMethod,
     whoopDemo: whoop.demo,
+    homePreview: Boolean(orbPreview),
   });
 
   const showChrome =
@@ -337,6 +407,52 @@ export function Orb() {
     buildAgenda(calendar.events, now),
     viewSize.h
   );
+  const logMinutes = countedMinutesToday(focusLog, now);
+  const displayMinutes = resolveDisplayMinutes({
+    logMinutes,
+    preview: orbPreview,
+    orbMinutesParam,
+  });
+  const liveStage = stageForMinutes(displayMinutes);
+  const focusingNow = isManualFocus || surface === 'stop-confirm';
+  const blooming = Boolean(completed) && !bloomDone;
+  const growthMoment: OrbMoment = showSettle
+    ? 'settle'
+    : blooming
+      ? 'bloom'
+      : focusingNow
+        ? 'focusing'
+        : 'still';
+  const fromStage =
+    growthMoment === 'bloom'
+      ? (bloomFromRef.current ?? liveStage)
+      : growthMoment === 'focusing'
+        ? (sessionFromRef.current ?? liveStage)
+        : liveStage;
+  const toStage =
+    growthMoment === 'bloom' ? (bloomToRef.current ?? liveStage) : liveStage;
+  if (growthClockRef.current.moment !== growthMoment) {
+    growthClockRef.current = { moment: growthMoment, startedAt: performance.now() };
+  }
+  growthRef.current = {
+    moment: growthMoment,
+    minutes: displayMinutes,
+    fromStage,
+    toStage,
+    freezeMs: orbFreeze == null ? null : orbFreeze * 1000,
+    reducedMotion,
+    startedAt: growthClockRef.current.startedAt,
+  };
+  const previewVisual = orbVisualState({
+    minutes: displayMinutes,
+    moment: growthMoment,
+    elapsedMs: orbFreeze == null ? 0 : orbFreeze * 1000,
+    reducedMotion,
+    fromStage,
+    toStage,
+    preview: orbPreview,
+  });
+
   const focusingSurface = surface === 'focusing' || surface === 'stop-confirm';
   const idleAgendaSurface =
     surface === 'ask' ||
@@ -349,6 +465,7 @@ export function Orb() {
     showAgenda &&
     !firstOpen &&
     !miniOnly &&
+    !showSettle &&
     !showSettings &&
     !showLog &&
     shouldShowAgenda({
@@ -405,7 +522,61 @@ export function Orb() {
     setShowIntro(play);
     setPlayIntro(loadPlayIntro());
     setIntroSound(loadIntroSound());
-  }, [introParam, miniOnlyParam]);
+    const playSettle = shouldPlaySettle({
+      settleParam,
+      preview: orbPreview,
+      sessionPlayed: loadSettlePlayed(),
+      introOpen: play,
+      focusing: isStoredFocusRunning(),
+      miniOnly: miniOnlyParam,
+      firstOpen: false,
+    });
+    if (playSettle) {
+      markSettlePlayed();
+      setShowSettle(true);
+    } else {
+      setShowSettle(false);
+    }
+  }, [introParam, miniOnlyParam, orbPreview, settleParam]);
+
+  const finishSettle = useCallback((skipped: boolean) => {
+    settleSkippedRef.current = skipped || settleSkippedRef.current;
+    markSettlePlayed();
+    setShowSettle(false);
+  }, []);
+
+  useEffect(() => {
+    if (firstOpen && showSettle) setShowSettle(false);
+  }, [firstOpen, showSettle]);
+
+  useEffect(() => {
+    if (!showSettle || orbFreeze != null) return;
+    const timer = window.setTimeout(() => finishSettle(false), ORB_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [finishSettle, orbFreeze, showSettle]);
+
+  useEffect(() => {
+    if (!completed || bloomDone || orbFreeze != null) return;
+    const timer = window.setTimeout(() => setBloomDone(true), ORB_BLOOM_MS);
+    return () => window.clearTimeout(timer);
+  }, [bloomDone, completed, orbFreeze]);
+
+  useEffect(() => {
+    if (orbPreview !== 'bloom') return;
+    seedCompleted('Deep work', ORB_BLOOM_PREVIEW_SESSION, ORB_BLOOM_PREVIEW_SESSION);
+    bloomFromRef.current = stageForMinutes(ORB_BLOOM_PREVIEW_BEFORE);
+    bloomToRef.current = stageForMinutes(ORB_BLOOM_PREVIEW_BEFORE + ORB_BLOOM_PREVIEW_SESSION);
+    setBloomDone(false);
+  }, [orbPreview, seedCompleted]);
+
+  const patchLastLog = useCallback(
+    (patch: Partial<FocusLogEntry>) => {
+      const id = lastLogIdRef.current;
+      if (!id) return;
+      setFocusLog(updateFocusLogEntry(logKeyRef.current, id, patch));
+    },
+    []
+  );
 
   useEffect(() => {
     setPopOutOnLeave(loadPopOutOnLeave());
@@ -607,18 +778,19 @@ export function Orb() {
     window.addEventListener('resize', resize);
     window.visualViewport?.addEventListener('resize', resize);
     
-    let time = 0;
     let lastTs = 0;
 
-    const paintMini = (visualScatter: number) => {
+    const paintMini = (visualScatter: number, look: OrbLook, breath: number) => {
       const frame = miniDrawRef.current;
-      const phase = frame.focusing ? breathPhase(performance.now()) : 0;
       const payload = {
         scatter: visualScatter,
         density: frame.density,
         dim: frame.dim,
-        scale: frame.focusing ? breathScale(phase, frame.reducedMotion) : 1,
-        glow: breathGlow(phase, frame.focusing),
+        scale: look.scale * breath,
+        glow: look.glow,
+        halo: look.halo,
+        brightness: look.brightness,
+        warmth: look.warmth,
       };
       for (const target of [miniWindow.canvasRef.current, previewCanvasRef.current]) {
         if (!target) continue;
@@ -630,7 +802,6 @@ export function Orb() {
     const render = (ts: number) => {
       const dt = lastTs === 0 ? 16 : Math.min(64, ts - lastTs);
       lastTs = ts;
-      time += 0.008;
 
       visualScatterRef.current = stepVisualScatter(
         visualScatterRef.current,
@@ -656,7 +827,32 @@ export function Orb() {
       const centerY = layout.centerY * dpr;
       const radius = physicalRadius;
       const hoverBoost = hoverBoostRef.current;
-      const breatheAmp = visualScatter < 0.05 ? 0.05 : 0.03;
+      const growth = growthRef.current;
+      const elapsed =
+        growth.freezeMs != null ? growth.freezeMs : ts - growth.startedAt;
+      const visual = orbVisualState({
+        minutes: growth.minutes,
+        moment: growth.moment,
+        elapsedMs: elapsed,
+        reducedMotion: growth.reducedMotion,
+        fromStage: growth.fromStage,
+        toStage: growth.toStage,
+      });
+      const look = visual.look;
+      const debugGrowth = window as Window & {
+        __orbGrowth?: {
+          stage: string;
+          minutes: number;
+          moment: OrbMoment;
+          scale: number;
+        };
+      };
+      debugGrowth.__orbGrowth = {
+        stage: visual.stage.key,
+        minutes: visual.minutes,
+        moment: visual.moment,
+        scale: look.scale * visual.breath,
+      };
       
       if (showBackdropRef.current) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -666,33 +862,42 @@ export function Orb() {
       }
 
       if (miniOnlyRef.current) {
-        paintMini(visualScatter);
+        paintMini(visualScatter, look, visual.breath);
         animationRef.current = requestAnimationFrame(render);
         return;
       }
 
-      const frame = miniDrawRef.current;
-      const focusPhase = frame.focusing ? breathPhase(performance.now()) : 0;
-      if (frame.focusing) {
-        const glow = breathGlow(focusPhase, true);
+      const glowColor = `${255}, ${Math.round(255 - 12 * look.warmth)}, ${Math.round(255 - 28 * look.warmth)}`;
+      if (look.glow > 0) {
+        const glow = look.glow;
         const gradient = ctx.createRadialGradient(
           centerX,
           centerY,
-          radius * 0.18,
+          radius * 0.18 * look.scale,
           centerX,
           centerY,
-          radius * (1.15 + 0.35 * glow)
+          radius * (1.15 + 0.35 * glow) * look.scale
         );
-        gradient.addColorStop(0, `rgba(255,255,255,${0.16 * glow})`);
-        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        gradient.addColorStop(0, `rgba(${glowColor},${0.16 * glow})`);
+        gradient.addColorStop(1, `rgba(${glowColor},0)`);
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-      
-      // Breathing: focus uses the 5s inhale/exhale; otherwise a slight idle pulse
-      const breatheScale = frame.focusing
-        ? breathScale(focusPhase, frame.reducedMotion)
-        : 1 + Math.sin(time * 0.45) * breatheAmp;
+      if (look.halo > 0) {
+        const ring = ctx.createRadialGradient(
+          centerX,
+          centerY,
+          radius * 0.95 * look.scale,
+          centerX,
+          centerY,
+          radius * (1.55 + 0.2 * look.halo) * look.scale
+        );
+        ring.addColorStop(0, `rgba(${glowColor},0)`);
+        ring.addColorStop(0.55, `rgba(${glowColor},${0.14 * look.halo})`);
+        ring.addColorStop(1, `rgba(${glowColor},0)`);
+        ctx.fillStyle = ring;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
       
       // Re-randomize a small fraction of thresholds for shimmer effect
       if (Math.random() < 0.01) {
@@ -704,7 +909,7 @@ export function Orb() {
       const clearRects = textClearRectsOnDisk(collectTextClearRects(), {
         centerX: layout.centerX,
         centerY: layout.centerY,
-        radius: textClearCloudRadius(layout.radius, visualScatter),
+        radius: textClearCloudRadius(layout.radius * look.scale, visualScatter),
       });
       ctx.fillStyle = '#ffffff';
       
@@ -716,7 +921,7 @@ export function Orb() {
         
         // Keep probability based on escape state.
         // Gap-aware brightness scales only the starting keep probability.
-        const startingKeep = point.shade * densityRef.current * hoverBoost;
+        const startingKeep = point.shade * densityRef.current * hoverBoost * look.brightness;
         let keepProb: number;
         if (progress === 0) {
           // Non-escaped: shade with gentle dimming
@@ -729,9 +934,10 @@ export function Orb() {
         // Skip if below threshold
         if (point.threshold >= keepProb) continue;
         
-        // Compute position with breathing
-        let x = point.x * breatheScale;
-        let y = point.y * breatheScale;
+        const pointRadius = Math.hypot(point.x, point.y) / Math.max(radius, 1);
+        const pointScale = growthPointScale(look, visual.breath, pointRadius);
+        let x = point.x * pointScale;
+        let y = point.y * pointScale;
         
         // Scatter displacement for escaped points only
         if (progress > 0) {
@@ -799,7 +1005,7 @@ export function Orb() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      paintMini(visualScatter);
+      paintMini(visualScatter, look, visual.breath);
       
       animationRef.current = requestAnimationFrame(render);
     };
@@ -858,6 +1064,7 @@ export function Orb() {
   useEffect(() => {
     if (
       showIntro ||
+      showSettle ||
       !shouldShowShortcutsCard({
         firstOpen,
         miniOnly,
@@ -869,7 +1076,7 @@ export function Orb() {
       return;
     }
     setShowShortcutsCard(true);
-  }, [firstOpen, miniOnly, showIntro, surface]);
+  }, [firstOpen, miniOnly, showIntro, showSettle, surface]);
 
   const toggleFullscreen = () => {
     markHintSeen('fullscreen');
@@ -911,7 +1118,7 @@ export function Orb() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (introOpenRef.current) return;
+      if (introOpenRef.current || settleOpenRef.current) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -986,6 +1193,13 @@ export function Orb() {
     setStopConfirm(false);
     setSessionConfirm(false);
     dismissCompleted();
+    sessionFromRef.current = stageForMinutes(
+      resolveDisplayMinutes({
+        logMinutes: countedMinutesToday(loadFocusLog(logKeyRef.current), nowRef.current),
+        preview: orbPreview,
+        orbMinutesParam,
+      })
+    );
     startFocus(minutes, name);
     dismissShortcutsCard();
     bumpHint('hover');
@@ -993,6 +1207,10 @@ export function Orb() {
 
   const handleOrbClick = () => {
     if (firstOpen) return;
+    if (showSettle) {
+      finishSettle(true);
+      return;
+    }
     if (isBreak) {
       setSessionConfirm((open) => !open);
       return;
@@ -1078,6 +1296,7 @@ export function Orb() {
   settingsOpenRef.current = showSettings;
   logOpenRef.current = showLog;
   introOpenRef.current = showIntro;
+  settleOpenRef.current = showSettle;
   showBackdropRef.current = showBackdrop;
   surfaceRef.current = surface;
   miniOnlyRef.current = miniOnly;
@@ -1115,6 +1334,9 @@ export function Orb() {
   return (
     <div 
       data-testid="orb-root"
+      data-orb-stage={previewVisual.stage.key}
+      data-orb-moment={growthMoment}
+      data-orb-minutes={String(Math.round(displayMinutes))}
       data-log-open={showLog ? 'true' : 'false'}
       data-backdrop={showBackdrop ? 'true' : 'false'}
       data-cursor-hidden={hideCursor ? 'true' : 'false'}
@@ -1179,7 +1401,9 @@ export function Orb() {
             showSettings ? 'invisible pointer-events-none' : ''
           }`}
         >
-          {surface === 'in-meeting' || !surface ? (
+          {showSettle ? (
+            <FocusSettle onSkip={finishSettle} />
+          ) : surface === 'in-meeting' || !surface ? (
             <StatusLine
               text={line}
               detail={hoverDetailText(day, now)}
@@ -1212,6 +1436,25 @@ export function Orb() {
               completedTask={completed?.task}
               completedMinutes={completed?.minutes}
               completedPlanned={completed?.planned}
+              focusedToday={
+                completed ? formatFocusedToday(displayMinutes) : null
+              }
+              blooming={blooming}
+              nextStep={nextStep}
+              onNextStepChange={(value) => {
+                setNextStep(value);
+                patchLastLog({ nextStep: value });
+              }}
+              distracted={distracted}
+              onDistracted={(value) => {
+                setDistracted(value);
+                patchLastLog({ distracted: value });
+              }}
+              focusRating={focusRating}
+              onFocusRating={(value) => {
+                setFocusRating(value);
+                patchLastLog({ focusRating: value });
+              }}
               joinUrl={extractJoinUrl(day.nextEvent)}
               onStart={(taskName, choice) =>
                 beginFocus(taskName ?? taskDraft, choice ?? durationChoice)
@@ -1389,7 +1632,23 @@ export function Orb() {
           soundEnabled={introSound}
           reducedMotion={reducedMotion}
           freezeAt={introFreeze}
-          onDone={() => setShowIntro(false)}
+          onDone={() => {
+            setShowIntro(false);
+            if (
+              shouldPlaySettle({
+                settleParam,
+                preview: orbPreview,
+                sessionPlayed: loadSettlePlayed(),
+                introOpen: false,
+                focusing: isStoredFocusRunning(),
+                miniOnly: miniOnlyParam,
+                firstOpen,
+              })
+            ) {
+              markSettlePlayed();
+              setShowSettle(true);
+            }
+          }}
         />
       ) : null}
 

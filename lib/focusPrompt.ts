@@ -1,7 +1,7 @@
 import { DayModel, DEFAULT_FOCUS_MINUTES } from './day';
 import { formatCompactDuration } from './tab';
 
-export const ASK_PROMPT = 'What do you want to focus on?';
+export const ASK_PROMPT = "What's the one thing?";
 export const END_EARLY_PROMPT = 'End focus early?';
 export const END_SESSION_PROMPT = 'End session?';
 export const END_SESSION_LABEL = 'End session';

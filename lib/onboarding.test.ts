@@ -18,6 +18,18 @@ describe('isFirstOpen', () => {
     ).toBe(true);
   });
 
+  it('skips the welcome screen for an orb growth preview', () => {
+    expect(
+      isFirstOpen({
+        mockScenario: null,
+        isGoogleConnected: false,
+        calendarUrl: '',
+        authMethod: null,
+        homePreview: true,
+      })
+    ).toBe(false);
+  });
+
   it('skips the welcome screen for a WHOOP mock without sign-in', () => {
     expect(
       isFirstOpen({

@@ -79,6 +79,7 @@ async function seed(page, extra = {}) {
     ({ hints, extra }) => {
       localStorage.clear();
       sessionStorage.setItem('focusOrb:introPlayed', '1');
+      sessionStorage.setItem('focusOrb:settlePlayed', '1');
       localStorage.setItem('focusOrb:hints', hints);
       localStorage.setItem('focusOrb:shortcutsCard', '1');
       for (const [key, value] of Object.entries(extra)) localStorage.setItem(key, value);

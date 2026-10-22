@@ -144,6 +144,34 @@ describe('game-menu rows', () => {
     expect(onOpenLog).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the focused-today line, next-step note, and ratings after bloom', () => {
+    const onNextStepChange = vi.fn();
+    const onDistracted = vi.fn();
+    const onFocusRating = vi.fn();
+    renderPrompt('completed', {
+      focusedToday: '1h 45m focused today.',
+      nextStep: '',
+      onNextStepChange,
+      onDistracted,
+      onFocusRating,
+    });
+    expect(screen.getByTestId('focused-today').textContent).toBe('1h 45m focused today.');
+    expect(screen.getByTestId('focused-today').textContent).not.toMatch(/[—–]/);
+    fireEvent.change(screen.getByTestId('next-step'), { target: { value: 'Write the recap' } });
+    expect(onNextStepChange).toHaveBeenCalledWith('Write the recap');
+    fireEvent.click(screen.getByTestId('distract-no'));
+    expect(onDistracted).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByTestId('rating-4'));
+    expect(onFocusRating).toHaveBeenCalledWith(4);
+  });
+
+  it('hides the note form while the bloom is playing', () => {
+    renderPrompt('completed', { focusedToday: '1h 45m focused today.', blooming: true });
+    expect(screen.getByTestId('focused-today')).toBeTruthy();
+    expect(screen.queryByTestId('focus-completed')).toBeNull();
+    expect(screen.queryByTestId('next-step')).toBeNull();
+  });
+
   it('defaults completed to Another round', () => {
     const { onAnotherRound, onBreak } = renderPrompt('completed');
     expect(screen.getByTestId('another-round').getAttribute('data-highlighted')).toBe('true');

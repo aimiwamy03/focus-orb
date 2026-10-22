@@ -31,6 +31,7 @@ function seedScript(options) {
   return (opts) => {
     localStorage.clear();
     sessionStorage.setItem('focusOrb:introPlayed', '1');
+    sessionStorage.setItem('focusOrb:settlePlayed', '1');
     if (opts.shortcutsSeen) localStorage.setItem('focusOrb:shortcutsCard', '1');
     localStorage.setItem('focusOrb:hints', opts.hints);
     if (opts.backdrop === false) localStorage.setItem('focusOrb:showBackdrop', '0');
@@ -329,7 +330,7 @@ await introPage.addInitScript(() => {
   sessionStorage.clear();
   localStorage.setItem('focusOrb:shortcutsCard', '1');
 });
-await introPage.goto(`${BASE}/?mock=empty&intro=1`, { waitUntil: 'networkidle' });
+await introPage.goto(`${BASE}/?mock=empty&intro=1&settle=0`, { waitUntil: 'networkidle' });
 await introPage.waitForSelector('[data-testid="focus-intro"]');
 if ((await introPage.getByTestId('star-dust-backdrop').count()) !== 1) {
   fail('Backdrop should already be mounted under the intro');

@@ -13,6 +13,7 @@ import {
   type FocusLogEntry,
   groupFocusLog,
 } from '@/lib/focusLog';
+import { dayFinalStage, formatDayStage } from '@/lib/orbGrowth';
 import { FocusLogChart } from './FocusLogChart';
 
 export function FocusLog({
@@ -114,11 +115,21 @@ export function FocusLog({
                   {day.label}
                 </h3>
                 {day.entries.length > 0 ? (
-                  <span
-                    data-testid={`focus-log-day-total-${day.label}`}
-                    className="focus-log-day-total"
-                  >
-                    {formatDayFocused(day.minutes)}
+                  <span className="flex items-baseline gap-2">
+                    <span
+                      data-testid={`focus-log-day-total-${day.label}`}
+                      className="focus-log-day-total"
+                    >
+                      {formatDayFocused(day.minutes)}
+                    </span>
+                    {formatDayStage(dayFinalStage(entries, new Date(Number(day.key)))) ? (
+                      <span
+                        data-testid={`focus-log-day-stage-${day.label}`}
+                        className="focus-log-day-total"
+                      >
+                        {formatDayStage(dayFinalStage(entries, new Date(Number(day.key))))}
+                      </span>
+                    ) : null}
                   </span>
                 ) : null}
               </div>
@@ -191,6 +202,14 @@ export function FocusLog({
                                 </span>
                               ) : null}
                             </span>
+                            {entry.nextStep ? (
+                              <span
+                                data-testid={`focus-log-next-${entry.id}`}
+                                className="focus-log-duration-label"
+                              >
+                                {entry.nextStep}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       </li>
