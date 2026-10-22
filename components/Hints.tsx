@@ -83,13 +83,12 @@ export function Hints({
         type="button"
         data-testid="help-toggle"
         onClick={() => setHelpOpen((open) => !open)}
-        className={`fixed top-4 left-4 z-40 rounded-full px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet transition-opacity duration-300 hover:text-orb-dim ${
+        className={`help-toggle fixed top-4 left-4 z-40 flex h-6 w-6 items-center justify-center p-0 text-[length:var(--type-chrome)] leading-none text-orb-quiet transition-opacity duration-300 hover:text-orb-dim ${
           chromeVisible
             ? 'visible opacity-100'
             : 'invisible pointer-events-none opacity-0'
         }`}
         aria-label={SHORTCUTS_LABEL}
-        title={SHORTCUTS_LABEL}
       >
         ?
       </button>

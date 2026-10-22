@@ -98,7 +98,9 @@ try {
   await chromePage.waitForSelector('[data-testid="keycap-S"]');
   await chromePage.waitForSelector('[data-testid="enter-hint"]');
   const helpTitle = await chromePage.locator('[data-testid="help-toggle"]').getAttribute('title');
-  if (helpTitle !== 'Shortcuts') throw new Error(`? title is ${helpTitle}`);
+  if (helpTitle) throw new Error(`? native tooltip should be gone, got ${helpTitle}`);
+  const helpAria = await chromePage.locator('[data-testid="help-toggle"]').getAttribute('aria-label');
+  if (helpAria !== 'Shortcuts') throw new Error(`? aria-label is ${helpAria}`);
   if ((await chromePage.locator('[data-testid="shortcuts-card"]').count()) > 0) {
     throw new Error('shortcuts card showed after it was marked seen');
   }
