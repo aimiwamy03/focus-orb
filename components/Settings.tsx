@@ -89,7 +89,7 @@ export function Settings({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
       <div
         data-testid="settings-sheet"
-        className="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 w-full max-w-md flex-col rounded-lg"
+        className="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 w-full max-w-md cursor-auto flex-col rounded-lg"
         style={{ backgroundColor: SETTINGS_BG }}
       >
         <div className="flex shrink-0 items-center justify-between px-6 pb-4 pt-6">

@@ -9,12 +9,15 @@ import {
   DurationChoice,
   END_EARLY_PROMPT,
   END_LABEL,
+  END_SESSION_LABEL,
+  END_SESSION_PROMPT,
   FALLBACK_TASK,
   formatBreakCopy,
   formatCompleted,
   formatFocusingCopy,
   JOIN_LABEL,
   KEEP_GOING_LABEL,
+  KEEP_RESTING_LABEL,
   MENU_ASK_HINT,
   PromptSurface,
   SKIP_LABEL,
@@ -24,7 +27,7 @@ import {
 } from '@/lib/focusPrompt';
 import { createMenuState, reduceMenu, type MenuState } from '@/lib/menuKey';
 import { SPACE_HINT } from '@/lib/shortcuts';
-import { ChoiceItem, ChoiceRow } from './ChoiceRow';
+import { ChoiceItem, ChoiceRow, choiceClass } from './ChoiceRow';
 import { KeyHint } from './KeyHint';
 
 interface FocusPromptProps {
@@ -41,23 +44,45 @@ interface FocusPromptProps {
   completedMinutes?: number;
   completedPlanned?: number;
   joinUrl?: string | null;
-  onStart: () => void;
+  onStart: (task?: string) => void;
   onKeepGoing: () => void;
   onEnd: () => void;
   onBreak: () => void;
   onAnotherRound: () => void;
   onJoin?: () => void;
   onSkip?: () => void;
+  onOpenSession?: () => void;
+  onKeepSession?: () => void;
+  onEndSession?: () => void;
+  sessionKeepLabel?: string;
   chromeVisible?: boolean;
   keyboardActive?: boolean;
 }
 
-function askItems(untilMinutes: number | null): (ChoiceItem & { value: DurationChoice })[] {
+type MenuItem = ChoiceItem & {
+  action:
+    | 'duration'
+    | 'start'
+    | 'recent'
+    | 'keep'
+    | 'end-block'
+    | 'open-session'
+    | 'end-session'
+    | 'keep-session'
+    | 'break'
+    | 'another'
+    | 'join'
+    | 'skip';
+  value?: DurationChoice | string;
+};
+
+function durationItems(untilMinutes: number | null): MenuItem[] {
   return [
     ...DURATION_CHIPS.map((minutes) => ({
       id: `duration-${minutes}m`,
       label: `${minutes}m`,
       value: minutes,
+      action: 'duration' as const,
       disabled: untilMinutes != null && minutes > untilMinutes,
     })),
     ...(untilMinutes != null
@@ -66,6 +91,7 @@ function askItems(untilMinutes: number | null): (ChoiceItem & { value: DurationC
             id: 'duration-Until next meeting',
             label: UNTIL_MEETING_LABEL,
             value: 'until' as const,
+            action: 'duration' as const,
           },
         ]
       : []),
@@ -75,36 +101,55 @@ function askItems(untilMinutes: number | null): (ChoiceItem & { value: DurationC
 function itemsFor(
   surface: PromptSurface,
   untilMinutes: number | null,
-  joinUrl?: string | null
-): ChoiceItem[] {
-  if (surface === 'ask') return askItems(untilMinutes);
+  joinUrl: string | null | undefined,
+  suggestions: string[],
+  keepSessionLabel: string
+): MenuItem[] {
+  if (surface === 'ask') {
+    return [
+      ...suggestions.map((name) => ({
+        id: `recent-${name}`,
+        label: name,
+        action: 'recent' as const,
+        value: name,
+      })),
+      ...durationItems(untilMinutes),
+      { id: 'focus-start', label: START_LABEL, action: 'start' },
+    ];
+  }
   if (surface === 'stop-confirm') {
     return [
-      { id: 'keep-going', label: KEEP_GOING_LABEL },
-      { id: 'end-focus', label: END_LABEL },
+      { id: 'keep-going', label: KEEP_GOING_LABEL, action: 'keep' },
+      { id: 'end-focus', label: END_LABEL, action: 'end-block' },
+    ];
+  }
+  if (surface === 'session-confirm') {
+    return [
+      { id: 'keep-session', label: keepSessionLabel, action: 'keep-session' },
+      { id: 'end-session', label: END_SESSION_LABEL, action: 'end-session' },
     ];
   }
   if (surface === 'completed') {
     return [
-      { id: 'take-break', label: DONE_LABEL },
-      { id: 'another-round', label: ANOTHER_ROUND_LABEL },
+      { id: 'take-break', label: DONE_LABEL, action: 'break' },
+      { id: 'another-round', label: ANOTHER_ROUND_LABEL, action: 'another' },
     ];
   }
   if (surface === 'meeting-soon' && joinUrl) {
     return [
-      { id: 'join-meeting', label: JOIN_LABEL },
-      { id: 'skip-meeting', label: SKIP_LABEL },
+      { id: 'join-meeting', label: JOIN_LABEL, action: 'join' },
+      { id: 'skip-meeting', label: SKIP_LABEL, action: 'skip' },
     ];
+  }
+  if (surface === 'break' || surface === 'focusing') {
+    return [{ id: 'end-session', label: END_SESSION_LABEL, action: 'open-session' }];
   }
   return [];
 }
 
-function defaultIndex(surface: PromptSurface, items: ChoiceItem[], choice: DurationChoice): number {
+function defaultIndex(surface: PromptSurface, items: MenuItem[], choice: DurationChoice): number {
   if (surface === 'ask') {
-    const match = items.findIndex((item) => {
-      const value = 'value' in item ? (item as { value: DurationChoice }).value : null;
-      return value === choice;
-    });
+    const match = items.findIndex((item) => item.action === 'duration' && item.value === choice);
     return match >= 0 ? match : 0;
   }
   if (surface === 'completed') return Math.min(1, Math.max(0, items.length - 1));
@@ -132,17 +177,22 @@ export function FocusPrompt({
   onAnotherRound,
   onJoin,
   onSkip,
+  onOpenSession,
+  onKeepSession,
+  onEndSession,
+  sessionKeepLabel = KEEP_RESTING_LABEL,
   chromeVisible = false,
   keyboardActive = true,
 }: FocusPromptProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const suggestions = useMemo(() => visibleAskSuggestions(recentTasks, task), [recentTasks, task]);
   const items = useMemo(
-    () => itemsFor(surface, untilMinutes, joinUrl),
-    [surface, untilMinutes, joinUrl]
+    () => itemsFor(surface, untilMinutes, joinUrl, mounted ? suggestions : [], sessionKeepLabel),
+    [surface, untilMinutes, joinUrl, mounted, suggestions, sessionKeepLabel]
   );
-  const durations = useMemo(() => askItems(untilMinutes), [untilMinutes]);
+  const durations = useMemo(() => durationItems(untilMinutes), [untilMinutes]);
   const [menu, setMenu] = useState<MenuState>(() =>
     createMenuState({
       count: items.length,
@@ -164,7 +214,12 @@ export function FocusPrompt({
     onJoin,
     onSkip,
     onChoiceChange,
+    onOpenSession,
+    onKeepSession,
+    onEndSession,
+    onTaskChange,
     surface,
+    items,
   });
   handlersRef.current = {
     onStart,
@@ -175,7 +230,12 @@ export function FocusPrompt({
     onJoin,
     onSkip,
     onChoiceChange,
+    onOpenSession,
+    onKeepSession,
+    onEndSession,
+    onTaskChange,
     surface,
+    items,
   };
 
   const itemKey = items.map((item) => `${item.id}:${item.disabled ? 1 : 0}`).join('|');
@@ -192,41 +252,78 @@ export function FocusPrompt({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surface, itemKey]);
 
+  useEffect(() => {
+    if (surface === 'ask') inputRef.current?.focus({ preventScroll: true });
+  }, [surface]);
+
   const confirmIndex = (index: number) => {
+    const item = handlersRef.current.items[index];
+    if (!item || item.disabled) return;
     const { surface: kind } = handlersRef.current;
-    if (kind === 'ask') {
-      const item = durations[index];
-      if (item && !item.disabled) handlersRef.current.onChoiceChange(item.value);
+    if (item.action === 'duration') {
+      handlersRef.current.onChoiceChange(item.value as DurationChoice);
       handlersRef.current.onStart();
       return;
     }
-    if (kind === 'stop-confirm') {
-      if (index === 1) handlersRef.current.onEnd();
-      else handlersRef.current.onKeepGoing();
+    if (item.action === 'start') {
+      handlersRef.current.onStart();
       return;
     }
-    if (kind === 'completed') {
-      if (index === 0) handlersRef.current.onBreak();
-      else handlersRef.current.onAnotherRound();
+    if (item.action === 'recent') {
+      handlersRef.current.onStart(String(item.value ?? item.label));
+      return;
+    }
+    if (item.action === 'keep') {
+      handlersRef.current.onKeepGoing();
+      return;
+    }
+    if (item.action === 'end-block') {
+      handlersRef.current.onEnd();
+      return;
+    }
+    if (item.action === 'open-session') {
+      handlersRef.current.onOpenSession?.();
+      return;
+    }
+    if (item.action === 'keep-session') {
+      handlersRef.current.onKeepSession?.();
+      return;
+    }
+    if (item.action === 'end-session') {
+      handlersRef.current.onEndSession?.();
+      return;
+    }
+    if (item.action === 'break') {
+      handlersRef.current.onBreak();
+      return;
+    }
+    if (item.action === 'another') {
+      handlersRef.current.onAnotherRound();
       return;
     }
     if (kind === 'meeting-soon') {
-      if (index === 1) handlersRef.current.onSkip?.();
+      if (item.action === 'skip') handlersRef.current.onSkip?.();
       else handlersRef.current.onJoin?.();
     }
   };
 
   const cancelMenu = () => {
     const { surface: kind } = handlersRef.current;
+    if (kind === 'ask') {
+      inputRef.current?.blur();
+      return;
+    }
     if (kind === 'stop-confirm') handlersRef.current.onKeepGoing();
     if (kind === 'meeting-soon') handlersRef.current.onSkip?.();
+    if (kind === 'break' || kind === 'focusing') handlersRef.current.onOpenSession?.();
+    if (kind === 'session-confirm') handlersRef.current.onKeepSession?.();
   };
 
   const highlightIndex = (index: number) => {
     setMenu((current) => ({ ...current, index, focus: 'row' }));
-    if (handlersRef.current.surface === 'ask') {
-      const item = durations[index];
-      if (item && !item.disabled) handlersRef.current.onChoiceChange(item.value);
+    const item = handlersRef.current.items[index];
+    if (item?.action === 'duration' && !item.disabled) {
+      handlersRef.current.onChoiceChange(item.value as DurationChoice);
     }
   };
 
@@ -239,10 +336,12 @@ export function FocusPrompt({
         target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
       const ourInput =
         inField && target instanceof HTMLElement && Boolean(target.closest('[data-testid="focus-prompt"]'));
+      const inputEmpty = ourInput && target instanceof HTMLInputElement ? target.value.length === 0 : false;
       const result = reduceMenu(menuRef.current, {
         key: event.key,
         shiftKey: event.shiftKey,
         inInput: Boolean(ourInput),
+        inputEmpty,
       });
       if (result.preventDefault) event.preventDefault();
       menuRef.current = result.state;
@@ -250,10 +349,16 @@ export function FocusPrompt({
       if (
         handlersRef.current.surface === 'ask' &&
         result.state.focus === 'row' &&
-        (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Tab')
+        (event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'ArrowDown' ||
+          event.key === 'Tab')
       ) {
-        const item = durations[result.state.index];
-        if (item && !item.disabled) handlersRef.current.onChoiceChange(item.value);
+        const item = handlersRef.current.items[result.state.index];
+        if (item?.action === 'duration' && !item.disabled) {
+          handlersRef.current.onChoiceChange(item.value as DurationChoice);
+        }
       }
       if (result.effect === 'confirm') confirmIndex(result.state.index);
       if (result.effect === 'cancel') cancelMenu();
@@ -262,23 +367,30 @@ export function FocusPrompt({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [keyboardActive, items.length, durations]);
+  }, [keyboardActive, items.length]);
 
   if (surface === 'in-meeting') return null;
 
   const focusing = formatFocusingCopy(task, focusMinutes ?? 0);
-  const suggestions = visibleAskSuggestions(recentTasks, task);
+  const durationOffset = items.findIndex((item) => item.action === 'duration');
+  const startIndex = items.findIndex((item) => item.action === 'start');
+  const durationHighlight =
+    durationOffset >= 0 && items[menu.index]?.action === 'duration'
+      ? menu.index - durationOffset
+      : -1;
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     onStart();
   };
 
+  const endSessionItems = items.filter((item) => item.action === 'open-session');
+
   return (
     <div
       data-testid="focus-prompt"
       data-surface={surface}
-      className="relative z-20 flex w-[min(32rem,92vw)] shrink-0 flex-col items-center gap-[length:var(--stack-gap)] text-center"
+      className="relative z-20 flex w-[min(32rem,92vw)] shrink-0 cursor-auto flex-col items-center gap-[length:var(--stack-gap)] text-center"
     >
       {surface === 'ask' && contextLine ? (
         <div
@@ -302,6 +414,7 @@ export function FocusPrompt({
             ref={inputRef}
             data-testid="focus-task"
             value={task}
+            autoFocus
             onChange={(event) => onTaskChange(event.target.value)}
             onFocus={() => setMenu((current) => ({ ...current, focus: 'input' }))}
             onBlur={() => setMenu((current) => ({ ...current, focus: 'row' }))}
@@ -312,18 +425,24 @@ export function FocusPrompt({
           />
           {mounted && suggestions.length > 0 ? (
             <div data-testid="recent-tasks" className="flex flex-wrap justify-center gap-2">
-              {suggestions.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  tabIndex={-1}
-                  data-testid={`recent-${item}`}
-                  onClick={() => onTaskChange(item)}
-                  className="rounded-full px-3 py-1 text-[length:var(--type-chip)] text-orb-dim hover:text-orb-text"
-                >
-                  {item}
-                </button>
-              ))}
+              {suggestions.map((item, index) => {
+                const active = menu.index === index;
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    tabIndex={-1}
+                    data-testid={`recent-${item}`}
+                    data-highlighted={active ? 'true' : 'false'}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => highlightIndex(index)}
+                    onClick={() => onTaskChange(item)}
+                    className={choiceClass('quiet', active, false)}
+                  >
+                    {item}
+                  </button>
+                );
+              })}
             </div>
           ) : null}
           <ChoiceRow
@@ -331,9 +450,9 @@ export function FocusPrompt({
             tone="chip"
             confirmOnClick={false}
             items={durations}
-            highlighted={menu.index}
-            onHighlight={highlightIndex}
-            onConfirm={confirmIndex}
+            highlighted={durationHighlight}
+            onHighlight={(index) => highlightIndex(durationOffset + index)}
+            onConfirm={(index) => confirmIndex(durationOffset + index)}
           />
           <div
             data-testid="menu-hint"
@@ -353,7 +472,14 @@ export function FocusPrompt({
             type="submit"
             tabIndex={-1}
             data-testid="focus-start"
-            className="rounded-full border border-white/20 bg-white/15 px-[length:var(--btn-px)] py-[length:var(--btn-py)] text-[length:var(--type-button)] font-medium tracking-wide text-orb-text hover:bg-white/25 outline-none focus:outline-none"
+            data-highlighted={menu.index === startIndex ? 'true' : 'false'}
+            onMouseDown={(event) => event.preventDefault()}
+            onMouseEnter={() => highlightIndex(startIndex)}
+            className={
+              menu.index === startIndex
+                ? choiceClass('button', true, false)
+                : 'rounded-full border border-white/20 bg-white/15 px-[length:var(--btn-px)] py-[length:var(--btn-py)] text-[length:var(--type-button)] font-medium tracking-wide text-orb-text hover:bg-white/25 outline-none focus:outline-none'
+            }
           >
             {START_LABEL}
           </button>
@@ -361,30 +487,42 @@ export function FocusPrompt({
       ) : null}
 
       {surface === 'focusing' ? (
-        <div className="space-y-1">
-          <div
-            data-text-clear
-            data-testid="focus-task-name"
-            className="text-[length:var(--type-heading)] leading-tight text-orb-text"
-          >
-            {focusing.task}
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <div
+              data-text-clear
+              data-testid="focus-task-name"
+              className="text-[length:var(--type-heading)] leading-tight text-orb-text"
+            >
+              {focusing.task}
+            </div>
+            <div
+              data-text-clear
+              data-testid="focus-countdown"
+              className="text-[length:var(--type-status)] text-orb-text"
+            >
+              {focusing.countdown}
+            </div>
+            <div
+              data-testid="space-hint"
+              data-text-clear
+              className={`text-[length:var(--type-hint)] tracking-wide text-orb-quiet transition-opacity duration-300 ${
+                chromeVisible ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              {SPACE_HINT}
+            </div>
           </div>
-          <div
-            data-text-clear
-            data-testid="focus-countdown"
-            className="text-[length:var(--type-status)] text-orb-dim"
-          >
-            {focusing.countdown}
-          </div>
-          <div
-            data-testid="space-hint"
-            data-text-clear
-            className={`text-[length:var(--type-hint)] tracking-wide text-orb-quiet transition-opacity duration-300 ${
-              chromeVisible ? 'opacity-100' : 'opacity-0'
-            }`}
-          >
-            {SPACE_HINT}
-          </div>
+          {endSessionItems.length > 0 ? (
+            <ChoiceRow
+              testId="end-session-row"
+              tone="quiet"
+              items={endSessionItems}
+              highlighted={menu.index}
+              onHighlight={highlightIndex}
+              onConfirm={confirmIndex}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -395,6 +533,25 @@ export function FocusPrompt({
           </div>
           <ChoiceRow
             testId="stop-confirm-row"
+            items={items}
+            highlighted={menu.index}
+            onHighlight={highlightIndex}
+            onConfirm={confirmIndex}
+          />
+        </div>
+      ) : null}
+
+      {surface === 'session-confirm' ? (
+        <div className="space-y-3">
+          <div
+            data-text-clear
+            data-testid="end-session-prompt"
+            className="text-[length:var(--type-heading)] leading-tight text-orb-text"
+          >
+            {END_SESSION_PROMPT}
+          </div>
+          <ChoiceRow
+            testId="session-confirm-row"
             items={items}
             highlighted={menu.index}
             onHighlight={highlightIndex}
@@ -444,12 +601,24 @@ export function FocusPrompt({
       ) : null}
 
       {surface === 'break' ? (
-        <div
-          data-text-clear
-          data-testid="focus-break"
-          className="text-[length:var(--type-heading)] leading-tight text-orb-dim"
-        >
-          {formatBreakCopy(focusMinutes ?? 0)}
+        <div className="space-y-3">
+          <div
+            data-text-clear
+            data-testid="focus-break"
+            className="text-[length:var(--type-heading)] leading-tight text-orb-text"
+          >
+            {formatBreakCopy(focusMinutes ?? 0)}
+          </div>
+          {endSessionItems.length > 0 ? (
+            <ChoiceRow
+              testId="end-session-row"
+              tone="quiet"
+              items={endSessionItems}
+              highlighted={menu.index}
+              onHighlight={highlightIndex}
+              onConfirm={confirmIndex}
+            />
+          ) : null}
         </div>
       ) : null}
 

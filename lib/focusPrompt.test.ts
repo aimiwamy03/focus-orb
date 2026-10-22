@@ -6,6 +6,9 @@ import {
   BREAK_MINUTES,
   capDuration,
   END_EARLY_PROMPT,
+  END_SESSION_LABEL,
+  END_SESSION_PROMPT,
+  KEEP_RESTING_LABEL,
   FALLBACK_TASK,
   MENU_ASK_HINT,
   formatBreakCopy,
@@ -141,6 +144,11 @@ describe('copy', () => {
     expect(formatMeetingSoonCopy(4.2)).toBe('Meeting in 5m');
     expect(ASK_PROMPT).not.toMatch(/[—–]/);
     expect(END_EARLY_PROMPT).not.toMatch(/[—–]/);
+    expect(END_SESSION_PROMPT).toBe('End session?');
+    expect(END_SESSION_LABEL).toBe('End session');
+    expect(KEEP_RESTING_LABEL).toBe('Keep resting');
+    expect(END_SESSION_PROMPT).not.toMatch(/[—–]/);
+    expect(END_SESSION_LABEL).not.toMatch(/[—–]/);
     expect(MENU_ASK_HINT).toBe('← → to choose, Enter to start');
     expect(MENU_ASK_HINT).not.toMatch(/[—–]/);
     expect(KEEP_GOING_LABEL).not.toMatch(/[—–]/);
@@ -156,6 +164,7 @@ describe('copy', () => {
       })
     ).toBe('Deep work 32m');
     expect(formatMiniFocusStatus({ surface: 'stop-confirm' })).toBe('End early?');
+    expect(formatMiniFocusStatus({ surface: 'session-confirm' })).toBe('End session?');
     expect(formatMiniFocusStatus({ surface: 'break', minutes: 5 })).toBe('Break 5m');
     expect(shortTask('A very long planning session')).toBe('A very long pla…');
   });
@@ -224,6 +233,17 @@ describe('promptSurface', () => {
         dayState: 'free',
       })
     ).toBe('break');
+    expect(
+      promptSurface({
+        isFocusing: false,
+        isBreak: true,
+        stopConfirm: false,
+        sessionConfirm: true,
+        completed: false,
+        headsUp: false,
+        dayState: 'free',
+      })
+    ).toBe('session-confirm');
     expect(BREAK_MINUTES).toBe(5);
   });
 });

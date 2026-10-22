@@ -22,6 +22,9 @@ function renderPrompt(
     onAnotherRound: vi.fn(),
     onJoin: vi.fn(),
     onSkip: vi.fn(),
+    onOpenSession: vi.fn(),
+    onKeepSession: vi.fn(),
+    onEndSession: vi.fn(),
   };
   render(
     <FocusPrompt
@@ -44,6 +47,9 @@ function renderPrompt(
       onAnotherRound={handlers.onAnotherRound}
       onJoin={handlers.onJoin}
       onSkip={handlers.onSkip}
+      onOpenSession={handlers.onOpenSession}
+      onKeepSession={handlers.onKeepSession}
+      onEndSession={handlers.onEndSession}
       chromeVisible
       {...extra}
     />
@@ -116,6 +122,47 @@ describe('game-menu rows', () => {
     expect(onChoiceChange).toHaveBeenCalledWith(90);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets empty-input arrows move chips and reach Start', () => {
+    const { onStart } = renderAsk('');
+    const input = screen.getByTestId('focus-task') as HTMLInputElement;
+    input.focus();
+    fireEvent.keyDown(input, { key: 'ArrowRight' });
+    expect(screen.getByTestId('duration-90m').getAttribute('data-highlighted')).toBe('true');
+    fireEvent.keyDown(input, { key: 'ArrowRight' });
+    expect(screen.getByTestId('focus-start').getAttribute('data-highlighted')).toBe('true');
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels the Ask field on Escape', () => {
+    renderAsk('');
+    const input = screen.getByTestId('focus-task') as HTMLInputElement;
+    input.focus();
+    expect(document.activeElement).toBe(input);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it('offers End session on a break and confirms from the prompt', () => {
+    const { onOpenSession } = renderPrompt('break', { focusMinutes: 5 });
+    expect(screen.getByTestId('focus-break').textContent).toBe('Break 5m');
+    expect(screen.getByTestId('end-session').textContent).toBe('End session');
+    expect(screen.getByTestId('end-session').getAttribute('data-highlighted')).toBe('true');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onOpenSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('defaults End session confirm to Keep resting and Ends on Right then Enter', () => {
+    const { onKeepSession, onEndSession } = renderPrompt('session-confirm');
+    expect(screen.getByTestId('end-session-prompt').textContent).toBe('End session?');
+    expect(screen.getByTestId('keep-session').getAttribute('data-highlighted')).toBe('true');
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(screen.getByTestId('end-session').getAttribute('data-highlighted')).toBe('true');
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onEndSession).toHaveBeenCalledTimes(1);
+    expect(onKeepSession).not.toHaveBeenCalled();
   });
 
   it('joins from the meeting prompt and skips on Escape', () => {

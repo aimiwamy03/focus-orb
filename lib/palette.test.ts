@@ -12,6 +12,8 @@ import {
   SETTINGS_MUTED,
   SETTINGS_TEXT,
   AGENDA_ACCENT,
+  HIGHLIGHT_FILL,
+  HIGHLIGHT_RING,
 } from './palette';
 
 describe('palette tokens meet WCAG AA on the orb background', () => {
@@ -39,5 +41,11 @@ describe('palette tokens meet WCAG AA on the orb background', () => {
   it('exports the tokens the UI uses', () => {
     expect(PALETTE_TOKENS.bg).toBe(ORB_BG);
     expect(PALETTE_TOKENS.textDim).toBe(ORB_TEXT_DIM);
+    expect(PALETTE_TOKENS.highlightFill).toBe(HIGHLIGHT_FILL);
+  });
+
+  it('keeps highlighted text AA on the highlight fill', () => {
+    expect(meetsAaContrast(ORB_TEXT, HIGHLIGHT_FILL, 15)).toBe(true);
+    expect(contrastRatio(HIGHLIGHT_RING, ORB_BG)).toBeGreaterThanOrEqual(4.5);
   });
 });

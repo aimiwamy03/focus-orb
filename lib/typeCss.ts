@@ -1,4 +1,4 @@
-import { ORB_BG, ORB_PLACEHOLDER, ORB_TEXT, ORB_TEXT_DIM, ORB_TEXT_QUIET, SETTINGS_BG, SETTINGS_MUTED, SETTINGS_TEXT } from './palette';
+import { HIGHLIGHT_FILL, HIGHLIGHT_RING, ORB_BG, ORB_PLACEHOLDER, ORB_TEXT, ORB_TEXT_DIM, ORB_TEXT_QUIET, SETTINGS_BG, SETTINGS_MUTED, SETTINGS_TEXT } from './palette';
 import { clampCss, TYPE_SCALE } from './typeScale';
 
 export const TYPE_CSS = `:root {
@@ -22,4 +22,6 @@ export const TYPE_CSS = `:root {
   --color-orb-sheet: ${SETTINGS_BG};
   --color-orb-muted: ${SETTINGS_MUTED};
   --color-orb-settings-text: ${SETTINGS_TEXT};
+  --color-orb-highlight: ${HIGHLIGHT_FILL};
+  --color-orb-ring: ${HIGHLIGHT_RING};
 }`;

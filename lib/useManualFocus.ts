@@ -118,6 +118,12 @@ export function useManualFocus() {
     });
   }, []);
 
+  const endSession = useCallback(() => {
+    setSession(null);
+    setCompleted(null);
+    setTimeRemaining(null);
+  }, []);
+
   const dismissCompleted = useCallback(() => {
     setCompleted(null);
   }, []);
@@ -137,6 +143,7 @@ export function useManualFocus() {
     startFocus,
     startBreak,
     stopFocus,
+    endSession,
     dismissCompleted,
     seedCompleted,
   };
