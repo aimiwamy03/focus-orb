@@ -46,11 +46,12 @@ describe('shouldShowShortcutsCard', () => {
 });
 
 describe('isShortcutKey', () => {
-  it('matches the four listed shortcuts', () => {
+  it('matches the listed shortcuts', () => {
     expect(isShortcutKey('f')).toBe(true);
     expect(isShortcutKey('s')).toBe(true);
     expect(isShortcutKey(' ')).toBe(true);
     expect(isShortcutKey('p')).toBe(true);
+    expect(isShortcutKey('l')).toBe(true);
     expect(isShortcutKey('?')).toBe(false);
     expect(isShortcutKey('Enter')).toBe(false);
   });
@@ -67,9 +68,9 @@ describe('shortcuts storage and copy', () => {
     expect(loadShortcutsCardSeen()).toBe(true);
   });
 
-  it('lists four shortcuts and has no em dashes', () => {
-    expect(SHORTCUT_ROWS).toHaveLength(4);
-    expect(SHORTCUT_ROWS.map((row) => row.key)).toEqual(['F', 'S', 'Space', 'P']);
+  it('lists the chrome shortcuts and has no em dashes', () => {
+    expect(SHORTCUT_ROWS).toHaveLength(5);
+    expect(SHORTCUT_ROWS.map((row) => row.key)).toEqual(['F', 'S', 'Space', 'P', 'L']);
     const copy = [
       SHORTCUTS_LABEL,
       GOT_IT_LABEL,

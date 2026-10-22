@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { BREAK_MINUTES, FALLBACK_TASK } from './focusPrompt';
+import type { FocusLogEnded, FocusLogEntry } from './focusLog';
+
+export type FocusLogDraft = Omit<FocusLogEntry, 'id'>;
 
 const STORAGE_KEY = 'focusOrb:manualFocus';
 
@@ -16,10 +19,46 @@ export interface CompletedFocus {
   planned: number;
 }
 
-export function useManualFocus() {
+export function draftFocusEnd(
+  session: FocusSession,
+  ended: FocusLogEnded,
+  nowMs = Date.now()
+): FocusLogDraft {
+  const elapsed = (nowMs - session.startTime) / (1000 * 60);
+  const minutes =
+    ended === 'completed'
+      ? Math.max(1, Math.round(session.duration))
+      : Math.max(1, Math.min(session.duration, Math.round(elapsed) || 1));
+  const endMs =
+    ended === 'completed' ? session.startTime + session.duration * 60_000 : nowMs;
+  return {
+    task: session.task,
+    startMs: session.startTime,
+    endMs,
+    minutes,
+    planned: session.duration,
+    ended,
+  };
+}
+
+export function useManualFocus(options?: { onFocusEnded?: (draft: FocusLogDraft) => void }) {
   const [session, setSession] = useState<FocusSession | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [completed, setCompleted] = useState<CompletedFocus | null>(null);
+  const onEndedRef = useRef(options?.onFocusEnded);
+  const sessionRef = useRef<FocusSession | null>(null);
+  const recordedStartRef = useRef<number | null>(null);
+  onEndedRef.current = options?.onFocusEnded;
+  sessionRef.current = session;
+
+  const emitFocusEnd = useCallback((current: FocusSession, ended: FocusLogEnded, nowMs?: number) => {
+    if (current.kind !== 'focus') return null;
+    if (recordedStartRef.current === current.startTime) return null;
+    recordedStartRef.current = current.startTime;
+    const draft = draftFocusEnd(current, ended, nowMs);
+    onEndedRef.current?.(draft);
+    return draft;
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -61,10 +100,11 @@ export function useManualFocus() {
       const remaining = session.duration - elapsed;
 
       if (remaining <= 0) {
-        if (session.kind === 'focus') {
+        const draft = emitFocusEnd(session, 'completed');
+        if (draft) {
           setCompleted({
             task: session.task,
-            minutes: session.duration,
+            minutes: draft.minutes,
             planned: session.duration,
           });
         }
@@ -82,6 +122,7 @@ export function useManualFocus() {
   }, [session]);
 
   const startFocus = useCallback((duration: number, task?: string) => {
+    recordedStartRef.current = null;
     setCompleted(null);
     setSession({
       startTime: Date.now(),
@@ -92,6 +133,7 @@ export function useManualFocus() {
   }, []);
 
   const startBreak = useCallback(() => {
+    recordedStartRef.current = null;
     setCompleted(null);
     setSession({
       startTime: Date.now(),
@@ -102,27 +144,31 @@ export function useManualFocus() {
   }, []);
 
   const stopFocus = useCallback(() => {
-    setSession((current) => {
-      if (current?.kind === 'focus') {
-        const elapsed = (Date.now() - current.startTime) / (1000 * 60);
-        const spent = Math.max(1, Math.min(current.duration, Math.round(elapsed) || 1));
+    const current = sessionRef.current;
+    if (current?.kind === 'focus') {
+      const draft = emitFocusEnd(current, 'ended-early');
+      if (draft) {
         setCompleted({
           task: current.task,
-          minutes: spent,
+          minutes: draft.minutes,
           planned: current.duration,
         });
-      } else {
-        setCompleted(null);
       }
-      return null;
-    });
-  }, []);
+    } else {
+      setCompleted(null);
+    }
+    setSession(null);
+  }, [emitFocusEnd]);
 
   const endSession = useCallback(() => {
+    const current = sessionRef.current;
+    if (current?.kind === 'focus') {
+      emitFocusEnd(current, 'ended-session');
+    }
     setSession(null);
     setCompleted(null);
     setTimeRemaining(null);
-  }, []);
+  }, [emitFocusEnd]);
 
   const dismissCompleted = useCallback(() => {
     setCompleted(null);

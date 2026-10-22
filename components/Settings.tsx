@@ -12,6 +12,12 @@ import {
 } from '@/lib/miniOrb';
 import { isGoogleConfigured } from '@/lib/onboarding';
 import { SETTINGS_BG } from '@/lib/palette';
+import {
+  CLEAR_LABEL,
+  CLEAR_LOG_LABEL,
+  CLEAR_LOG_PROMPT,
+  KEEP_LOG_LABEL,
+} from '@/lib/focusLog';
 
 type AuthMethod = 'google' | 'ical' | null;
 
@@ -36,6 +42,7 @@ interface SettingsProps {
   userEmail?: string | null;
   showAgenda?: boolean;
   setShowAgenda?: (value: boolean) => void;
+  onClearLog?: () => void;
 }
 
 export function Settings({
@@ -58,10 +65,12 @@ export function Settings({
   userEmail,
   showAgenda = true,
   setShowAgenda,
+  onClearLog,
 }: SettingsProps) {
   const [tempUrl, setTempUrl] = useState(calendarUrl);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [clearLogConfirm, setClearLogConfirm] = useState(false);
   const configured = isGoogleConfigured();
 
   const handleSave = () => {
@@ -267,6 +276,46 @@ export function Settings({
               />
               Pop out when I leave this tab
             </label>
+          </div>
+        ) : null}
+
+        {onClearLog ? (
+          <div className="space-y-2">
+            {clearLogConfirm ? (
+              <div data-testid="clear-log-confirm" className="space-y-2">
+                <p className="text-[length:var(--type-status)] text-orb-dim">{CLEAR_LOG_PROMPT}</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    data-testid="clear-log-keep"
+                    onClick={() => setClearLogConfirm(false)}
+                    className="flex-1 rounded bg-white px-3 py-2 text-[length:var(--type-status)] text-black"
+                  >
+                    {KEEP_LOG_LABEL}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="clear-log-yes"
+                    onClick={() => {
+                      onClearLog();
+                      setClearLogConfirm(false);
+                    }}
+                    className="flex-1 rounded bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text"
+                  >
+                    {CLEAR_LABEL}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                data-testid="clear-log"
+                onClick={() => setClearLogConfirm(true)}
+                className="w-full rounded bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text transition-colors hover:bg-black/20"
+              >
+                {CLEAR_LOG_LABEL}
+              </button>
+            )}
           </div>
         ) : null}
 

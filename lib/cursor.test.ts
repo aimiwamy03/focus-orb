@@ -73,6 +73,14 @@ describe('shouldHideCursor', () => {
         settingsOpen: true,
       })
     ).toBe(false);
+    expect(
+      shouldHideCursor({
+        surface: 'focusing',
+        stillMs: 10_000,
+        overInteractive: false,
+        logOpen: true,
+      })
+    ).toBe(false);
   });
 
   it('keeps the cursor on first open and the mini-only fallback', () => {

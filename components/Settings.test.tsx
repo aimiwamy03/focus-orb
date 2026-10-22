@@ -1,11 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 vi.mock('@/app/actions', () => ({ signInWithGoogle: vi.fn() }));
 
 import { Settings } from './Settings';
 import { MOCK_GOOGLE_CALENDARS, calendarLabelTags } from '@/lib/calendars';
 import { SIGN_OUT_LABEL } from '@/lib/miniOrb';
+
+afterEach(() => cleanup());
 
 function renderSettings() {
   return render(
@@ -24,6 +26,7 @@ function renderSettings() {
       toggleCalendar={() => {}}
       defaultDuration={50}
       setDefaultDuration={() => {}}
+      onClearLog={vi.fn()}
     />
   );
 }
@@ -49,5 +52,36 @@ describe('Settings sheet', () => {
     expect(screen.getByTestId('sign-out').textContent).toBe(SIGN_OUT_LABEL);
     expect(screen.getByLabelText('Close')).toBeTruthy();
     expect(screen.getByTestId('settings-sheet').className).toContain('max-h-');
+    expect(screen.getByTestId('clear-log').textContent).toBe('Clear log');
+  });
+
+  it('asks before clearing the log', () => {
+    const onClearLog = vi.fn();
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod="google"
+        selectAuthMethod={() => {}}
+        isGoogleConnected
+        disconnectGoogle={async () => {}}
+        calendars={MOCK_GOOGLE_CALENDARS}
+        selectedCalendarIds={['primary']}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        onClearLog={onClearLog}
+      />
+    );
+    fireEvent.click(screen.getByTestId('clear-log'));
+    expect(screen.getByTestId('clear-log-confirm').textContent).toContain('Clear the focus log?');
+    fireEvent.click(screen.getByTestId('clear-log-keep'));
+    expect(onClearLog).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('clear-log'));
+    fireEvent.click(screen.getByTestId('clear-log-yes'));
+    expect(onClearLog).toHaveBeenCalledTimes(1);
   });
 });

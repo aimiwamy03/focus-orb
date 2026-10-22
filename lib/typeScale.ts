@@ -15,6 +15,8 @@ export const TYPE_SCALE = {
   hint: { min: 14, vw: 0.2, add: 13, max: 15 },
   chrome: { min: 15, vw: 0.15, add: 13.5, max: 16 },
   key: { min: 14, vw: 0, add: 14, max: 14 },
+  logHeading: { min: 28, vw: 1.2, add: 18, max: 36 },
+  logBody: { min: 17, vw: 0.15, add: 16, max: 18 },
 } as const satisfies Record<string, FluidType>;
 
 export function fluidPx(rule: FluidType, viewW: number): number {

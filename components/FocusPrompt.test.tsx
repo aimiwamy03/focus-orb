@@ -25,6 +25,7 @@ function renderPrompt(
     onOpenSession: vi.fn(),
     onKeepSession: vi.fn(),
     onEndSession: vi.fn(),
+    onOpenLog: vi.fn(),
   };
   render(
     <FocusPrompt
@@ -50,6 +51,7 @@ function renderPrompt(
       onOpenSession={handlers.onOpenSession}
       onKeepSession={handlers.onKeepSession}
       onEndSession={handlers.onEndSession}
+      onOpenLog={handlers.onOpenLog}
       chromeVisible
       {...extra}
     />
@@ -105,6 +107,12 @@ describe('game-menu rows', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onKeepGoing).toHaveBeenCalledTimes(1);
     expect(onEnd).not.toHaveBeenCalled();
+  });
+
+  it('opens the log from the completed status line', () => {
+    const { onOpenLog } = renderPrompt('completed');
+    screen.getByTestId('focus-completed').click();
+    expect(onOpenLog).toHaveBeenCalledTimes(1);
   });
 
   it('defaults completed to Another round', () => {
