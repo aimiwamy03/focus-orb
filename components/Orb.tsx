@@ -5,6 +5,14 @@ import { useSearchParams } from 'next/navigation';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
+import {
+  agendaClearsOrb,
+  buildAgenda,
+  loadShowAgenda,
+  saveShowAgenda,
+  shouldShowAgenda,
+  visibleAgendaSections,
+} from '@/lib/agenda';
 import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, statusLineText } from '@/lib/day';
 import { orbLayout, type OrbLayout } from '@/lib/layout';
 import {
@@ -58,6 +66,7 @@ import { useMiniWindow } from '@/components/useMiniWindow';
 import { StackBoundary } from '@/components/StackBoundary';
 import { Settings } from './Settings';
 import { Hints, markHintSeen } from './Hints';
+import { Agenda } from './Agenda';
 import { FocusPrompt } from './FocusPrompt';
 import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
@@ -130,6 +139,8 @@ export function Orb() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [leaveHint, setLeaveHint] = useState(false);
   const [showShortcutsCard, setShowShortcutsCard] = useState(false);
+  const [showAgenda, setShowAgenda] = useState(true);
+  const [viewSize, setViewSize] = useState({ w: 1280, h: 800 });
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const handleOrbClickRef = useRef<() => void>(() => {});
   const miniOnlyRef = useRef(false);
@@ -243,6 +254,31 @@ export function Orb() {
       ? formatMeetingSoonCopy(minutesBetween(now, day.nextEvent.start))
       : statusLineText(day, now);
 
+  const agendaSections = visibleAgendaSections(
+    buildAgenda(calendar.events, now),
+    viewSize.h
+  );
+  const focusingSurface = surface === 'focusing' || surface === 'stop-confirm';
+  const idleAgendaSurface =
+    surface === 'ask' ||
+    surface === 'break' ||
+    surface === 'completed' ||
+    surface === 'meeting-soon';
+  const mountAgenda =
+    showAgenda &&
+    !firstOpen &&
+    !miniOnly &&
+    !showSettings &&
+    shouldShowAgenda({
+      enabled: true,
+      surface: idleAgendaSurface || focusingSurface ? surface : null,
+      viewW: viewSize.w,
+      viewH: viewSize.h,
+      chromeVisible: true,
+      clearsOrb: agendaClearsOrb(layoutRef.current),
+    });
+  const agendaFaded = focusingSurface && !showChrome;
+
   const updateLayout = useCallback(() => {
     if (typeof window === 'undefined') return;
     const canvas = canvasRef.current;
@@ -250,6 +286,9 @@ export function Orb() {
     const viewH = canvas?.clientHeight || window.innerHeight;
     const stackH = stackRef.current?.getBoundingClientRect().height ?? 0;
     layoutRef.current = orbLayout(viewW, viewH, stackH);
+    setViewSize((current) =>
+      current.w === viewW && current.h === viewH ? current : { w: viewW, h: viewH }
+    );
   }, []);
 
   useEffect(() => {
@@ -813,6 +852,10 @@ export function Orb() {
   }, [miniOnly, miniWindow.isOpen, miniWindow.open, pipSupported]);
 
   useEffect(() => {
+    setShowAgenda(loadShowAgenda());
+  }, []);
+
+  useEffect(() => {
     const onFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFullscreen);
     return () => document.removeEventListener('fullscreenchange', onFullscreen);
@@ -864,6 +907,8 @@ export function Orb() {
           if (isOverOrb(e.clientX, e.clientY)) handleOrbClick();
         }}
       />
+
+      {mountAgenda ? <Agenda sections={agendaSections} faded={agendaFaded} /> : null}
 
       {miniOnly ? (
         <button
@@ -1085,9 +1130,11 @@ export function Orb() {
             setPopOutOnLeave(value);
             savePopOutOnLeave(value);
           }}
-          defaultDuration={durationChoice}
-          setDefaultDuration={setDurationChoice}
-          userEmail={calendar.userEmail}
+          showAgenda={showAgenda}
+          setShowAgenda={(value) => {
+            setShowAgenda(value);
+            saveShowAgenda(value);
+          }}
         />
       )}
     </div>

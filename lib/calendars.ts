@@ -6,6 +6,7 @@ export interface CalendarInfo {
   id: string;
   summary: string;
   primary?: boolean;
+  backgroundColor?: string;
 }
 
 export interface GoogleCalendarListItem {
@@ -13,6 +14,7 @@ export interface GoogleCalendarListItem {
   summary?: string;
   primary?: boolean;
   accessRole?: string;
+  backgroundColor?: string;
 }
 
 export const IMPORT_CALENDAR_SUFFIX = '@import.calendar.google.com';
@@ -48,17 +50,19 @@ export interface GoogleEventItem {
 }
 
 export const MOCK_GOOGLE_CALENDARS: CalendarInfo[] = [
-  { id: 'primary', summary: 'Personal', primary: true },
-  { id: 'amy-self@group.calendar.google.com', summary: 'Self', primary: true },
+  { id: 'primary', summary: 'Personal', primary: true, backgroundColor: '#4285f4' },
+  { id: 'amy-self@group.calendar.google.com', summary: 'Self', primary: true, backgroundColor: '#33b679' },
   {
     id: 'amy-self@import.calendar.google.com',
     summary: 'Self',
+    backgroundColor: '#8e24aa',
   },
   {
     id: 'en.usa#holiday@group.v.calendar.google.com',
     summary: 'Holidays in United States',
+    backgroundColor: '#f4511e',
   },
-  { id: 'work@company.com', summary: 'Work' },
+  { id: 'work@company.com', summary: 'Work', backgroundColor: '#f6bf26' },
 ];
 
 export function defaultSelectedCalendarIds(calendars: CalendarInfo[]): string[] {
@@ -111,10 +115,14 @@ export function parseGoogleCalendarList(payload: {
       id: item.id,
       summary: item.summary || item.id,
       primary: !!item.primary,
+      ...(item.backgroundColor ? { backgroundColor: item.backgroundColor } : {}),
     }));
 }
 
-export function parseGoogleEvents(payload: { items?: GoogleEventItem[] }): CalendarEvent[] {
+export function parseGoogleEvents(
+  payload: { items?: GoogleEventItem[] },
+  color?: string
+): CalendarEvent[] {
   return (payload.items ?? []).map((event) => {
     const isAllDay = !event.start.dateTime && !!event.start.date;
     const self = event.attendees?.find((attendee) => attendee.self);
@@ -136,6 +144,7 @@ export function parseGoogleEvents(payload: { items?: GoogleEventItem[] }): Calen
       location: event.location,
       description: event.description,
       conferenceUri: video?.uri,
+      backgroundColor: color,
     };
   });
 }
@@ -147,7 +156,9 @@ export function mergeEventsFromCalendars(
   const merged: CalendarEvent[] = [];
   for (const id of selectedIds) {
     const events = eventsById[id];
-    if (events) merged.push(...events);
+    if (events) {
+      merged.push(...events.map((event) => ({ ...event, calendarId: event.calendarId ?? id })));
+    }
   }
   return merged.sort((a, b) => a.start.getTime() - b.start.getTime());
 }
@@ -166,6 +177,7 @@ export function getMockGoogleEventsByCalendar(now: Date): Record<string, Calenda
         start: at(now, 12, 0),
         end: at(now, 12, 30),
         isAllDay: false,
+        backgroundColor: '#4285f4',
       },
     ],
     'work@company.com': [
@@ -174,6 +186,7 @@ export function getMockGoogleEventsByCalendar(now: Date): Record<string, Calenda
         start: at(now, 15, 0),
         end: at(now, 16, 0),
         isAllDay: false,
+        backgroundColor: '#f6bf26',
       },
     ],
   };

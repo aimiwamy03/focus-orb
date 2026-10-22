@@ -203,19 +203,24 @@ export function useCalendar() {
       }
 
       const data = await response.json();
-      const mapped: CalendarEvent[] = data.events.map((e: CalendarEvent & { start: string; end: string }) => ({
-        summary: e.summary,
-        start: new Date(e.start),
-        end: new Date(e.end),
-        isAllDay: e.isAllDay || false,
-        status: e.status,
-        transparency: e.transparency,
-        declined: e.declined,
-        hangoutLink: e.hangoutLink,
-        location: e.location,
-        description: e.description,
-        conferenceUri: e.conferenceUri,
-      }));
+      const mapped: CalendarEvent[] = data.events.map((e: CalendarEvent & { start: string; end: string }) => {
+        const calendar = listed.find((item) => item.id === e.calendarId);
+        return {
+          summary: e.summary,
+          start: new Date(e.start),
+          end: new Date(e.end),
+          isAllDay: e.isAllDay || false,
+          status: e.status,
+          transparency: e.transparency,
+          declined: e.declined,
+          hangoutLink: e.hangoutLink,
+          location: e.location,
+          description: e.description,
+          conferenceUri: e.conferenceUri,
+          calendarId: e.calendarId,
+          backgroundColor: e.backgroundColor || calendar?.backgroundColor,
+        };
+      });
       
       applyEvents(mapped, clock);
     } catch (err) {

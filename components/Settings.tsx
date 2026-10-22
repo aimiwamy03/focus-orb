@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { signInWithGoogle } from '@/app/actions';
 import { CalendarInfo, calendarLabelTags } from '@/lib/calendars';
+import { SHOW_AGENDA_LABEL } from '@/lib/agenda';
 
 type AuthMethod = 'google' | 'ical' | null;
 
@@ -22,9 +23,8 @@ interface SettingsProps {
   pipSupported?: boolean;
   popOutOnLeave?: boolean;
   setPopOutOnLeave?: (value: boolean) => void;
-  defaultDuration: DurationChoice;
-  setDefaultDuration: (choice: DurationChoice) => void;
-  userEmail?: string | null;
+  showAgenda?: boolean;
+  setShowAgenda?: (value: boolean) => void;
 }
 
 export function Settings({
@@ -42,9 +42,8 @@ export function Settings({
   pipSupported = false,
   popOutOnLeave = false,
   setPopOutOnLeave,
-  defaultDuration,
-  setDefaultDuration,
-  userEmail,
+  showAgenda = true,
+  setShowAgenda,
 }: SettingsProps) {
   const [tempUrl, setTempUrl] = useState(calendarUrl);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -238,6 +237,21 @@ export function Settings({
             ))}
           </div>
         </div>
+
+        {setShowAgenda ? (
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
+              <input
+                type="checkbox"
+                data-testid="show-agenda"
+                checked={showAgenda}
+                onChange={(event) => setShowAgenda(event.target.checked)}
+                className="rounded border-zinc-600 bg-zinc-800"
+              />
+              {SHOW_AGENDA_LABEL}
+            </label>
+          </div>
+        ) : null}
 
         {pipSupported && setPopOutOnLeave ? (
           <div className="space-y-2">

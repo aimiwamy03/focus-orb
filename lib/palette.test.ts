@@ -11,6 +11,7 @@ import {
   SETTINGS_BG,
   SETTINGS_MUTED,
   SETTINGS_TEXT,
+  AGENDA_ACCENT,
 } from './palette';
 
 describe('palette tokens meet WCAG AA on the orb background', () => {
@@ -24,6 +25,10 @@ describe('palette tokens meet WCAG AA on the orb background', () => {
   it.each(tokens)('%s is at least 4.5:1 on the orb bg', (_name, color, fontPx) => {
     expect(contrastRatio(color, ORB_BG)).toBeGreaterThanOrEqual(4.5);
     expect(meetsAaContrast(color, ORB_BG, fontPx)).toBe(true);
+  });
+
+  it('keeps the agenda accent readable', () => {
+    expect(meetsAaContrast(AGENDA_ACCENT, ORB_BG, 14)).toBe(true);
   });
 
   it('keeps the same floor on the settings sheet', () => {

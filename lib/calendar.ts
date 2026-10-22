@@ -11,6 +11,8 @@ export interface CalendarEvent {
   location?: string;
   description?: string;
   conferenceUri?: string;
+  calendarId?: string;
+  backgroundColor?: string;
 }
 
 export interface NextEventInfo {

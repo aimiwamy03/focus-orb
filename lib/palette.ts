@@ -6,6 +6,7 @@ export const ORB_PLACEHOLDER = '#a3a3a3';
 export const SETTINGS_BG = '#18181b';
 export const SETTINGS_TEXT = '#e4e4e7';
 export const SETTINGS_MUTED = '#a1a1aa';
+export const AGENDA_ACCENT = '#8eb4c8';
 
 const AA_NORMAL = 4.5;
 const AA_LARGE = 3;
@@ -19,6 +20,7 @@ export const PALETTE_TOKENS = {
   settingsBg: SETTINGS_BG,
   settingsText: SETTINGS_TEXT,
   settingsMuted: SETTINGS_MUTED,
+  agendaAccent: AGENDA_ACCENT,
 } as const;
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {

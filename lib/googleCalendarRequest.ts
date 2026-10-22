@@ -61,8 +61,9 @@ export async function handleGoogleCalendarGet(options: {
   const now = options.now ?? new Date();
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(now);
-  endOfDay.setHours(23, 59, 59, 999);
+  const timeMax = new Date(startOfDay);
+  timeMax.setDate(timeMax.getDate() + 3);
+  timeMax.setHours(23, 59, 59, 999);
 
   const calendarIds = (options.url.searchParams.get('calendars') ?? 'primary')
     .split(',')
@@ -71,7 +72,7 @@ export async function handleGoogleCalendarGet(options: {
 
   const events = await fetchEvents(accessToken, calendarIds, {
     timeMin: startOfDay.toISOString(),
-    timeMax: endOfDay.toISOString(),
+    timeMax: timeMax.toISOString(),
   });
 
   return {

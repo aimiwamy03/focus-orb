@@ -88,6 +88,38 @@ if (phase === 'after') {
   await page.waitForTimeout(250);
   await shot(page, 'end_highlighted_1280x800');
   await page.close();
+
+  for (const vp of [
+    { name: '1280x800', width: 1280, height: 800 },
+    { name: '1440x900', width: 1440, height: 900 },
+  ]) {
+    const ask = await browser.newPage({
+      viewport: { width: vp.width, height: vp.height },
+    });
+    await open(ask, '/?mock=open-afternoon&now=11:30');
+    await ask.waitForSelector('[data-testid="agenda"]');
+    await shot(ask, `agenda_ask_${vp.name}`);
+    await ask.close();
+
+    const focus = await browser.newPage({
+      viewport: { width: vp.width, height: vp.height },
+    });
+    await open(
+      focus,
+      '/?mock=open-afternoon&now=11:30&prompt=focus&focus=50&task=Write%20the%20spec'
+    );
+    await focus.mouse.move(vp.width / 2, vp.height / 2);
+    await focus.waitForTimeout(400);
+    await shot(focus, `agenda_focusing_hover_${vp.name}`);
+    await focus.close();
+  }
+
+  const narrow = await browser.newPage({
+    viewport: { width: 686, height: 386 },
+  });
+  await open(narrow, '/?mock=open-afternoon&now=11:30');
+  await shot(narrow, 'agenda_hidden_686x386');
+  await narrow.close();
 }
 
 await browser.close();

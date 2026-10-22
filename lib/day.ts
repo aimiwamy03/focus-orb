@@ -218,6 +218,10 @@ export function statusLineText(model: DayModel, now: Date): string {
     return 'Clear for the rest of the day.';
   }
 
+  const nextTitle = model.nextEvent?.summary ?? model.nextBusy.events[0]?.summary;
+  if (nextTitle) {
+    return `Free until ${formatClock(model.nextBusy.start)}, then ${nextTitle}.`;
+  }
   return `Free until ${formatClock(model.nextBusy.start)}.`;
 }
 

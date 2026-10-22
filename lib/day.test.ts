@@ -180,7 +180,7 @@ describe('buildDayModel', () => {
 describe('statusLineText', () => {
   it('describes a free stretch before a single meeting', () => {
     const model = buildDayModel([ev('Design sync', at(13, 30), at(14))], at(12));
-    expect(statusLineText(model, at(12))).toBe('Free until 1:30.');
+    expect(statusLineText(model, at(12))).toBe('Free until 1:30, then Design sync.');
   });
 
   it('describes a free stretch before a back-to-back run', () => {
@@ -192,7 +192,7 @@ describe('statusLineText', () => {
       ],
       at(12)
     );
-    expect(statusLineText(model, at(12))).toBe('Free until 1:30.');
+    expect(statusLineText(model, at(12))).toBe('Free until 1:30, then Design sync.');
   });
 
   it('describes an isolated meeting and when you are free', () => {
