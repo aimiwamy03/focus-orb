@@ -10,6 +10,8 @@ export const TYPE_CSS = `:root {
   --type-hint: ${clampCss(TYPE_SCALE.hint)};
   --type-chrome: ${clampCss(TYPE_SCALE.chrome)};
   --type-key: ${clampCss(TYPE_SCALE.key)};
+  --type-log-heading: ${clampCss(TYPE_SCALE.logHeading)};
+  --type-log-body: ${clampCss(TYPE_SCALE.logBody)};
   --stack-gap: clamp(0.35rem, 1.1vh, 0.7rem);
   --stack-pad: clamp(0.4rem, 1.2vh, 1rem);
   --btn-px: clamp(1.05rem, 1.3vw, 1.4rem);

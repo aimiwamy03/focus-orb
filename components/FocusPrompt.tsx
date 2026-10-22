@@ -54,6 +54,7 @@ interface FocusPromptProps {
   onOpenSession?: () => void;
   onKeepSession?: () => void;
   onEndSession?: () => void;
+  onOpenLog?: () => void;
   sessionKeepLabel?: string;
   chromeVisible?: boolean;
   keyboardActive?: boolean;
@@ -180,6 +181,7 @@ export function FocusPrompt({
   onOpenSession,
   onKeepSession,
   onEndSession,
+  onOpenLog,
   sessionKeepLabel = KEEP_RESTING_LABEL,
   chromeVisible = false,
   keyboardActive = true,
@@ -562,13 +564,15 @@ export function FocusPrompt({
 
       {surface === 'completed' && completedTask != null && completedMinutes != null ? (
         <div className="space-y-3">
-          <div
+          <button
+            type="button"
             data-text-clear
             data-testid="focus-completed"
-            className="text-[length:var(--type-heading)] leading-tight text-orb-text"
+            onClick={() => onOpenLog?.()}
+            className="text-[length:var(--type-heading)] leading-tight text-orb-text underline-offset-4 hover:underline"
           >
             {formatCompleted(completedMinutes, completedTask, completedPlanned)}
-          </div>
+          </button>
           <ChoiceRow
             testId="completed-row"
             items={items}

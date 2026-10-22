@@ -11,10 +11,21 @@ export const SHORTCUT_ROWS = [
   { key: 'S', action: 'settings' },
   { key: 'Space', action: 'start/stop focus' },
   { key: 'P', action: 'pop out' },
+  { key: 'L', action: 'log' },
 ] as const;
 
 export function isShortcutKey(key: string): boolean {
-  return key === 'f' || key === 'F' || key === 's' || key === 'S' || key === ' ' || key === 'p' || key === 'P';
+  return (
+    key === 'f' ||
+    key === 'F' ||
+    key === 's' ||
+    key === 'S' ||
+    key === ' ' ||
+    key === 'p' ||
+    key === 'P' ||
+    key === 'l' ||
+    key === 'L'
+  );
 }
 
 export function loadShortcutsCardSeen(): boolean {

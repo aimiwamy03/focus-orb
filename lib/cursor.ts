@@ -22,6 +22,7 @@ export const KEEP_CURSOR_SELECTOR = [
   '[data-testid="agenda"]',
   '[data-testid="focus-prompt"]',
   '[data-testid="settings-sheet"]',
+  '[data-testid="focus-log"]',
 ].join(', ');
 
 export function promptShowsCursor(surface: PromptSurface | null | undefined): boolean {
@@ -40,8 +41,9 @@ export function shouldHideCursor(input: {
   firstOpen?: boolean;
   miniOnly?: boolean;
   settingsOpen?: boolean;
+  logOpen?: boolean;
 }): boolean {
-  if (input.firstOpen || input.miniOnly || input.settingsOpen) return false;
+  if (input.firstOpen || input.miniOnly || input.settingsOpen || input.logOpen) return false;
   if (input.overInteractive) return false;
   if (promptShowsCursor(input.surface)) return false;
   if (input.surface !== 'focusing') return false;

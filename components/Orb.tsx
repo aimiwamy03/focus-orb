@@ -36,6 +36,16 @@ import {
   untilMeetingDuration,
 } from '@/lib/focusPrompt';
 import { CURSOR_HIDE_MS, isKeepCursorTarget, shouldHideCursor } from '@/lib/cursor';
+import {
+  LOG_LABEL,
+  clearFocusLog,
+  deleteFocusLogEntry,
+  focusLogKey,
+  loadFocusLog,
+  recordFocusLog,
+  type FocusLogEntry,
+} from '@/lib/focusLog';
+import { FocusLog } from './FocusLog';
 import { collectTextClearRects, textClearAlpha, textClearRectsOnDisk } from '@/lib/textClear';
 import {
   breathGlow,
@@ -136,6 +146,8 @@ export function Orb() {
   const [stopConfirm, setStopConfirm] = useState(false);
   const [sessionConfirm, setSessionConfirm] = useState(false);
   const [hideCursor, setHideCursor] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
   const [skipHeadsUp, setSkipHeadsUp] = useState(false);
   const [taskDraft, setTaskDraft] = useState('');
   const [recentTasks, setRecentTasks] = useState<string[]>([]);
@@ -154,6 +166,7 @@ export function Orb() {
   const miniOnlyRef = useRef(false);
   const firstOpenRef = useRef(false);
   const settingsOpenRef = useRef(false);
+  const logOpenRef = useRef(false);
   const surfaceRef = useRef<PromptSurface | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
@@ -178,6 +191,16 @@ export function Orb() {
   
   const calendar = useCalendar();
   const { nextEvent, day, now, scatterWindow } = calendar;
+  const logKey = focusLogKey({
+    email: calendar.userEmail,
+    mock: Boolean(calendar.mockScenario),
+  });
+  const logKeyRef = useRef(logKey);
+  logKeyRef.current = logKey;
+
+  useEffect(() => {
+    setFocusLog(loadFocusLog(logKey));
+  }, [logKey]);
   const density = densityForModel(day);
   const densityRef = useRef(density);
   const inBusyRef = useRef(day.state === 'in-meeting' || day.state === 'in-run');
@@ -196,7 +219,11 @@ export function Orb() {
     endSession,
     dismissCompleted,
     seedCompleted,
-  } = useManualFocus();
+  } = useManualFocus({
+    onFocusEnded: (draft) => {
+      setFocusLog(recordFocusLog(logKeyRef.current, draft));
+    },
+  });
 
   const tabTitle = useLiveTab({
     model: day,
@@ -213,7 +240,8 @@ export function Orb() {
     authMethod: calendar.authMethod,
   });
 
-  const showChrome = !firstOpen && !miniOnly && !showSettings && (showOverlay || hoverParam);
+  const showChrome =
+    !firstOpen && !miniOnly && !showSettings && !showLog && (showOverlay || hoverParam);
 
   const surface = promptSurface({
     firstOpen,
@@ -286,6 +314,7 @@ export function Orb() {
     !firstOpen &&
     !miniOnly &&
     !showSettings &&
+    !showLog &&
     shouldShowAgenda({
       enabled: true,
       surface: idleAgendaSurface || focusingSurface ? surface : null,
@@ -773,6 +802,14 @@ export function Orb() {
         e.preventDefault();
         if (miniWindow.isOpen) miniWindow.close();
         else void miniWindow.open();
+      } else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        if (logOpenRef.current) {
+          setShowLog(false);
+          return;
+        }
+        setShowSettings(false);
+        setShowLog(true);
       } else if (e.key === 'Escape' && miniOnlyRef.current) {
         e.preventDefault();
         setMiniOnly(false);
@@ -899,12 +936,13 @@ export function Orb() {
 
   firstOpenRef.current = firstOpen;
   settingsOpenRef.current = showSettings;
+  logOpenRef.current = showLog;
   surfaceRef.current = surface;
   miniOnlyRef.current = miniOnly;
 
   useEffect(() => {
     setHideCursor(false);
-  }, [surface, showSettings, firstOpen, miniOnly]);
+  }, [surface, showSettings, showLog, firstOpen, miniOnly]);
 
   useEffect(() => {
     const onMove = (event: PointerEvent) => {
@@ -920,6 +958,7 @@ export function Orb() {
             firstOpen: firstOpenRef.current,
             miniOnly: miniOnlyRef.current,
             settingsOpen: settingsOpenRef.current,
+            logOpen: logOpenRef.current,
           })
         );
       }, CURSOR_HIDE_MS);
@@ -934,6 +973,7 @@ export function Orb() {
   return (
     <div 
       data-testid="orb-root"
+      data-log-open={showLog ? 'true' : 'false'}
       data-cursor-hidden={hideCursor ? 'true' : 'false'}
       className={`relative h-screen w-screen overflow-hidden ${hideCursor ? 'cursor-none' : ''}`}
       data-satellites={day.remainingInRun.length}
@@ -1052,7 +1092,11 @@ export function Orb() {
               }}
               sessionKeepLabel={isBreak ? KEEP_RESTING_LABEL : KEEP_FOCUSING_LABEL}
               chromeVisible={showChrome}
-              keyboardActive={!showSettings}
+              keyboardActive={!showSettings && !showLog}
+              onOpenLog={() => {
+                setShowSettings(false);
+                setShowLog(true);
+              }}
             />
           )}
           {calendar.mockScenario ? (
@@ -1139,6 +1183,19 @@ export function Orb() {
             </button>
             <button
               type="button"
+              data-testid="focus-log-open"
+              onClick={() => {
+                setShowSettings(false);
+                setShowLog(true);
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
+              aria-pressed={showLog}
+            >
+              {LOG_LABEL}
+              <KeyHint label="L" />
+            </button>
+            <button
+              type="button"
               data-testid="settings-gear"
               onClick={() => setShowSettings(true)}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
@@ -1209,8 +1266,22 @@ export function Orb() {
             setShowAgenda(value);
             saveShowAgenda(value);
           }}
+          onClearLog={() => setFocusLog(clearFocusLog(logKey))}
         />
       )}
+
+      {showLog ? (
+        <FocusLog
+          entries={focusLog}
+          now={now}
+          onClose={() => setShowLog(false)}
+          onPickTask={(task) => {
+            setTaskDraft(task);
+            setShowLog(false);
+          }}
+          onDelete={(id) => setFocusLog(deleteFocusLogEntry(logKey, id))}
+        />
+      ) : null}
     </div>
   );
 }
