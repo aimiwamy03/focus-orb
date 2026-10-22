@@ -251,12 +251,10 @@ export function Orb() {
     },
   });
 
-  const tabTitle = useLiveTab({
+  useLiveTab({
     model: day,
-    now,
     scatter,
     isManualFocus,
-    focusMinutes: manualTimeRemaining,
   });
 
   const firstOpen = isFirstOpen({
@@ -1070,7 +1068,6 @@ export function Orb() {
         }
       }}
     >
-      <title>{tabTitle}</title>
       <StarDustBackdrop enabled={showBackdrop} />
       <canvas
         ref={canvasRef}

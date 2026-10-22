@@ -79,18 +79,3 @@ export function formatTimeRemaining(minutes: number): string {
   return `${mins}m`;
 }
 
-/**
- * Format minutes for tab title (compact)
- */
-export function formatTabTitle(minutes: number): string {
-  if (minutes < 0) return '● now';
-  if (minutes < 1) return '● <1m';
-  
-  const hours = Math.floor(minutes / 60);
-  const mins = Math.floor(minutes % 60);
-  
-  if (hours > 0) {
-    return `● ${hours}h${mins}m`;
-  }
-  return `● ${mins}m`;
-}
