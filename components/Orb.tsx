@@ -5,8 +5,16 @@ import { useSearchParams } from 'next/navigation';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
 import { useLiveTab } from '@/lib/useLiveTab';
+import {
+  agendaClearsOrb,
+  buildAgenda,
+  loadShowAgenda,
+  saveShowAgenda,
+  shouldShowAgenda,
+  visibleAgendaSections,
+} from '@/lib/agenda';
 import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, statusLineText } from '@/lib/day';
-import { orbLayout, type OrbLayout } from '@/lib/layout';
+import { orbLayout, textClearCloudRadius, type OrbLayout } from '@/lib/layout';
 import {
   DurationChoice,
   FALLBACK_TASK,
@@ -18,12 +26,13 @@ import {
   promptSurface,
   rememberTask,
   resolveDuration,
+  resolveStartTask,
   saveLastDuration,
   saveLastTask,
   saveRecentTasks,
   untilMeetingDuration,
 } from '@/lib/focusPrompt';
-import { collectTextClearRects, textClearAlpha } from '@/lib/textClear';
+import { collectTextClearRects, textClearAlpha, textClearRectsOnDisk } from '@/lib/textClear';
 import {
   breathGlow,
   breathPhase,
@@ -57,6 +66,7 @@ import { useMiniWindow } from '@/components/useMiniWindow';
 import { StackBoundary } from '@/components/StackBoundary';
 import { Settings } from './Settings';
 import { Hints, markHintSeen } from './Hints';
+import { Agenda } from './Agenda';
 import { FocusPrompt } from './FocusPrompt';
 import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
@@ -65,7 +75,9 @@ import { Welcome } from './Welcome';
 import { MiniOrbView } from './MiniOrbView';
 import { KeyHint } from './KeyHint';
 import { ShortcutsCard } from './ShortcutsCard';
-import { isFirstOpen } from '@/lib/onboarding';
+import { isFirstOpen, isGoogleConfigured } from '@/lib/onboarding';
+import { SAMPLE_DAY_LABEL } from '@/lib/fixtures';
+import { signInWithGoogle } from '@/app/actions';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -105,6 +117,7 @@ export function Orb() {
   const promptParam = searchParams.get('prompt');
   const taskParam = searchParams.get('task');
   const doneParam = searchParams.get('done');
+  const plannedParam = searchParams.get('planned');
   const pipSupported = useSyncExternalStore(
     () => () => {},
     () => canUseDocumentPip() && !forceUnsupported,
@@ -117,6 +130,7 @@ export function Orb() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [orbHovered, setOrbHovered] = useState(false);
   const [stopConfirm, setStopConfirm] = useState(false);
+  const [skipHeadsUp, setSkipHeadsUp] = useState(false);
   const [taskDraft, setTaskDraft] = useState('');
   const [recentTasks, setRecentTasks] = useState<string[]>([]);
   const [durationChoice, setDurationChoice] = useState<DurationChoice>(50);
@@ -126,6 +140,8 @@ export function Orb() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [leaveHint, setLeaveHint] = useState(false);
   const [showShortcutsCard, setShowShortcutsCard] = useState(false);
+  const [showAgenda, setShowAgenda] = useState(true);
+  const [viewSize, setViewSize] = useState({ w: 1280, h: 800 });
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const handleOrbClickRef = useRef<() => void>(() => {});
   const miniOnlyRef = useRef(false);
@@ -186,7 +202,7 @@ export function Orb() {
     authMethod: calendar.authMethod,
   });
 
-  const showChrome = !firstOpen && !miniOnly && (showOverlay || hoverParam);
+  const showChrome = !firstOpen && !miniOnly && !showSettings && (showOverlay || hoverParam);
 
   const surface = promptSurface({
     firstOpen,
@@ -196,6 +212,7 @@ export function Orb() {
     stopConfirm,
     completed: Boolean(completed),
     headsUp: isHeadsUp(day, now),
+    skipHeadsUp,
     dayState: day.state,
   });
   const untilMinutes = untilMeetingDuration(day);
@@ -238,13 +255,45 @@ export function Orb() {
       ? formatMeetingSoonCopy(minutesBetween(now, day.nextEvent.start))
       : statusLineText(day, now);
 
+  const agendaSections = visibleAgendaSections(
+    buildAgenda(calendar.events, now),
+    viewSize.h
+  );
+  const focusingSurface = surface === 'focusing' || surface === 'stop-confirm';
+  const idleAgendaSurface =
+    surface === 'ask' ||
+    surface === 'break' ||
+    surface === 'completed' ||
+    surface === 'meeting-soon';
+  const mountAgenda =
+    showAgenda &&
+    !firstOpen &&
+    !miniOnly &&
+    !showSettings &&
+    shouldShowAgenda({
+      enabled: true,
+      surface: idleAgendaSurface || focusingSurface ? surface : null,
+      viewW: viewSize.w,
+      viewH: viewSize.h,
+      chromeVisible: true,
+      clearsOrb: agendaClearsOrb(layoutRef.current),
+    });
+  const agendaFaded = focusingSurface && !showChrome;
+
   const updateLayout = useCallback(() => {
     if (typeof window === 'undefined') return;
     const canvas = canvasRef.current;
     const viewW = canvas?.clientWidth || window.innerWidth;
     const viewH = canvas?.clientHeight || window.innerHeight;
-    const stackH = stackRef.current?.getBoundingClientRect().height ?? 0;
-    layoutRef.current = orbLayout(viewW, viewH, stackH);
+    const stack = stackRef.current;
+    const text = stack?.querySelector<HTMLElement>(
+      '[data-testid="prompt-context"], [data-testid="focus-task-name"], [data-testid="meeting-soon-prompt"], [data-text-clear]'
+    );
+    const textTop = text?.getBoundingClientRect().top ?? stack?.getBoundingClientRect().top ?? viewH;
+    layoutRef.current = orbLayout(viewW, viewH, Math.max(0, viewH - textTop));
+    setViewSize((current) =>
+      current.w === viewW && current.h === viewH ? current : { w: viewW, h: viewH }
+    );
   }, []);
 
   useEffect(() => {
@@ -266,8 +315,6 @@ export function Orb() {
   useEffect(() => {
     setPopOutOnLeave(loadPopOutOnLeave());
     setRecentTasks(loadRecentTasks());
-    const storedTask = loadLastTask();
-    if (storedTask) setTaskDraft(storedTask);
     const storedDuration = loadLastDuration();
     if (storedDuration != null) setDurationChoice(storedDuration);
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -550,8 +597,12 @@ export function Orb() {
         pointsRef.current[idx].threshold = Math.random();
       }
       
-      // Draw all points, skipping or fading any that sit under text.
-      const clearRects = collectTextClearRects();
+      // Safety net only: clear text that the scatter cloud actually reaches.
+      const clearRects = textClearRectsOnDisk(collectTextClearRects(), {
+        centerX: layout.centerX,
+        centerY: layout.centerY,
+        radius: textClearCloudRadius(layout.radius, visualScatter),
+      });
       ctx.fillStyle = '#ffffff';
       
       for (const point of pointsRef.current) {
@@ -664,12 +715,14 @@ export function Orb() {
         firstOpen,
         miniOnly,
         seen: loadShortcutsCardSeen(),
+        surface,
       })
     ) {
+      setShowShortcutsCard(false);
       return;
     }
     setShowShortcutsCard(true);
-  }, [firstOpen, miniOnly]);
+  }, [firstOpen, miniOnly, surface]);
 
   const toggleFullscreen = () => {
     markHintSeen('fullscreen');
@@ -704,6 +757,9 @@ export function Orb() {
         e.preventDefault();
         if (miniWindow.isOpen) miniWindow.close();
         else void miniWindow.open();
+      } else if (e.key === 'Escape' && miniOnlyRef.current) {
+        e.preventDefault();
+        setMiniOnly(false);
       }
     };
     
@@ -728,17 +784,18 @@ export function Orb() {
     choice: DurationChoice = durationChoice
   ) => {
     const minutes = resolveDuration(choice, untilMinutes);
-    const name = (taskName ?? taskDraft).trim() || loadLastTask() || FALLBACK_TASK;
+    const name = resolveStartTask(taskName ?? taskDraft, loadLastTask(), recentTasks);
     const nextRecent = rememberTask(name, recentTasks);
     setRecentTasks(nextRecent);
     saveRecentTasks(nextRecent);
     saveLastTask(name);
     saveLastDuration(choice);
-    setTaskDraft(name);
+    setTaskDraft('');
     setStopConfirm(false);
     dismissCompleted();
     startFocus(minutes, name);
-    bumpHint('click');
+    dismissShortcutsCard();
+    bumpHint('hover');
   };
 
   const handleOrbClick = () => {
@@ -753,13 +810,17 @@ export function Orb() {
       beginFocus(completed.task, durationChoice);
       return;
     }
-    beginFocus(loadLastTask() || taskDraft, loadLastDuration() ?? durationChoice);
+    beginFocus(taskDraft, loadLastDuration() ?? durationChoice);
   };
   handleOrbClickRef.current = handleOrbClick;
 
   useEffect(() => {
     if (promptParam === 'done') {
-      seedCompleted(taskParam || 'Deep work', Number(doneParam) || 50);
+      seedCompleted(
+        taskParam || 'Deep work',
+        Number(doneParam) || 50,
+        Number(plannedParam) || Number(doneParam) || 50
+      );
       if (taskParam) setTaskDraft(taskParam);
       return;
     }
@@ -776,7 +837,7 @@ export function Orb() {
       if (promptParam === 'stop') setStopConfirm(true);
       if (taskParam) setTaskDraft(taskParam);
     }
-  }, [doneParam, focusParam, promptParam, seedCompleted, startBreak, startFocus, taskParam]);
+  }, [doneParam, focusParam, plannedParam, promptParam, seedCompleted, startBreak, startFocus, taskParam]);
 
   useEffect(() => {
     if (untilMinutes != null && typeof durationChoice === 'number' && durationChoice > untilMinutes) {
@@ -785,8 +846,27 @@ export function Orb() {
   }, [untilMinutes, durationChoice]);
 
   useEffect(() => {
+    if (!isHeadsUp(day, now)) setSkipHeadsUp(false);
+  }, [day, now]);
+
+  useEffect(() => {
     if (settingsParam) setShowSettings(true);
   }, [settingsParam]);
+
+  const triedPipRef = useRef(false);
+  useEffect(() => {
+    if (!miniOnly) {
+      triedPipRef.current = false;
+      return;
+    }
+    if (miniWindow.isOpen || !pipSupported || triedPipRef.current) return;
+    triedPipRef.current = true;
+    void miniWindow.open();
+  }, [miniOnly, miniWindow.isOpen, miniWindow.open, pipSupported]);
+
+  useEffect(() => {
+    setShowAgenda(loadShowAgenda());
+  }, []);
 
   useEffect(() => {
     const onFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
@@ -841,24 +921,38 @@ export function Orb() {
         }}
       />
 
+      {mountAgenda ? <Agenda sections={agendaSections} faded={agendaFaded} /> : null}
+
       {miniOnly ? (
         <button
           type="button"
           data-testid="floating-restore"
           onClick={() => setMiniOnly(false)}
-          className="absolute inset-0 z-30 flex items-center justify-center text-xs tracking-wide text-white/40 hover:text-white/60"
+          className="absolute inset-0 z-30 flex items-center justify-center text-[length:var(--type-status)] tracking-wide text-orb-quiet hover:text-orb-dim"
         >
           {FLOATING_RESTORE_LABEL}
         </button>
       ) : firstOpen ? (
-        <Welcome onConnect={() => setShowSettings(true)} />
+        <Welcome
+          googleConfigured={isGoogleConfigured()}
+          onConnect={() => {
+            if (isGoogleConfigured()) {
+              calendar.selectAuthMethod('google');
+              void signInWithGoogle();
+              return;
+            }
+            setShowSettings(true);
+          }}
+        />
       ) : (
         <div
           ref={stackRef}
           data-testid="bottom-stack"
-          className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2.5 px-4 pb-4 pt-1"
+          className={`absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-[length:var(--stack-gap)] px-4 pb-[length:var(--stack-pad)] pt-1 ${
+            showSettings ? 'invisible pointer-events-none' : ''
+          }`}
         >
-          {surface === 'meeting-soon' || surface === 'in-meeting' || !surface ? (
+          {surface === 'in-meeting' || !surface ? (
             <StatusLine
               text={line}
               detail={hoverDetailText(day, now)}
@@ -868,7 +962,11 @@ export function Orb() {
           ) : (
             <FocusPrompt
               surface={surface}
-              contextLine={statusLineText(day, now)}
+              contextLine={
+                surface === 'meeting-soon' && day.nextEvent
+                  ? formatMeetingSoonCopy(minutesBetween(now, day.nextEvent.start))
+                  : statusLineText(day, now)
+              }
               task={surface === 'focusing' || surface === 'stop-confirm' ? activeTask : taskDraft}
               onTaskChange={setTaskDraft}
               recentTasks={recentTasks}
@@ -881,6 +979,8 @@ export function Orb() {
               focusMinutes={manualTimeRemaining}
               completedTask={completed?.task}
               completedMinutes={completed?.minutes}
+              completedPlanned={completed?.planned}
+              joinUrl={extractJoinUrl(day.nextEvent)}
               onStart={() => beginFocus(taskDraft, durationChoice)}
               onKeepGoing={() => setStopConfirm(false)}
               onEnd={() => {
@@ -889,9 +989,23 @@ export function Orb() {
               }}
               onBreak={startBreak}
               onAnotherRound={() => beginFocus(completed?.task || taskDraft, durationChoice)}
+              onJoin={() => {
+                const url = extractJoinUrl(day.nextEvent);
+                if (url) window.open(url, '_blank', 'noreferrer');
+              }}
+              onSkip={() => setSkipHeadsUp(true)}
               chromeVisible={showChrome}
+              keyboardActive={!showSettings}
             />
           )}
+          {calendar.mockScenario ? (
+            <div
+              data-testid="sample-day-label"
+              className="text-[11px] tracking-wide text-orb-quiet"
+            >
+              {SAMPLE_DAY_LABEL}
+            </div>
+          ) : null}
           {showShortcutsCard ? (
             <StackBoundary>
               <ShortcutsCard onDismiss={dismissShortcutsCard} />
@@ -931,7 +1045,7 @@ export function Orb() {
                       void miniWindow.open();
                     }
                   }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
                   aria-pressed={miniWindow.isOpen}
                 >
                   {POP_OUT_LABEL}
@@ -948,7 +1062,7 @@ export function Orb() {
                     const ok = miniWindow.isOpen || (await miniWindow.open());
                     if (ok) setMiniOnly(true);
                   }}
-                  className="px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+                  className="px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
                   aria-pressed={miniOnly}
                 >
                   {MINI_ONLY_LABEL}
@@ -959,7 +1073,7 @@ export function Orb() {
               type="button"
               data-testid="fullscreen-toggle"
               onClick={toggleFullscreen}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
               aria-label="Full screen"
               aria-pressed={isFullscreen}
             >
@@ -970,7 +1084,7 @@ export function Orb() {
               type="button"
               data-testid="settings-gear"
               onClick={() => setShowSettings(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
               aria-label="Settings"
             >
               ⚙
@@ -981,9 +1095,10 @@ export function Orb() {
       ) : null}
 
       <Hints
-        active={!firstOpen}
+        active={!firstOpen && !miniOnly}
         chromeVisible={showChrome}
         revision={hintRev}
+        teach={surface === 'ask'}
         banner={
           !pipSupported && !firstOpen
             ? { id: 'chrome', text: CHROME_HINT }
@@ -1012,7 +1127,6 @@ export function Orb() {
       {showSettings && (
         <Settings 
           onClose={() => setShowSettings(false)}
-          onStartFocus={(minutes) => beginFocus(taskDraft, minutes)}
           calendarUrl={calendar.calendarUrl}
           setCalendarUrl={calendar.setCalendarUrl}
           scatterWindow={calendar.scatterWindow}
@@ -1029,6 +1143,14 @@ export function Orb() {
           setPopOutOnLeave={(value) => {
             setPopOutOnLeave(value);
             savePopOutOnLeave(value);
+          }}
+          defaultDuration={durationChoice}
+          setDefaultDuration={setDurationChoice}
+          userEmail={calendar.userEmail}
+          showAgenda={showAgenda}
+          setShowAgenda={(value) => {
+            setShowAgenda(value);
+            saveShowAgenda(value);
           }}
         />
       )}

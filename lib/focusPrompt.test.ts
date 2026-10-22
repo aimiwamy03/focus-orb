@@ -7,6 +7,7 @@ import {
   capDuration,
   END_EARLY_PROMPT,
   FALLBACK_TASK,
+  MENU_ASK_HINT,
   formatBreakCopy,
   formatCompleted,
   formatFocusingCopy,
@@ -19,6 +20,8 @@ import {
   promptSurface,
   rememberTask,
   resolveDuration,
+  resolveStartTask,
+  visibleAskSuggestions,
   RECENT_TASKS_KEY,
   saveLastDuration,
   saveRecentTasks,
@@ -48,6 +51,44 @@ describe('rememberTask', () => {
     expect(rememberTask('  Write  ', ['Email', 'Write'])).toEqual(['Write', 'Email']);
     expect(rememberTask('   ', ['Email'])).toEqual(['Email']);
     expect(rememberTask(FALLBACK_TASK, ['Email'])).toEqual(['Email']);
+  });
+});
+
+describe('visibleAskSuggestions', () => {
+  it('shows up to three unique recents and hides the typed value', () => {
+    expect(
+      visibleAskSuggestions(
+        [
+          'finish voice ai post',
+          'write the spec',
+          'review pr',
+          'ship',
+          'finish voice ai post',
+        ],
+        ''
+      )
+    ).toEqual(['finish voice ai post', 'write the spec', 'review pr']);
+    expect(
+      visibleAskSuggestions(
+        ['finish voice ai post', 'write the spec', 'review pr'],
+        'finish voice ai post'
+      )
+    ).toEqual(['write the spec', 'review pr']);
+  });
+});
+
+describe('resolveStartTask', () => {
+  it('uses typed text, then last task, then the most recent suggestion, then Focus', () => {
+    expect(resolveStartTask('  Draft  ', 'finish voice ai post', ['older'])).toBe(
+      'Draft'
+    );
+    expect(resolveStartTask('', 'finish voice ai post', ['older'])).toBe(
+      'finish voice ai post'
+    );
+    expect(resolveStartTask('   ', '', ['write the spec', 'review pr'])).toBe(
+      'write the spec'
+    );
+    expect(resolveStartTask('', '', [])).toBe(FALLBACK_TASK);
   });
 });
 
@@ -91,12 +132,17 @@ describe('copy', () => {
       countdown: '32m left',
     });
     expect(formatFocusingCopy('Deep work', 32.4).countdown).toBe('33m left');
-    expect(formatCompleted(50, 'Deep work')).toBe('Nice. 50m on Deep work');
+    expect(formatCompleted(50, 'Deep work')).toBe('Focused 50 of 50 min on Deep work');
+    expect(formatCompleted(18, 'Write the spec', 50)).toBe(
+      'Focused 18 of 50 min on Write the spec'
+    );
     expect(formatBreakCopy(4.2)).toBe('Break 5m');
     expect(formatBreakCopy(5)).toBe('Break 5m');
     expect(formatMeetingSoonCopy(4.2)).toBe('Meeting in 5m');
     expect(ASK_PROMPT).not.toMatch(/[—–]/);
     expect(END_EARLY_PROMPT).not.toMatch(/[—–]/);
+    expect(MENU_ASK_HINT).toBe('← → to choose, Enter to start');
+    expect(MENU_ASK_HINT).not.toMatch(/[—–]/);
     expect(KEEP_GOING_LABEL).not.toMatch(/[—–]/);
     expect(formatCompleted(50, 'Deep work')).not.toMatch(/[—–]/);
   });
@@ -137,6 +183,17 @@ describe('promptSurface', () => {
         dayState: 'free',
       })
     ).toBe('meeting-soon');
+    expect(
+      promptSurface({
+        isFocusing: false,
+        isBreak: false,
+        stopConfirm: false,
+        completed: false,
+        headsUp: true,
+        skipHeadsUp: true,
+        dayState: 'free',
+      })
+    ).toBe('ask');
     expect(
       promptSurface({
         isFocusing: false,

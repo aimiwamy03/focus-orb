@@ -58,6 +58,14 @@ describe('handleGoogleCalendarGet', () => {
         end: '2026-10-12T12:30:00.000Z',
       },
     ]);
+    const range = (fetchEvents.mock.calls[0] as unknown as [
+      string,
+      string[],
+      { timeMin: string; timeMax: string },
+    ])[2];
+    expect(
+      (new Date(range.timeMax).getTime() - new Date(range.timeMin).getTime()) / 86_400_000
+    ).toBeGreaterThan(2);
   });
 });
 

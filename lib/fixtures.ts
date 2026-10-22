@@ -15,6 +15,9 @@ export function isMockScenario(value: string | null): value is MockScenario {
   return !!value && (MOCK_SCENARIOS as readonly string[]).includes(value);
 }
 
+export const SAMPLE_DAY_NOW = '11:30';
+export const SAMPLE_DAY_LABEL = 'Sample day';
+
 export function parseNowParam(nowParam: string | null, base: Date = new Date()): Date {
   if (!nowParam) return new Date(base);
   const match = nowParam.match(/^(\d{1,2}):(\d{2})$/);
@@ -25,6 +28,16 @@ export function parseNowParam(nowParam: string | null, base: Date = new Date()):
   const pinned = new Date(base);
   pinned.setHours(hours, minutes, 0, 0);
   return pinned;
+}
+
+export function resolveDemoNow(
+  nowParam: string | null,
+  mockScenario: string | null,
+  base: Date = new Date()
+): Date {
+  if (nowParam) return parseNowParam(nowParam, base);
+  if (mockScenario) return parseNowParam(SAMPLE_DAY_NOW, base);
+  return new Date(base);
 }
 
 function at(now: Date, hours: number, minutes: number): Date {
@@ -51,10 +64,30 @@ function ev(
   };
 }
 
+function evOnDay(
+  now: Date,
+  days: number,
+  summary: string,
+  startH: number,
+  startM: number,
+  endH: number,
+  endM: number,
+  extra: Partial<CalendarEvent> = {}
+): CalendarEvent {
+  const day = new Date(now);
+  day.setDate(day.getDate() + days);
+  return ev(day, summary, startH, startM, endH, endM, extra);
+}
+
 export function getMockEvents(scenario: MockScenario, now: Date): CalendarEvent[] {
   switch (scenario) {
     case 'open-afternoon':
-      return [ev(now, 'Wrap-up', 15, 0, 16, 0)];
+      return [
+        ev(now, 'Morning standup', 9, 0, 9, 30, { backgroundColor: '#8e24aa' }),
+        ev(now, 'Wrap-up', 15, 0, 16, 0, { backgroundColor: '#4285f4' }),
+        evOnDay(now, 1, '1:1', 10, 0, 10, 30, { backgroundColor: '#33b679' }),
+        evOnDay(now, 2, 'Planning', 14, 0, 15, 0, { backgroundColor: '#f4511e' }),
+      ];
     case 'short-gap':
       return [ev(now, 'Design sync', 13, 30, 14, 0)];
     case 'back-to-back':

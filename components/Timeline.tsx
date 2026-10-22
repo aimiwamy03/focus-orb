@@ -139,7 +139,7 @@ export function Timeline({ events, now, hidden }: TimelineProps) {
         <div
           data-testid="timeline-tooltip"
           data-text-clear
-          className="pointer-events-none absolute bottom-9 whitespace-nowrap text-[10px] text-white/70"
+          className="pointer-events-none absolute bottom-9 whitespace-nowrap text-[length:var(--type-hint)] text-orb-dim"
           style={{ left: hover.x, transform: 'translateX(-50%)' }}
         >
           {hover.label}

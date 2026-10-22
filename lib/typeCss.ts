@@ -1,0 +1,25 @@
+import { ORB_BG, ORB_PLACEHOLDER, ORB_TEXT, ORB_TEXT_DIM, ORB_TEXT_QUIET, SETTINGS_BG, SETTINGS_MUTED, SETTINGS_TEXT } from './palette';
+import { clampCss, TYPE_SCALE } from './typeScale';
+
+export const TYPE_CSS = `:root {
+  --type-heading: ${clampCss(TYPE_SCALE.heading)};
+  --type-input: ${clampCss(TYPE_SCALE.input)};
+  --type-status: ${clampCss(TYPE_SCALE.status)};
+  --type-chip: ${clampCss(TYPE_SCALE.chip)};
+  --type-button: ${clampCss(TYPE_SCALE.button)};
+  --type-hint: ${clampCss(TYPE_SCALE.hint)};
+  --type-chrome: ${clampCss(TYPE_SCALE.chrome)};
+  --type-key: ${clampCss(TYPE_SCALE.key)};
+  --stack-gap: clamp(0.35rem, 1.1vh, 0.7rem);
+  --stack-pad: clamp(0.4rem, 1.2vh, 1rem);
+  --btn-px: clamp(1.05rem, 1.3vw, 1.4rem);
+  --btn-py: clamp(0.45rem, 1vh, 0.7rem);
+  --color-orb-bg: ${ORB_BG};
+  --color-orb-text: ${ORB_TEXT};
+  --color-orb-dim: ${ORB_TEXT_DIM};
+  --color-orb-quiet: ${ORB_TEXT_QUIET};
+  --color-orb-placeholder: ${ORB_PLACEHOLDER};
+  --color-orb-sheet: ${SETTINGS_BG};
+  --color-orb-muted: ${SETTINGS_MUTED};
+  --color-orb-settings-text: ${SETTINGS_TEXT};
+}`;

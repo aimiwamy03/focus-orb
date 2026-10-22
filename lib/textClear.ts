@@ -8,10 +8,42 @@ export interface ClearRect {
   bottom: number;
 }
 
+export function isVisibleClearTarget(el: Element): boolean {
+  const win = el.ownerDocument?.defaultView;
+  if (!win) return true;
+  const style = win.getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  if (Number.parseFloat(style.opacity) === 0) return false;
+  return true;
+}
+
+export function rectOverlapsCircle(
+  rect: ClearRect,
+  cx: number,
+  cy: number,
+  radius: number
+): boolean {
+  const closestX = Math.max(rect.left, Math.min(cx, rect.right));
+  const closestY = Math.max(rect.top, Math.min(cy, rect.bottom));
+  const dx = cx - closestX;
+  const dy = cy - closestY;
+  return dx * dx + dy * dy <= radius * radius;
+}
+
+export function textClearRectsOnDisk(
+  rects: ClearRect[],
+  disk: { centerX: number; centerY: number; radius: number }
+): ClearRect[] {
+  return rects.filter((rect) =>
+    rectOverlapsCircle(rect, disk.centerX, disk.centerY, disk.radius)
+  );
+}
+
 export function collectTextClearRects(root: ParentNode = document): ClearRect[] {
   const nodes = root.querySelectorAll('[data-text-clear]');
   const rects: ClearRect[] = [];
   for (const node of nodes) {
+    if (!isVisibleClearTarget(node)) continue;
     const r = (node as HTMLElement).getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) continue;
     rects.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });

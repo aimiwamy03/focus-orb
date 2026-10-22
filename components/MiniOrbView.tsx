@@ -1,13 +1,8 @@
 'use client';
 
-import { CSSProperties, MutableRefObject, useEffect, useRef } from 'react';
+import { CSSProperties, MutableRefObject, useEffect, useRef, useState } from 'react';
 import { sizeMiniCanvas } from '@/lib/drawMiniOrb';
-import {
-  MINI_BG,
-  MINI_STATUS_LINE,
-  MINI_STATUS_PAD_X,
-  MINI_STATUS_PAD_Y,
-} from '@/lib/miniOrb';
+import { MINI_BG, miniStatusType } from '@/lib/miniOrb';
 
 interface MiniOrbViewProps {
   status: string;
@@ -18,8 +13,10 @@ interface MiniOrbViewProps {
 
 export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewProps) {
   const localRef = useRef<HTMLCanvasElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const onClickRef = useRef(onClick);
   onClickRef.current = onClick;
+  const [type, setType] = useState(() => miniStatusType());
 
   const setRefs = (node: HTMLCanvasElement | null) => {
     localRef.current = node;
@@ -31,15 +28,23 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
 
   useEffect(() => {
     const node = localRef.current;
+    const root = rootRef.current;
     if (!node) return;
     const handler = () => onClickRef.current();
     node.addEventListener('click', handler);
-    const measure = () => sizeMiniCanvas(node);
+    const measure = () => {
+      sizeMiniCanvas(node);
+      const box = root ?? node.parentElement?.parentElement;
+      if (box) {
+        setType(miniStatusType(box.clientWidth, box.clientHeight));
+      }
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     const stage = node.parentElement;
     if (stage) observer.observe(stage);
+    if (root) observer.observe(root);
     const win = node.ownerDocument.defaultView;
     win?.addEventListener('resize', measure);
     win?.visualViewport?.addEventListener('resize', measure);
@@ -53,6 +58,7 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
 
   return (
     <div
+      ref={rootRef}
       data-testid="mini-orb"
       style={{
         width: '100%',
@@ -94,11 +100,11 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
         style={{
           flex: '0 0 auto',
           boxSizing: 'border-box',
-          padding: `${MINI_STATUS_PAD_Y}px ${MINI_STATUS_PAD_X}px`,
+          padding: `${type.padY}px ${type.padX}px`,
           textAlign: 'center',
-          fontSize: 11,
-          lineHeight: `${MINI_STATUS_LINE}px`,
-          color: 'rgba(255,255,255,0.5)',
+          fontSize: type.fontSize,
+          lineHeight: `${type.lineHeight}px`,
+          color: '#d0d0d0',
           pointerEvents: 'none',
           letterSpacing: '0.04em',
           zIndex: 1,

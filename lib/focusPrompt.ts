@@ -7,8 +7,12 @@ export const KEEP_GOING_LABEL = 'Keep going';
 export const END_LABEL = 'End';
 export const START_LABEL = 'Start';
 export const TAKE_BREAK_LABEL = 'Take a break';
-export const ANOTHER_ROUND_LABEL = 'Another round';
+export const ANOTHER_ROUND_LABEL = 'Start another';
+export const DONE_LABEL = 'Done';
 export const UNTIL_MEETING_LABEL = 'Until next meeting';
+export const JOIN_LABEL = 'Join';
+export const SKIP_LABEL = 'Skip';
+export const MENU_ASK_HINT = '← → to choose, Enter to start';
 export const FALLBACK_TASK = 'Focus';
 export const BREAK_MINUTES = 5;
 export const DURATION_CHIPS = [25, 50, 90] as const;
@@ -16,6 +20,7 @@ export const RECENT_TASKS_KEY = 'focusOrb:recentTasks';
 export const LAST_DURATION_KEY = 'focusOrb:lastDuration';
 export const LAST_TASK_KEY = 'focusOrb:lastTask';
 export const MAX_RECENT_TASKS = 5;
+export const MAX_ASK_SUGGESTIONS = 3;
 
 export type DurationChoice = number | 'until';
 export type PromptSurface =
@@ -68,6 +73,41 @@ export function saveLastTask(task: string): void {
   else localStorage.setItem(LAST_TASK_KEY, trimmed);
 }
 
+export function visibleAskSuggestions(
+  recent: string[],
+  typed: string,
+  limit: number = MAX_ASK_SUGGESTIONS
+): string[] {
+  const current = typed.trim().toLowerCase();
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of recent) {
+    const name = item.trim();
+    if (!name || name === FALLBACK_TASK) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    if (current && key === current) continue;
+    seen.add(key);
+    out.push(name);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+export function resolveStartTask(
+  typed: string,
+  lastTask: string,
+  recent: string[] = []
+): string {
+  const fromInput = typed.trim();
+  if (fromInput) return fromInput;
+  const last = lastTask.trim();
+  if (last) return last;
+  const fromRecent = recent.find((item) => item.trim());
+  if (fromRecent) return fromRecent.trim();
+  return FALLBACK_TASK;
+}
+
 export function loadLastDuration(): DurationChoice | null {
   if (typeof localStorage === 'undefined') return null;
   const raw = localStorage.getItem(LAST_DURATION_KEY);
@@ -109,9 +149,15 @@ export function resolveDuration(
   return capDuration(DEFAULT_FOCUS_MINUTES, untilMinutes);
 }
 
-export function formatCompleted(minutes: number, task: string): string {
+export function formatCompleted(
+  minutes: number,
+  task: string,
+  planned: number = minutes
+): string {
   const label = task.trim() || FALLBACK_TASK;
-  return `Nice. ${formatCompactDuration(minutes)} on ${label}`;
+  const spent = Math.max(1, Math.round(minutes));
+  const total = Math.max(spent, Math.round(planned));
+  return `Focused ${spent} of ${total} min on ${label}`;
 }
 
 export function remainingMinutes(minutesLeft: number): number {
@@ -166,6 +212,7 @@ export function promptSurface(input: {
   stopConfirm: boolean;
   completed: boolean;
   headsUp: boolean;
+  skipHeadsUp?: boolean;
   dayState: DayModel['state'];
 }): PromptSurface | null {
   if (input.firstOpen || input.miniOnly) return null;
@@ -176,7 +223,7 @@ export function promptSurface(input: {
   if (input.dayState === 'in-meeting' || input.dayState === 'in-run') {
     return 'in-meeting';
   }
-  if (input.headsUp) return 'meeting-soon';
+  if (input.headsUp && !input.skipHeadsUp) return 'meeting-soon';
   return 'ask';
 }
 
