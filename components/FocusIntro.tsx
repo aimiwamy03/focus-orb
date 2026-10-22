@@ -12,7 +12,7 @@ import {
   INTRO_TIMELINE,
   introClockSpeed,
   introFrame,
-  introSoundEvents,
+  introSoundCuesAt,
   isIntroSkipKey,
   type IntroAudioName,
 } from '@/lib/intro';
@@ -48,6 +48,10 @@ export function FocusIntro({
   const doneRef = useRef(false);
   const skippingRef = useRef(false);
   const depthRef = useRef(0);
+  const waitingGestureRef = useRef(false);
+  const startingAudioRef = useRef(false);
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
   const audioRef = useRef<{
     ctx: AudioContext;
     gain: GainNode;
@@ -152,7 +156,10 @@ export function FocusIntro({
   }, []);
 
   const startAudio = useCallback(async () => {
-    if (!soundEnabled) return;
+    if (!soundEnabledRef.current || audioRef.current || startingAudioRef.current || doneRef.current) {
+      return;
+    }
+    startingAudioRef.current = true;
     try {
       const AC =
         window.AudioContext ||
@@ -161,9 +168,11 @@ export function FocusIntro({
       const ctx = new AC();
       await ctx.resume();
       if (ctx.state !== 'running') {
+        waitingGestureRef.current = true;
         await ctx.close().catch(() => undefined);
         return;
       }
+      waitingGestureRef.current = false;
       const names = Object.keys(INTRO_AUDIO) as IntroAudioName[];
       const buffers = Object.fromEntries(
         await Promise.all(
@@ -182,26 +191,34 @@ export function FocusIntro({
       comp.connect(ctx.destination);
       const gain = ctx.createGain();
       gain.connect(comp);
+      const elapsed = startRef.current
+        ? ((performance.now() - startRef.current) / 1000) * introClockSpeed(reduced)
+        : 0;
       const t0 = ctx.currentTime + 0.02;
-      const sources = introSoundEvents().map((event) => {
+      const sources = introSoundCuesAt(elapsed).flatMap((cue) => {
+        const buffer = buffers[cue.name];
+        if (!buffer || cue.offset >= buffer.duration) return [];
         const src = ctx.createBufferSource();
-        src.buffer = buffers[event.name];
+        src.buffer = buffer;
         const g = ctx.createGain();
-        g.gain.value = event.volume;
+        g.gain.value = cue.volume;
         src.connect(g);
         g.connect(gain);
-        src.start(Math.max(t0 + event.at, ctx.currentTime));
-        return src;
+        src.start(Math.max(t0 + cue.when, ctx.currentTime), cue.offset);
+        return [src];
       });
       audioRef.current = { ctx, gain, sources };
     } catch {
-      /* browsers may block autoplay; fail silent */
+      waitingGestureRef.current = true;
+    } finally {
+      startingAudioRef.current = false;
     }
-  }, [soundEnabled]);
+  }, [reduced]);
 
   const finish = useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
+    waitingGestureRef.current = false;
     cancelAnimationFrame(rafRef.current);
     stopAudio(0.15);
     onDone();
@@ -253,6 +270,11 @@ export function FocusIntro({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (waitingGestureRef.current && !isIntroSkipKey(event.key)) {
+        event.preventDefault();
+        void startAudio();
+        return;
+      }
       if (!isIntroSkipKey(event.key)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -260,7 +282,7 @@ export function FocusIntro({
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [skip]);
+  }, [skip, startAudio]);
 
   return (
     <div
@@ -269,7 +291,13 @@ export function FocusIntro({
       className="focus-intro"
       role="dialog"
       aria-label="Opening intro"
-      onPointerDown={skip}
+      onPointerDown={() => {
+        if (waitingGestureRef.current) {
+          void startAudio();
+          return;
+        }
+        skip();
+      }}
     >
       <link rel="preload" as="image" href={INTRO_ART_SRC} />
       <div className="focus-intro-art-frame">

@@ -11,7 +11,10 @@ import {
   introClockSpeed,
   introFrame,
   introNarrow,
+  introSoundCuesAt,
   introSoundEvents,
+  introSoundPref,
+  introPointerUnlocksSound,
   isIntroSkipKey,
   isStoredFocusRunning,
   loadIntroPlayed,
@@ -106,13 +109,35 @@ describe('intro gating', () => {
   it('stores session played and toggle defaults', () => {
     expect(loadIntroPlayed()).toBe(false);
     expect(loadPlayIntro()).toBe(true);
-    expect(loadIntroSound()).toBe(false);
+    expect(loadIntroSound()).toBe(true);
     markIntroPlayed();
     savePlayIntro(false);
     saveIntroSound(true);
     expect(loadIntroPlayed()).toBe(true);
     expect(loadPlayIntro()).toBe(false);
     expect(loadIntroSound()).toBe(true);
+  });
+
+  it('defaults intro sound on, and only an explicit off persists', () => {
+    expect(introSoundPref(null)).toBe(true);
+    expect(introSoundPref(undefined)).toBe(true);
+    expect(introSoundPref('1')).toBe(true);
+    expect(introSoundPref('0')).toBe(false);
+    expect(loadIntroSound()).toBe(true);
+    saveIntroSound(false);
+    expect(loadIntroSound()).toBe(false);
+    localStorage.removeItem('focusOrb:introSound');
+    expect(loadIntroSound()).toBe(true);
+  });
+
+  it('aligns late audio to the current intro time without a prompt', () => {
+    const late = introSoundCuesAt(2);
+    expect(late.find((cue) => cue.name === 'bed')).toMatchObject({ when: 0, offset: 2 });
+    expect(late.some((cue) => cue.name === 'turn' && cue.when === 0)).toBe(false);
+    const early = introSoundCuesAt(0);
+    expect(early[0]).toMatchObject({ name: 'bed', when: 0, offset: 0 });
+    expect(introPointerUnlocksSound(true)).toBe(true);
+    expect(introPointerUnlocksSound(false)).toBe(false);
   });
 
   it('detects a restored focus session from localStorage', () => {
