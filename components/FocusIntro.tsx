@@ -1,0 +1,334 @@
+'use client';
+
+import { useCallback, useEffect, useRef } from 'react';
+import {
+  INTRO_ART_FALLBACK,
+  INTRO_ART_SRC,
+  INTRO_AUDIO,
+  INTRO_LINES,
+  INTRO_SKIP_HINT,
+  INTRO_SKIP_MS,
+  INTRO_TIMELINE,
+  introClockSpeed,
+  introFrame,
+  introSoundEvents,
+  isIntroSkipKey,
+  type IntroAudioName,
+} from '@/lib/intro';
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+export function FocusIntro({
+  soundEnabled,
+  reducedMotion,
+  freezeAt = null,
+  onDone,
+}: {
+  soundEnabled: boolean;
+  reducedMotion: boolean;
+  freezeAt?: number | null;
+  onDone: () => void;
+}) {
+  const reduced = reducedMotion || prefersReducedMotion();
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const artRef = useRef<HTMLImageElement>(null);
+  const vigRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<HTMLDivElement>(null);
+  const cubeRef = useRef<HTMLDivElement>(null);
+  const restRef = useRef<HTMLDivElement>(null);
+  const fuseRef = useRef<HTMLDivElement>(null);
+  const fuseFillRef = useRef<HTMLSpanElement>(null);
+  const hintRef = useRef<HTMLParagraphElement>(null);
+  const faceRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const rafRef = useRef(0);
+  const startRef = useRef(0);
+  const doneRef = useRef(false);
+  const skippingRef = useRef(false);
+  const depthRef = useRef(0);
+  const audioRef = useRef<{
+    ctx: AudioContext;
+    gain: GainNode;
+    sources: AudioBufferSourceNode[];
+  } | null>(null);
+
+  const layout = useCallback(() => {
+    const rest = restRef.current;
+    const scene = sceneRef.current;
+    const fuse = fuseRef.current;
+    if (!rest || !scene || !fuse) return;
+    const fs = parseFloat(getComputedStyle(rest).fontSize) || 34;
+    const height = Math.round(fs * 1.8);
+    const width = Math.round(window.innerWidth * 0.94);
+    const depth = height / 2;
+    depthRef.current = depth;
+    const root = overlayRef.current;
+    if (root) {
+      root.style.setProperty('--intro-w', `${width}px`);
+      root.style.setProperty('--intro-h', `${height}px`);
+    }
+    scene.style.perspective = '1200px';
+    faceRefs.current.forEach((face, i) => {
+      if (!face) return;
+      face.style.transform = `rotateX(${-i * 90}deg) translateZ(${depth}px)`;
+    });
+    fuse.style.marginTop = `${Math.round(height * 0.62)}px`;
+    const longest = INTRO_LINES[1];
+    rest.style.fontSize = '';
+    rest.style.letterSpacing = '';
+    rest.textContent = longest;
+    const available = Math.max(200, window.innerWidth - 24);
+    let spacing = parseFloat(getComputedStyle(rest).letterSpacing) || fs * 0.3;
+    while (rest.scrollWidth > available && spacing > fs * 0.06) {
+      spacing -= 0.4;
+      rest.style.letterSpacing = `${Math.max(fs * 0.06, spacing)}px`;
+    }
+    if (rest.scrollWidth > available && rest.scrollWidth > 0) {
+      const next = Math.max(11, fs * (available / rest.scrollWidth));
+      rest.style.fontSize = `${next}px`;
+    }
+    const fittedSize = rest.style.fontSize;
+    const fittedSpacing = rest.style.letterSpacing;
+    faceRefs.current.forEach((face) => {
+      if (!face) return;
+      if (fittedSize) face.style.fontSize = fittedSize;
+      if (fittedSpacing) face.style.letterSpacing = fittedSpacing;
+    });
+    rest.textContent = '';
+  }, []);
+
+  const applyFrame = useCallback(
+    (t: number) => {
+      const frame = introFrame(t, reduced);
+      const art = artRef.current;
+      const vig = vigRef.current;
+      const scene = sceneRef.current;
+      const cube = cubeRef.current;
+      const rest = restRef.current;
+      const fuse = fuseRef.current;
+      const fill = fuseFillRef.current;
+      const hint = hintRef.current;
+      const overlay = overlayRef.current;
+      if (art) {
+        art.style.opacity = String(frame.artOpacity);
+        art.style.transform = frame.artTransform;
+        art.style.filter = frame.artFilter;
+      }
+      if (vig) vig.style.opacity = String(frame.vigOpacity);
+      if (scene) scene.style.visibility = frame.sceneVisible ? 'visible' : 'hidden';
+      if (cube) {
+        const d = depthRef.current;
+        cube.style.transform = frame.sceneVisible
+          ? `translateZ(${-d}px) rotateX(${frame.cubeAngle}deg)`
+          : 'none';
+      }
+      if (rest) {
+        rest.textContent = frame.restText;
+        rest.style.opacity = String(frame.restOpacity);
+        rest.style.transform = frame.restScale === 1 ? 'none' : `scale(${frame.restScale})`;
+        rest.style.textShadow =
+          frame.restGlow > 0
+            ? `0 0 ${14 * frame.restGlow}px rgba(255,255,255,${0.45 * frame.restGlow}), 0 0 18px rgba(0,0,0,.9), 0 0 4px rgba(0,0,0,.85)`
+            : '';
+      }
+      if (fuse) fuse.style.opacity = String(frame.fuseOpacity);
+      if (fill) fill.style.transform = `scaleX(${frame.fuseScale})`;
+      if (hint) hint.style.opacity = String(frame.hintOpacity);
+      if (overlay && !skippingRef.current) overlay.style.opacity = String(frame.overlayOpacity);
+      return frame.done;
+    },
+    [reduced]
+  );
+
+  const stopAudio = useCallback((fade = 0.06) => {
+    const run = audioRef.current;
+    if (!run) return;
+    audioRef.current = null;
+    const now = run.ctx.currentTime;
+    try {
+      run.gain.gain.cancelScheduledValues(now);
+      run.gain.gain.setValueAtTime(run.gain.gain.value, now);
+      run.gain.gain.linearRampToValueAtTime(0, now + fade);
+    } catch {
+      /* fail silent */
+    }
+    window.setTimeout(() => {
+      run.sources.forEach((src) => {
+        try {
+          src.stop();
+        } catch {
+          /* already stopped */
+        }
+      });
+      try {
+        run.gain.disconnect();
+      } catch {
+        /* ignore */
+      }
+    }, fade * 1000 + 50);
+  }, []);
+
+  const startAudio = useCallback(async () => {
+    if (!soundEnabled) return;
+    try {
+      const AC =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      await ctx.resume();
+      if (ctx.state !== 'running') {
+        await ctx.close().catch(() => undefined);
+        return;
+      }
+      const names = Object.keys(INTRO_AUDIO) as IntroAudioName[];
+      const buffers = Object.fromEntries(
+        await Promise.all(
+          names.map(async (name) => {
+            const res = await fetch(INTRO_AUDIO[name]);
+            const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+            return [name, buf] as const;
+          })
+        )
+      ) as Record<IntroAudioName, AudioBuffer>;
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -3;
+      comp.ratio.value = 8;
+      comp.attack.value = 0.002;
+      comp.release.value = 0.1;
+      comp.connect(ctx.destination);
+      const gain = ctx.createGain();
+      gain.connect(comp);
+      const t0 = ctx.currentTime + 0.02;
+      const sources = introSoundEvents().map((event) => {
+        const src = ctx.createBufferSource();
+        src.buffer = buffers[event.name];
+        const g = ctx.createGain();
+        g.gain.value = event.volume;
+        src.connect(g);
+        g.connect(gain);
+        src.start(Math.max(t0 + event.at, ctx.currentTime));
+        return src;
+      });
+      audioRef.current = { ctx, gain, sources };
+    } catch {
+      /* browsers may block autoplay; fail silent */
+    }
+  }, [soundEnabled]);
+
+  const finish = useCallback(() => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    cancelAnimationFrame(rafRef.current);
+    stopAudio(0.15);
+    onDone();
+  }, [onDone, stopAudio]);
+
+  const skip = useCallback(() => {
+    if (doneRef.current || skippingRef.current) return;
+    skippingRef.current = true;
+    cancelAnimationFrame(rafRef.current);
+    const overlay = overlayRef.current;
+    if (overlay) {
+      overlay.classList.add('focus-intro-fade');
+      overlay.style.opacity = '0';
+    }
+    stopAudio(0.15);
+    window.setTimeout(() => finish(), INTRO_SKIP_MS);
+  }, [finish, stopAudio]);
+
+  useEffect(() => {
+    layout();
+    const onResize = () => layout();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [layout]);
+
+  useEffect(() => {
+    doneRef.current = false;
+    skippingRef.current = false;
+    if (freezeAt != null) {
+      applyFrame(freezeAt);
+      return;
+    }
+    const speed = introClockSpeed(reduced);
+    const tick = (now: number) => {
+      if (!startRef.current) startRef.current = now;
+      const t = ((now - startRef.current) / 1000) * speed;
+      const done = applyFrame(Math.min(t, INTRO_TIMELINE.total));
+      if (done) finish();
+      else rafRef.current = requestAnimationFrame(tick);
+    };
+    applyFrame(0);
+    void startAudio();
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      stopAudio();
+    };
+  }, [applyFrame, finish, freezeAt, reduced, startAudio, stopAudio]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!isIntroSkipKey(event.key)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      skip();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [skip]);
+
+  return (
+    <div
+      ref={overlayRef}
+      data-testid="focus-intro"
+      className="focus-intro"
+      role="dialog"
+      aria-label="Opening intro"
+      onPointerDown={skip}
+    >
+      <link rel="preload" as="image" href={INTRO_ART_SRC} />
+      <img
+        ref={artRef}
+        data-testid="focus-intro-art"
+        className="focus-intro-art"
+        src={INTRO_ART_SRC}
+        alt=""
+        width={2400}
+        height={1347}
+        fetchPriority="high"
+        onError={(event) => {
+          event.currentTarget.src = INTRO_ART_FALLBACK;
+        }}
+      />
+      <div ref={vigRef} className="focus-intro-vignette" aria-hidden />
+      <div className="focus-intro-captions">
+        <div ref={sceneRef} className="focus-intro-scene">
+          <div ref={cubeRef} className="focus-intro-cube">
+            {INTRO_LINES.map((line, index) => (
+              <div
+                key={`face-${index}`}
+                ref={(node) => {
+                  faceRefs.current[index] = node;
+                }}
+                className="focus-intro-face"
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div ref={restRef} data-testid="focus-intro-caption" className="focus-intro-rest" />
+        <div ref={fuseRef} className="focus-intro-fuse" aria-hidden>
+          <span ref={fuseFillRef} />
+        </div>
+      </div>
+      <p ref={hintRef} data-testid="focus-intro-hint" className="focus-intro-hint">
+        {INTRO_SKIP_HINT}
+      </p>
+    </div>
+  );
+}

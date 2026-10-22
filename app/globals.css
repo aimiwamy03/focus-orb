@@ -384,3 +384,156 @@ body {
   color: #ececee;
   border-bottom-color: oklch(0.78 0.08 230);
 }
+
+@font-face {
+  font-family: 'Intro Cormorant';
+  font-style: normal;
+  font-weight: 600;
+  src: url('/intro/cormorant.woff2') format('woff2');
+  font-display: swap;
+}
+
+.focus-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: #000;
+  overflow: hidden;
+  opacity: 1;
+  cursor: default;
+}
+
+.focus-intro-fade {
+  transition: opacity 300ms ease;
+}
+
+.focus-intro-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+  transform-origin: 50% 48%;
+  pointer-events: none;
+}
+
+.focus-intro-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse 62% 30% at 50% 50%,
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.6) 45%,
+    rgba(0, 0, 0, 0.25) 75%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.focus-intro-captions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.focus-intro-face,
+.focus-intro-rest {
+  font-family: 'Intro Cormorant', 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  font-size: clamp(18px, 3.2vw, 40px);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.85);
+  padding-left: 0.3em;
+}
+
+@media (max-width: 520px) {
+  .focus-intro-face,
+  .focus-intro-rest {
+    letter-spacing: 0.12em;
+    padding-left: 0.12em;
+  }
+}
+
+.focus-intro-scene {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--intro-w);
+  height: var(--intro-h);
+  margin-left: calc(var(--intro-w) / -2);
+  margin-top: calc(var(--intro-h) / -2);
+  perspective: 1200px;
+  perspective-origin: 50% 50%;
+  visibility: hidden;
+}
+
+.focus-intro-cube {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.focus-intro-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+}
+
+.focus-intro-rest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--intro-h);
+  margin-top: calc(var(--intro-h) / -2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.focus-intro-fuse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 160px;
+  margin-left: -80px;
+  height: 1px;
+  background: rgba(236, 236, 238, 0.1);
+  opacity: 0;
+  overflow: hidden;
+}
+
+.focus-intro-fuse span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  background: rgba(236, 236, 238, 0.55);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+
+.focus-intro-hint {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  margin: 0;
+  color: #8a8a90;
+  font: 15px -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  opacity: 0;
+  pointer-events: none;
+}

@@ -4,7 +4,8 @@ import type { FocusLogEnded, FocusLogEntry } from './focusLog';
 
 export type FocusLogDraft = Omit<FocusLogEntry, 'id'>;
 
-const STORAGE_KEY = 'focusOrb:manualFocus';
+export const MANUAL_FOCUS_KEY = 'focusOrb:manualFocus';
+const STORAGE_KEY = MANUAL_FOCUS_KEY;
 
 interface FocusSession {
   startTime: number;
