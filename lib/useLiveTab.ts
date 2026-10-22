@@ -18,6 +18,7 @@ export function useLiveTab(input: {
   const state = faviconStateFor({
     scatter: input.scatter,
     state: input.model.state,
+    isManualFocus: input.isManualFocus,
   });
 
   const lastStateRef = useRef<FaviconState | null>(null);

@@ -18,6 +18,7 @@ import {
   CLEAR_LOG_PROMPT,
   KEEP_LOG_LABEL,
 } from '@/lib/focusLog';
+import { SHOW_BACKDROP_LABEL } from '@/lib/backdrop';
 import { INTRO_SOUND_LABEL, PLAY_INTRO_LABEL } from '@/lib/intro';
 
 type AuthMethod = 'google' | 'ical' | null;
@@ -48,6 +49,8 @@ interface SettingsProps {
   setPlayIntro?: (value: boolean) => void;
   introSound?: boolean;
   setIntroSound?: (value: boolean) => void;
+  showBackdrop?: boolean;
+  setShowBackdrop?: (value: boolean) => void;
 }
 
 export function Settings({
@@ -75,6 +78,8 @@ export function Settings({
   setPlayIntro,
   introSound = false,
   setIntroSound,
+  showBackdrop = true,
+  setShowBackdrop,
 }: SettingsProps) {
   const [tempUrl, setTempUrl] = useState(calendarUrl);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -257,18 +262,32 @@ export function Settings({
           </div>
         </div>
 
-        {setShowAgenda ? (
+        {setShowAgenda || setShowBackdrop ? (
           <div className="space-y-2">
-            <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
-              <input
-                type="checkbox"
-                data-testid="show-agenda"
-                checked={showAgenda}
-                onChange={(event) => setShowAgenda(event.target.checked)}
-                className="rounded border-orb-quiet bg-black/30"
-              />
-              {SHOW_AGENDA_LABEL}
-            </label>
+            {setShowAgenda ? (
+              <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
+                <input
+                  type="checkbox"
+                  data-testid="show-agenda"
+                  checked={showAgenda}
+                  onChange={(event) => setShowAgenda(event.target.checked)}
+                  className="rounded border-orb-quiet bg-black/30"
+                />
+                {SHOW_AGENDA_LABEL}
+              </label>
+            ) : null}
+            {setShowBackdrop ? (
+              <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
+                <input
+                  type="checkbox"
+                  data-testid="show-backdrop"
+                  checked={showBackdrop}
+                  onChange={(event) => setShowBackdrop(event.target.checked)}
+                  className="rounded border-orb-quiet bg-black/30"
+                />
+                {SHOW_BACKDROP_LABEL}
+              </label>
+            ) : null}
           </div>
         ) : null}
 

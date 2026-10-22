@@ -90,6 +90,35 @@ describe('Settings sheet', () => {
     expect(setIntroSound).toHaveBeenCalledWith(true);
   });
 
+  it('toggles Backdrop and defaults it on', () => {
+    const setShowBackdrop = vi.fn();
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod="google"
+        selectAuthMethod={() => {}}
+        isGoogleConnected
+        disconnectGoogle={async () => {}}
+        calendars={MOCK_GOOGLE_CALENDARS}
+        selectedCalendarIds={['primary']}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        showBackdrop
+        setShowBackdrop={setShowBackdrop}
+      />
+    );
+    const toggle = screen.getByTestId('show-backdrop') as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    expect(screen.getByText('Backdrop')).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(setShowBackdrop).toHaveBeenCalledWith(false);
+  });
+
   it('asks before clearing the log', () => {
     const onClearLog = vi.fn();
     render(

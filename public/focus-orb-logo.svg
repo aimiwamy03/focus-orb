@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<!-- Focus Orb mark. Blue = oklch(0.78 0.08 230) -->
+<circle cx="512.00" cy="512.00" r="128.00" fill="#80C1E1"/>
+<circle cx="512.00" cy="212.00" r="38.00" fill="#ECECEE"/>
+<circle cx="688.34" cy="269.29" r="38.00" fill="#ECECEE"/>
+<circle cx="797.32" cy="419.29" r="38.00" fill="#ECECEE"/>
+<circle cx="797.32" cy="604.71" r="38.00" fill="#ECECEE"/>
+<circle cx="688.34" cy="754.71" r="38.00" fill="#ECECEE"/>
+<circle cx="512.00" cy="812.00" r="38.00" fill="#ECECEE"/>
+<circle cx="335.66" cy="754.71" r="38.00" fill="#ECECEE"/>
+<circle cx="226.68" cy="604.71" r="38.00" fill="#ECECEE"/>
+<circle cx="226.68" cy="419.29" r="38.00" fill="#ECECEE"/>
+<circle cx="335.66" cy="269.29" r="38.00" fill="#ECECEE"/>
+</svg>
