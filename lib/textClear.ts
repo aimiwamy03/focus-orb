@@ -32,10 +32,8 @@ export function rectOverlapsCircle(
 
 export function textClearRectsOnDisk(
   rects: ClearRect[],
-  disk: { centerX: number; centerY: number; radius: number },
-  compact = false
+  disk: { centerX: number; centerY: number; radius: number }
 ): ClearRect[] {
-  if (compact) return [];
   return rects.filter((rect) =>
     rectOverlapsCircle(rect, disk.centerX, disk.centerY, disk.radius)
   );

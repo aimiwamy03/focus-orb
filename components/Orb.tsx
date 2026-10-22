@@ -14,7 +14,7 @@ import {
   visibleAgendaSections,
 } from '@/lib/agenda';
 import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, statusLineText } from '@/lib/day';
-import { MIN_FIT_HEIGHT, orbLayout, type OrbLayout } from '@/lib/layout';
+import { orbLayout, textClearCloudRadius, type OrbLayout } from '@/lib/layout';
 import {
   DurationChoice,
   FALLBACK_TASK,
@@ -285,8 +285,12 @@ export function Orb() {
     const canvas = canvasRef.current;
     const viewW = canvas?.clientWidth || window.innerWidth;
     const viewH = canvas?.clientHeight || window.innerHeight;
-    const stackH = stackRef.current?.getBoundingClientRect().height ?? 0;
-    layoutRef.current = orbLayout(viewW, viewH, stackH);
+    const stack = stackRef.current;
+    const text = stack?.querySelector<HTMLElement>(
+      '[data-testid="prompt-context"], [data-testid="focus-task-name"], [data-testid="meeting-soon-prompt"], [data-text-clear]'
+    );
+    const textTop = text?.getBoundingClientRect().top ?? stack?.getBoundingClientRect().top ?? viewH;
+    layoutRef.current = orbLayout(viewW, viewH, Math.max(0, viewH - textTop));
     setViewSize((current) =>
       current.w === viewW && current.h === viewH ? current : { w: viewW, h: viewH }
     );
@@ -593,12 +597,12 @@ export function Orb() {
         pointsRef.current[idx].threshold = Math.random();
       }
       
-      // Draw all points, skipping or fading any that sit under overlapping text.
-      const clearRects = textClearRectsOnDisk(
-        collectTextClearRects(),
-        layout,
-        canvas.height / dpr < MIN_FIT_HEIGHT
-      );
+      // Safety net only: clear text that the scatter cloud actually reaches.
+      const clearRects = textClearRectsOnDisk(collectTextClearRects(), {
+        centerX: layout.centerX,
+        centerY: layout.centerY,
+        radius: textClearCloudRadius(layout.radius, visualScatter),
+      });
       ctx.fillStyle = '#ffffff';
       
       for (const point of pointsRef.current) {

@@ -130,6 +130,11 @@ if (phase === 'after') {
   await shot(narrow, 'agenda_hidden_686x386');
   await narrow.close();
 
+  const soon = await browser.newPage({ viewport: { width: 1280, height: 640 } });
+  await open(soon, '/?mock=pre-meeting&now=13:26');
+  await shot(soon, 'meeting_soon_1280x640');
+  await soon.close();
+
   const afterMeet = await browser.newPage({
     viewport: { width: 1280, height: 800 },
   });

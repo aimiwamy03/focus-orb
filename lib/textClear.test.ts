@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MIN_FIT_HEIGHT, orbLayout } from './layout';
+import { maxDrawnExtent, orbLayout } from './layout';
 import {
   TEXT_CLEAR_FALLOFF,
   TEXT_CLEAR_PAD,
@@ -137,8 +137,14 @@ describe('text-clear does not cut the disk', () => {
     'draws every in-radius point at %i x %i with no rect subtraction',
     (width, height, stack) => {
       const layout = orbLayout(width, height, stack);
-      const compact = height < MIN_FIT_HEIGHT;
-      const applied = textClearRectsOnDisk(stackRects(width, height, stack), layout, compact);
+      const applied = textClearRectsOnDisk(
+        stackRects(width, height, stack),
+        {
+          centerX: layout.centerX,
+          centerY: layout.centerY,
+          radius: maxDrawnExtent(layout.radius),
+        }
+      );
       expect(applied).toEqual([]);
       for (const [x, y] of sampleDisk(layout)) {
         expect(textClearAlpha(x, y, applied)).toBe(1);
