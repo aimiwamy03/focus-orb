@@ -30,7 +30,7 @@ describe('sanitizeTrackEvent', () => {
 });
 
 describe('track', () => {
-  const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+  const fetchMock = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
 
   beforeEach(() => {
     fetchMock.mockClear();
@@ -44,13 +44,16 @@ describe('track', () => {
   it('posts sanitized events to /api/events', () => {
     track({ name: 'block_started_by_voice', minutes: 40, adjusted: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/events');
-    expect(init?.method).toBe('POST');
-    expect(JSON.parse(String(init?.body))).toEqual({
-      name: 'block_started_by_voice',
-      properties: { minutes: 40, adjusted: false },
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/events',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'block_started_by_voice',
+          properties: { minutes: 40, adjusted: false },
+        }),
+      })
+    );
   });
 });
 
@@ -69,7 +72,7 @@ describe('forwardToPostHog', () => {
   });
 
   it('forwards only allowed properties when a key is set', async () => {
-    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 }));
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(null, { status: 200 }));
     await expect(
       forwardToPostHog(
         { name: 'block_started_by_voice', properties: { minutes: 30, adjusted: true } },
@@ -77,8 +80,11 @@ describe('forwardToPostHog', () => {
         fetchImpl
       )
     ).resolves.toBe('sent');
-    const [url, init] = fetchImpl.mock.calls[0];
-    expect(url).toBe('https://example.posthog/capture/');
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://example.posthog/capture/',
+      expect.objectContaining({ method: 'POST' })
+    );
+    const init = fetchImpl.mock.calls[0]?.[1];
     const body = JSON.parse(String(init?.body));
     expect(body.event).toBe('block_started_by_voice');
     expect(body.properties).toMatchObject({ minutes: 30, adjusted: true });
