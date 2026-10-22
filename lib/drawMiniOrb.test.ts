@@ -33,4 +33,16 @@ describe('sizeMiniCanvas', () => {
     expect(canvas.width).toBe(240);
     expect(canvas.height).toBe(180);
   });
+
+  it('sizes a large 600x600 PiP from the CSS box', () => {
+    const canvas = document.createElement('canvas');
+    Object.defineProperty(canvas, 'clientWidth', { configurable: true, value: 600 });
+    Object.defineProperty(canvas, 'clientHeight', { configurable: true, value: 566 });
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+    expect(sizeMiniCanvas(canvas)).toBe(2);
+    expect(canvas.width).toBe(1200);
+    expect(canvas.height).toBe(1132);
+    expect(canvas.style.width).toBe('100%');
+    expect(canvas.style.height).toBe('100%');
+  });
 });

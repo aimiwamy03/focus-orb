@@ -23,20 +23,28 @@ export function useMiniWindow(options: {
   const measurePip = useCallback(() => {
     const win = winRef.current;
     if (!win || win.closed) return;
-    applyPipDocumentStyle(win.document);
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    sizeMiniCanvas(canvas, {
+    applyPipDocumentStyle(win.document, {
       width: win.innerWidth,
       height: win.innerHeight,
-      dpr: win.devicePixelRatio || 1,
     });
+    const root = win.document.body.firstElementChild;
+    if (root instanceof HTMLElement) {
+      root.style.width = `${win.innerWidth}px`;
+      root.style.height = `${win.innerHeight}px`;
+    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // Size from the canvas CSS box (the stage above the status line),
+    // never from the full window. A window-sized buffer in a shorter
+    // stage is what shifts a large PiP orb up and left.
+    sizeMiniCanvas(canvas);
   }, []);
 
   const close = useCallback(() => {
     const win = winRef.current;
     winRef.current = null;
     setContainer(null);
+    onClosedRef.current();
     if (win && !win.closed) {
       try {
         win.close();
@@ -61,10 +69,13 @@ export function useMiniWindow(options: {
       const pip = window.documentPictureInPicture;
       if (!pip) return false;
       const win = await pip.requestWindow({ width: MINI_SIZE, height: MINI_SIZE });
-      applyPipDocumentStyle(win.document);
+      applyPipDocumentStyle(win.document, {
+        width: win.innerWidth,
+        height: win.innerHeight,
+      });
       const root = win.document.createElement('div');
-      root.style.width = '100%';
-      root.style.height = '100%';
+      root.style.width = `${win.innerWidth}px`;
+      root.style.height = `${win.innerHeight}px`;
       win.document.body.appendChild(root);
       winRef.current = win;
       setContainer(root);

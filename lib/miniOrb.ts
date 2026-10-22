@@ -32,15 +32,21 @@ export function miniOrbLayout(
   };
 }
 
-export function applyPipDocumentStyle(doc: Document) {
+export function applyPipDocumentStyle(
+  doc: Document,
+  box?: { width: number; height: number }
+) {
+  const win = doc.defaultView;
+  const width = Math.max(1, Math.round(box?.width ?? win?.innerWidth ?? MINI_SIZE));
+  const height = Math.max(1, Math.round(box?.height ?? win?.innerHeight ?? MINI_SIZE));
   const html = doc.documentElement;
   const body = doc.body;
   html.style.margin = '0';
-  html.style.width = '100%';
-  html.style.height = '100%';
+  html.style.width = `${width}px`;
+  html.style.height = `${height}px`;
   body.style.margin = '0';
-  body.style.width = '100%';
-  body.style.height = '100%';
+  body.style.width = `${width}px`;
+  body.style.height = `${height}px`;
   body.style.background = MINI_BG;
   body.style.overflow = 'hidden';
 }

@@ -61,6 +61,8 @@ async function assertCentered(page, width, height) {
       padRight: statusStyle.paddingRight,
       canvasW: canvas.width,
       canvasH: canvas.height,
+      canvasCssW: canvas.clientWidth,
+      canvasCssH: canvas.clientHeight,
       dpr: window.devicePixelRatio || 1,
     };
   });
@@ -76,11 +78,14 @@ async function assertCentered(page, width, height) {
   if (info.padLeft !== info.padRight) {
     throw new Error(`status padding ${info.padLeft}/${info.padRight} is not symmetric`);
   }
-  if (Math.abs(info.canvasW - Math.round(width * info.dpr)) > 1) {
-    throw new Error(`canvas width ${info.canvasW} does not match ${width} * dpr ${info.dpr}`);
+  if (Math.abs(info.canvasW - Math.round(info.canvasCssW * info.dpr)) > 1) {
+    throw new Error(`canvas width ${info.canvasW} does not match CSS ${info.canvasCssW} * dpr ${info.dpr}`);
   }
-  if (Math.abs(info.canvasH - Math.round(height * info.dpr)) > 1) {
-    throw new Error(`canvas height ${info.canvasH} does not match ${height} * dpr ${info.dpr}`);
+  if (Math.abs(info.canvasH - Math.round(info.canvasCssH * info.dpr)) > 1) {
+    throw new Error(`canvas height ${info.canvasH} does not match CSS ${info.canvasCssH} * dpr ${info.dpr}`);
+  }
+  if (info.canvasCssH > height - 8) {
+    throw new Error(`mini canvas CSS height ${info.canvasCssH} ate the status band in ${width}x${height}`);
   }
 }
 

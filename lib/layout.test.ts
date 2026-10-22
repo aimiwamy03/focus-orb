@@ -59,4 +59,25 @@ describe('orbLayout fits the bottom stack', () => {
     expect(short.radius).toBeLessThanOrEqual(tall.radius);
     expect(short.centerY).toBeLessThan(tall.centerY + 40);
   });
+
+  it.each([
+    [1024, 920],
+    [900, 1200],
+  ])('keeps a square or tall %i x %i orb inside the available band', (width, height) => {
+    const layout = orbLayout(width, height, stackAsk);
+    expect(contentFits(height, layout, stackAsk)).toBe(true);
+    expect(layout.centerX).toBeCloseTo(width / 2);
+    expect(layout.centerY + layout.radius).toBeLessThanOrEqual(height - stackAsk + 1);
+    expect(layout.centerY - layout.radius).toBeGreaterThanOrEqual(0);
+    expect(layout.radius).toBeGreaterThanOrEqual(52);
+  });
+
+  it('recomputes after a 1280x640 window is resized to 1024x920', () => {
+    const before = orbLayout(1280, 640, stackAsk);
+    const after = orbLayout(1024, 920, stackAsk);
+    expect(contentFits(920, after, stackAsk)).toBe(true);
+    expect(after.centerX).toBeCloseTo(512);
+    expect(after.centerX).not.toBeCloseTo(before.centerX);
+    expect(after.centerY + after.radius).toBeLessThanOrEqual(920 - stackAsk + 1);
+  });
 });

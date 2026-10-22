@@ -1,4 +1,5 @@
 import { collectTextClearRects, textClearAlpha, type ClearRect } from './textClear';
+import { ensureOrbCanvasSize, readCssBox, sizeOrbCanvas } from './orbCanvas';
 import { MINI_BG, MINI_SIZE, miniOrbLayout } from './miniOrb';
 
 export interface MiniDrawFrame {
@@ -78,41 +79,18 @@ export function readMiniCssSize(canvas: HTMLCanvasElement): {
   height: number;
   dpr: number;
 } {
-  const win = canvas.ownerDocument?.defaultView;
-  const dpr = win?.devicePixelRatio || 1;
-  const parent = canvas.parentElement;
-  const width = canvas.clientWidth || parent?.clientWidth || 0;
-  const height = canvas.clientHeight || parent?.clientHeight || 0;
-  return {
-    width: Math.max(1, width || MINI_SIZE),
-    height: Math.max(1, height || MINI_SIZE),
-    dpr,
-  };
+  return readCssBox(canvas, MINI_SIZE);
 }
 
 export function sizeMiniCanvas(
   canvas: HTMLCanvasElement,
   size?: { width: number; height: number; dpr?: number }
 ): number {
-  const measured = size ?? readMiniCssSize(canvas);
-  const dpr = measured.dpr ?? 1;
-  const width = Math.max(1, measured.width);
-  const height = Math.max(1, measured.height);
-  canvas.width = Math.max(1, Math.round(width * dpr));
-  canvas.height = Math.max(1, Math.round(height * dpr));
-  canvas.style.width = '100%';
-  canvas.style.height = '100%';
-  return dpr;
+  return sizeOrbCanvas(canvas, size, MINI_SIZE).dpr;
 }
 
 export function ensureMiniCanvasSize(canvas: HTMLCanvasElement): number {
-  const { width, height, dpr } = readMiniCssSize(canvas);
-  const nextW = Math.max(1, Math.round(width * dpr));
-  const nextH = Math.max(1, Math.round(height * dpr));
-  if (canvas.width !== nextW || canvas.height !== nextH) {
-    return sizeMiniCanvas(canvas, { width, height, dpr });
-  }
-  return dpr;
+  return ensureOrbCanvasSize(canvas, MINI_SIZE).dpr;
 }
 
 export function drawMiniOrb(
@@ -124,7 +102,7 @@ export function drawMiniOrb(
   const dpr = options.dpr ?? 1;
   const width = canvas.width;
   const height = canvas.height;
-  const layout = miniOrbLayout(width / dpr, height / dpr);
+  const layout = miniOrbLayout(width / dpr, height / dpr, 0);
   const cx = layout.centerX * dpr;
   const cy = layout.centerY * dpr;
   const radius = layout.radius * dpr;
