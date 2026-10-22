@@ -58,6 +58,14 @@ export function isSkippedEvent(event: CalendarEvent): boolean {
   return false;
 }
 
+/** Agenda listing: keep free/transparent and fromGmail events, still hide all-day and declined. */
+export function hidesFromAgenda(event: CalendarEvent): boolean {
+  if (event.isAllDay) return true;
+  if (event.declined) return true;
+  if (event.status === 'cancelled') return true;
+  return false;
+}
+
 export function filterDayEvents(events: CalendarEvent[], now: Date): CalendarEvent[] {
   const sod = startOfDay(now);
   const eod = endOfDay(now);
