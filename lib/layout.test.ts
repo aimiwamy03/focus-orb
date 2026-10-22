@@ -4,6 +4,7 @@ import {
   firstOverlappingPair,
   fullyInsideViewport,
   MIN_FIT_HEIGHT,
+  MIN_PRESENCE_RADIUS,
   orbDiskRect,
   orbLayout,
   rectsOverlap,
@@ -51,7 +52,7 @@ describe('orbLayout fits the bottom stack', () => {
     const layout = orbLayout(686, 386, stack);
     expect(contentFits(386, layout, stack)).toBe(true);
     expect(layout.centerY + layout.radius).toBeLessThanOrEqual(386 - stack + 1);
-    expect(layout.radius).toBeGreaterThanOrEqual(28);
+    expect(layout.radius).toBeGreaterThanOrEqual(MIN_PRESENCE_RADIUS);
     expect(layout.radius).toBeLessThan(orbLayout(1280, 800, stackAsk).radius);
   });
 

@@ -14,7 +14,7 @@ import {
   visibleAgendaSections,
 } from '@/lib/agenda';
 import { densityForModel, extractJoinUrl, hoverDetailText, isHeadsUp, minutesBetween, statusLineText } from '@/lib/day';
-import { orbLayout, type OrbLayout } from '@/lib/layout';
+import { MIN_FIT_HEIGHT, orbLayout, type OrbLayout } from '@/lib/layout';
 import {
   DurationChoice,
   FALLBACK_TASK,
@@ -32,7 +32,7 @@ import {
   saveRecentTasks,
   untilMeetingDuration,
 } from '@/lib/focusPrompt';
-import { collectTextClearRects, textClearAlpha } from '@/lib/textClear';
+import { collectTextClearRects, textClearAlpha, textClearRectsOnDisk } from '@/lib/textClear';
 import {
   breathGlow,
   breathPhase,
@@ -593,8 +593,12 @@ export function Orb() {
         pointsRef.current[idx].threshold = Math.random();
       }
       
-      // Draw all points, skipping or fading any that sit under text.
-      const clearRects = collectTextClearRects();
+      // Draw all points, skipping or fading any that sit under overlapping text.
+      const clearRects = textClearRectsOnDisk(
+        collectTextClearRects(),
+        layout,
+        canvas.height / dpr < MIN_FIT_HEIGHT
+      );
       ctx.fillStyle = '#ffffff';
       
       for (const point of pointsRef.current) {

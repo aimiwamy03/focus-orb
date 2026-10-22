@@ -19,7 +19,8 @@ export const STACK_GAP = 20;
 export const MIN_RADIUS = 52;
 export const MIN_RADIUS_COMPACT = 28;
 export const STACK_TOP_PAD_COMPACT = 48;
-export const STACK_GAP_COMPACT = 10;
+export const STACK_GAP_COMPACT = 2;
+export const MIN_PRESENCE_RADIUS = 45;
 export const ORB_EDGE_PAD = 4;
 
 export function stackInsets(viewH: number): { topPad: number; gap: number } {

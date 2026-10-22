@@ -17,6 +17,30 @@ export function isVisibleClearTarget(el: Element): boolean {
   return true;
 }
 
+export function rectOverlapsCircle(
+  rect: ClearRect,
+  cx: number,
+  cy: number,
+  radius: number
+): boolean {
+  const closestX = Math.max(rect.left, Math.min(cx, rect.right));
+  const closestY = Math.max(rect.top, Math.min(cy, rect.bottom));
+  const dx = cx - closestX;
+  const dy = cy - closestY;
+  return dx * dx + dy * dy <= radius * radius;
+}
+
+export function textClearRectsOnDisk(
+  rects: ClearRect[],
+  disk: { centerX: number; centerY: number; radius: number },
+  compact = false
+): ClearRect[] {
+  if (compact) return [];
+  return rects.filter((rect) =>
+    rectOverlapsCircle(rect, disk.centerX, disk.centerY, disk.radius)
+  );
+}
+
 export function collectTextClearRects(root: ParentNode = document): ClearRect[] {
   const nodes = root.querySelectorAll('[data-text-clear]');
   const rects: ClearRect[] = [];
