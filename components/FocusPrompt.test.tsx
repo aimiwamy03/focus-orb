@@ -103,10 +103,12 @@ describe('Ask task field', () => {
 
   it('anchors the empty caret to a start-aligned Focus placeholder', () => {
     renderAsk('');
-    const input = screen.getByTestId('focus-task');
+    const input = screen.getByTestId('focus-task') as HTMLInputElement;
     expect(screen.getByTestId('focus-task-placeholder').textContent).toBe(FALLBACK_TASK);
+    expect(screen.getByTestId('ask-task-field').getAttribute('data-value')).toBe(FALLBACK_TASK);
     expect(input.className).toBe('ask-task');
     expect(input.className).not.toMatch(/text-center/);
+    expect(input.size).toBe(1);
   });
 
   it('hides the Focus placeholder once she types', () => {

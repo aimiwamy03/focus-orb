@@ -353,11 +353,10 @@ body {
 .ask-task-field {
   position: relative;
   display: inline-grid;
+  flex: 0 0 auto;
   justify-items: stretch;
   align-items: end;
-  width: max-content;
   max-width: 100%;
-  min-width: 0;
 }
 
 .ask-task-sizer,
@@ -384,8 +383,9 @@ body {
 }
 
 .ask-task {
+  box-sizing: border-box;
   width: 100%;
-  min-width: 1px;
+  min-width: 0;
   margin: 0;
   border: 0;
   background: transparent;
@@ -393,6 +393,7 @@ body {
   text-align: start;
   caret-color: #e8e8e8;
   outline: none;
+  field-sizing: content;
 }
 
 .ask-task::placeholder {

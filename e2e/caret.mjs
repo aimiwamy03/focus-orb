@@ -37,76 +37,146 @@ async function seed(page) {
   });
 }
 
-async function measureCaret(page) {
+async function measureEmpty(page) {
   return page.evaluate(() => {
+    const heading = document.querySelector('[data-testid="ask-heading"]');
     const input = document.querySelector('[data-testid="focus-task"]');
     const placeholder = document.querySelector('[data-testid="focus-task-placeholder"]');
-    if (!(input instanceof HTMLInputElement) || !placeholder) {
+    const field = document.querySelector('[data-testid="ask-task-field"]');
+    if (
+      !(heading instanceof HTMLElement) ||
+      !(input instanceof HTMLInputElement) ||
+      !(placeholder instanceof HTMLElement) ||
+      !(field instanceof HTMLElement)
+    ) {
       return { ok: false, reason: 'missing field' };
     }
     input.focus();
     const cs = getComputedStyle(input);
+    const headingBox = heading.getBoundingClientRect();
+    const placeholderBox = placeholder.getBoundingClientRect();
+    const fieldBox = field.getBoundingClientRect();
     const caretX =
       input.getBoundingClientRect().left +
       parseFloat(cs.paddingLeft) +
       parseFloat(cs.borderLeftWidth);
-    const placeholderLeft = placeholder.getBoundingClientRect().left;
+    const headingCx = headingBox.left + headingBox.width / 2;
+    const placeholderCx = placeholderBox.left + placeholderBox.width / 2;
+    const fieldCx = fieldBox.left + fieldBox.width / 2;
     return {
       ok: true,
       caretX,
-      placeholderLeft,
-      diff: Math.abs(caretX - placeholderLeft),
+      placeholderLeft: placeholderBox.left,
+      caretDiff: Math.abs(caretX - placeholderBox.left),
+      headingCx,
+      placeholderCx,
+      fieldCx,
+      centerDiff: Math.abs(placeholderCx - headingCx),
+      fieldCenterDiff: Math.abs(fieldCx - headingCx),
       align: cs.textAlign,
       value: input.value,
       placeholder: placeholder.textContent,
+      inputWidth: input.getBoundingClientRect().width,
+      placeholderWidth: placeholderBox.width,
     };
   });
 }
 
-async function runIn(browserType, name) {
+async function measureTyped(page) {
+  return page.evaluate(() => {
+    const heading = document.querySelector('[data-testid="ask-heading"]');
+    const input = document.querySelector('[data-testid="focus-task"]');
+    const field = document.querySelector('[data-testid="ask-task-field"]');
+    if (
+      !(heading instanceof HTMLElement) ||
+      !(input instanceof HTMLInputElement) ||
+      !(field instanceof HTMLElement)
+    ) {
+      return { ok: false, reason: 'missing typed field' };
+    }
+    const headingBox = heading.getBoundingClientRect();
+    const inputBox = input.getBoundingClientRect();
+    const fieldBox = field.getBoundingClientRect();
+    const headingCx = headingBox.left + headingBox.width / 2;
+    const textCx = inputBox.left + inputBox.width / 2;
+    const fieldCx = fieldBox.left + fieldBox.width / 2;
+    return {
+      ok: true,
+      headingCx,
+      textCx,
+      fieldCx,
+      centerDiff: Math.abs(textCx - headingCx),
+      fieldCenterDiff: Math.abs(fieldCx - headingCx),
+      align: getComputedStyle(input).textAlign,
+      value: input.value,
+      inputWidth: inputBox.width,
+    };
+  });
+}
+
+async function runIn(browserType, name, viewport) {
   const browser = await browserType.launch(
     browserType === chromium ? { args: ['--use-gl=angle'] } : {}
   );
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await browser.newPage({ viewport });
   await seed(page);
   await page.goto(`${BASE}/?mock=empty`, { waitUntil: 'networkidle' });
   await page.waitForSelector('[data-testid="focus-task"]');
   await page.waitForTimeout(400);
   await page.getByTestId('focus-task').click();
-  const empty = await measureCaret(page);
-  if (!empty.ok) fail(`${name} empty field missing: ${empty.reason}`);
+  const empty = await measureEmpty(page);
+  if (!empty.ok) fail(`${name} ${viewport.width} empty field missing: ${empty.reason}`);
   if (empty.align !== 'start' && empty.align !== 'left') {
     fail(`${name} empty input should be start-aligned, got ${empty.align}`);
   }
   if (empty.placeholder !== 'Focus') {
     fail(`${name} placeholder should be Focus, got ${empty.placeholder}`);
   }
-  if (empty.diff > 2) {
+  if (empty.caretDiff > 2) {
     fail(
-      `${name} empty caret x ${empty.caretX} should match placeholder left ${empty.placeholderLeft} within 2px (diff ${empty.diff})`
+      `${name} empty caret x ${empty.caretX} should match placeholder left ${empty.placeholderLeft} within 2px (diff ${empty.caretDiff})`
     );
   }
-  await publish(page, `ask_caret_empty_${name}.png`);
+  if (empty.centerDiff > 3) {
+    fail(
+      `${name} empty placeholder center ${empty.placeholderCx} should match heading center ${empty.headingCx} within 3px (diff ${empty.centerDiff})`
+    );
+  }
+  const tag = `${name}_${viewport.width}`;
+  await publish(page, `ask_caret_empty_${tag}.png`);
 
   await page.getByTestId('focus-task').fill('write the spec');
   await page.waitForTimeout(150);
   if ((await page.getByTestId('focus-task-placeholder').count()) !== 0) {
     fail(`${name} typed field should hide the Focus placeholder`);
   }
-  const typedAlign = await page.getByTestId('focus-task').evaluate((el) => getComputedStyle(el).textAlign);
-  if (typedAlign !== 'start' && typedAlign !== 'left') {
-    fail(`${name} typed input should stay start-aligned in a centered field, got ${typedAlign}`);
+  const typed = await measureTyped(page);
+  if (!typed.ok) fail(`${name} typed field missing: ${typed.reason}`);
+  if (typed.align !== 'start' && typed.align !== 'left') {
+    fail(`${name} typed input should stay start-aligned in a centered field, got ${typed.align}`);
   }
-  await publish(page, `ask_caret_typed_${name}.png`);
+  if (typed.centerDiff > 3) {
+    fail(
+      `${name} typed text center ${typed.textCx} should match heading center ${typed.headingCx} within 3px (diff ${typed.centerDiff})`
+    );
+  }
+  await publish(page, `ask_caret_typed_${tag}.png`);
   await page.close();
   await browser.close();
 }
 
-await runIn(chromium, 'chromium');
-try {
-  await runIn(webkit, 'webkit');
-} catch (error) {
-  fail(`WebKit caret check failed: ${error instanceof Error ? error.message : error}`);
+const viewports = [
+  { width: 1024, height: 800 },
+  { width: 1280, height: 800 },
+];
+
+for (const viewport of viewports) {
+  await runIn(chromium, 'chromium', viewport);
+  try {
+    await runIn(webkit, 'webkit', viewport);
+  } catch (error) {
+    fail(`WebKit caret check failed: ${error instanceof Error ? error.message : error}`);
+  }
 }
 
 if (process.exitCode) {

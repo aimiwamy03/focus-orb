@@ -412,13 +412,18 @@ export function FocusPrompt({
       {surface === 'ask' ? (
         <form onSubmit={onSubmit} className="flex w-full flex-col items-center gap-[length:var(--stack-gap)]">
           <label
+            data-testid="ask-heading"
             data-text-clear
             className="text-[length:var(--type-heading)] leading-tight tracking-wide text-orb-text"
           >
             {ASK_PROMPT}
           </label>
           <div className="ask-task-wrap">
-            <div className="ask-task-field">
+            <div
+              className="ask-task-field"
+              data-testid="ask-task-field"
+              data-value={task || FALLBACK_TASK}
+            >
               <span className="ask-task-sizer" aria-hidden>
                 {task || FALLBACK_TASK}
               </span>
@@ -435,6 +440,7 @@ export function FocusPrompt({
                 ref={inputRef}
                 data-testid="focus-task"
                 value={task}
+                size={1}
                 autoFocus
                 onChange={(event) => onTaskChange(event.target.value)}
                 onFocus={() => setMenu((current) => ({ ...current, focus: 'input' }))}
