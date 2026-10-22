@@ -28,7 +28,7 @@ export function ShortcutsCard({ onDismiss }: ShortcutsCardProps) {
         {SHORTCUT_ROWS.map((row) => (
           <li
             key={row.key}
-            className="flex items-center justify-center gap-2 text-[11px] leading-4 text-white/40"
+            className="flex items-center justify-center gap-2 text-[11px] leading-4 text-orb-quiet"
           >
             <KeyHint label={row.key} />
             <span>{row.action}</span>
@@ -39,7 +39,7 @@ export function ShortcutsCard({ onDismiss }: ShortcutsCardProps) {
         type="button"
         data-testid="shortcuts-got-it"
         onClick={onDismiss}
-        className="mt-2 text-[11px] tracking-wide text-white/45 hover:text-white/70"
+        className="mt-2 text-[11px] tracking-wide text-orb-quiet hover:text-orb-dim"
       >
         {GOT_IT_LABEL}
       </button>
