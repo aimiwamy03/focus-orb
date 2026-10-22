@@ -53,6 +53,7 @@ describe('isShortcutKey', () => {
     expect(isShortcutKey('p')).toBe(true);
     expect(isShortcutKey('m')).toBe(true);
     expect(isShortcutKey('l')).toBe(true);
+    expect(isShortcutKey('v')).toBe(true);
     expect(isShortcutKey('?')).toBe(false);
     expect(isShortcutKey('Enter')).toBe(false);
   });
@@ -70,8 +71,8 @@ describe('shortcuts storage and copy', () => {
   });
 
   it('lists the chrome shortcuts and has no em dashes', () => {
-    expect(SHORTCUT_ROWS).toHaveLength(6);
-    expect(SHORTCUT_ROWS.map((row) => row.key)).toEqual(['F', 'S', 'Space', 'P', 'M', 'L']);
+    expect(SHORTCUT_ROWS).toHaveLength(7);
+    expect(SHORTCUT_ROWS.map((row) => row.key)).toEqual(['F', 'S', 'Space', 'V', 'P', 'M', 'L']);
     const copy = [
       SHORTCUTS_LABEL,
       GOT_IT_LABEL,

@@ -10,10 +10,11 @@ describe('KeyHint', () => {
     expect(isSquareKeycap('S')).toBe(true);
     expect(isSquareKeycap('P')).toBe(true);
     expect(isSquareKeycap('L')).toBe(true);
+    expect(isSquareKeycap('V')).toBe(true);
     expect(isSquareKeycap('Space')).toBe(false);
     expect(isSquareKeycap('Enter')).toBe(false);
 
-    for (const letter of ['F', 'S', 'P', 'L']) {
+    for (const letter of ['F', 'S', 'P', 'L', 'V']) {
       cleanup();
       render(<KeyHint label={letter} />);
       const cap = screen.getByTestId(`keycap-${letter}`);

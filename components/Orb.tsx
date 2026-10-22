@@ -104,6 +104,9 @@ import { signInWithGoogle } from '@/app/actions';
 import { formatWhoopWindow, recordWhoopNudge, whoopBestWindow } from '@/lib/whoop';
 import { useWhoop } from '@/lib/useWhoop';
 import { StarDustBackdrop } from './StarDustBackdrop';
+import { VoiceMicButton, VoiceOverlay } from './VoiceOverlay';
+import { parseVoiceQuery, useVoiceStart, type VoicePending } from '@/lib/useVoiceStart';
+import { track } from '@/lib/track';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -146,6 +149,7 @@ export function Orb() {
   const plannedParam = searchParams.get('planned');
   const introParam = searchParams.get('intro');
   const introFreeze = parseIntroFreeze(searchParams.get('t'));
+  const voiceMock = parseVoiceQuery(searchParams.get('voice'));
   const whoop = useWhoop();
   const pipSupported = useSyncExternalStore(
     () => () => {},
@@ -187,6 +191,7 @@ export function Orb() {
   const logOpenRef = useRef(false);
   const introOpenRef = useRef(false);
   const showBackdropRef = useRef(true);
+  const startedByVoiceRef = useRef(false);
   const surfaceRef = useRef<PromptSurface | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
@@ -242,6 +247,12 @@ export function Orb() {
   } = useManualFocus({
     onFocusEnded: (draft) => {
       setFocusLog(recordFocusLog(logKeyRef.current, draft));
+      if (draft.ended === 'ended-session') return;
+      track({
+        name: 'block_completed',
+        minutes: Math.max(0, Math.round(draft.minutes)),
+        source: startedByVoiceRef.current ? 'voice' : 'manual',
+      });
     },
   });
 
@@ -813,6 +824,37 @@ export function Orb() {
     setShowShortcutsCard(false);
   }, []);
 
+  const beginVoiceFocus = useCallback(
+    (next: VoicePending) => {
+      startedByVoiceRef.current = true;
+      const name = resolveStartTask(next.label, loadLastTask(), recentTasks);
+      const nextRecent = rememberTask(name, recentTasks);
+      setRecentTasks(nextRecent);
+      saveRecentTasks(nextRecent);
+      saveLastTask(name);
+      saveLastDuration(next.minutes);
+      if (whoop.offerMinutes != null) {
+        recordWhoopNudge(whoop.suggestion?.lineKey ?? null, next.minutes, whoop.offerMinutes);
+      }
+      setTaskDraft('');
+      setStopConfirm(false);
+      setSessionConfirm(false);
+      dismissCompleted();
+      startFocus(next.minutes, name);
+      dismissShortcutsCard();
+    },
+    [dismissCompleted, dismissShortcutsCard, recentTasks, startFocus, whoop.offerMinutes, whoop.suggestion?.lineKey]
+  );
+
+  const voice = useVoiceStart({
+    enabled: !firstOpen && !miniOnly && !showSettings && !showLog && !showIntro,
+    mock: Boolean(voiceMock),
+    gapMinutes: day.gapMinutes,
+    nextEventTitle: day.nextEvent?.summary ?? null,
+    whoopOfferMinutes: whoop.mode === 'off' ? null : whoop.offerMinutes,
+    onStart: beginVoiceFocus,
+  });
+
   useEffect(() => {
     if (
       showIntro ||
@@ -929,6 +971,7 @@ export function Orb() {
     taskName?: string,
     choice: DurationChoice = durationChoice
   ) => {
+    startedByVoiceRef.current = false;
     const minutes = resolveDuration(choice, untilMinutes);
     const name = resolveStartTask(taskName ?? taskDraft, loadLastTask(), recentTasks);
     const nextRecent = rememberTask(name, recentTasks);
@@ -1244,6 +1287,31 @@ export function Orb() {
           else if (id === 'mini-only') void toggleMiniOnly();
           else if (id === 'log') openLog();
         }}
+      />
+
+      <VoiceMicButton
+        visible={!firstOpen && !miniOnly && !showSettings && !showLog && !showIntro}
+        holding={voice.phase === 'listening'}
+        onHoldStart={voice.holdStart}
+        onHoldEnd={voice.holdEnd}
+      />
+      <VoiceOverlay
+        phase={voice.phase}
+        liveTranscript={voice.liveTranscript}
+        mock={voice.mock}
+        mockInput={voice.mockInput}
+        onMockChange={voice.setMockInput}
+        onMockSubmit={voice.submitMock}
+        pending={voice.pending}
+        conflict={voice.conflict}
+        errorKind={voice.errorKind}
+        repeatMessage={voice.repeatMessage}
+        typedInput={voice.typedInput}
+        onTypedChange={voice.setTypedInput}
+        onTypedSubmit={voice.submitTyped}
+        onCancel={voice.cancelConfirm}
+        onYes={voice.conflictYes}
+        onNo={voice.conflictNo}
       />
 
       {miniWindow.portal}
