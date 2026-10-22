@@ -180,7 +180,7 @@ describe('buildDayModel', () => {
 describe('statusLineText', () => {
   it('describes a free stretch before a single meeting', () => {
     const model = buildDayModel([ev('Design sync', at(13, 30), at(14))], at(12));
-    expect(statusLineText(model, at(12))).toBe('Free until 1:30.');
+    expect(statusLineText(model, at(12))).toBe('Free until 1:30. Click the orb to focus.');
   });
 
   it('describes a free stretch before a back-to-back run', () => {
@@ -192,7 +192,7 @@ describe('statusLineText', () => {
       ],
       at(12)
     );
-    expect(statusLineText(model, at(12))).toBe('Free until 1:30.');
+    expect(statusLineText(model, at(12))).toBe('Free until 1:30. Click the orb to focus.');
   });
 
   it('describes an isolated meeting and when you are free', () => {
@@ -260,7 +260,7 @@ describe('hoverDetailText', () => {
       at(12)
     );
     expect(hoverDetailText(model, at(12))).toBe(
-      '1:30 Design sync / 2:00 1:1 / 2:30 Review'
+      '1:30 Design sync . 2:00 1:1 . 2:30 Review'
     );
   });
 
@@ -330,7 +330,7 @@ describe('afterMeetingNudge', () => {
     );
     const nudge = afterMeetingNudge(model, at(15));
     expect(nudge).not.toBeNull();
-    expect(nudge?.text).toBe('Free for 25m.');
+    expect(nudge?.text).toBe('Free for 25m. Click the orb to focus.');
     expect(nudge?.focus.minutes).toBe(20);
     expect(formatClock(nudge!.focus.end)).toBe('3:20');
   });
@@ -365,8 +365,10 @@ describe('afterMeetingNudge', () => {
     const nudge = afterMeetingNudge(model, at(15));
     expect(nudge).not.toBeNull();
     expect(nudge?.endedEvent.summary).toBe('Review');
-    expect(nudge?.text).toBe('Clear for the rest of the day.');
-    expect(statusLineText(model, at(15))).toBe('Clear for the rest of the day.');
+    expect(nudge?.text).toBe('Clear for the rest of the day. Click the orb to focus.');
+    expect(statusLineText(model, at(15))).toBe(
+      'Clear for the rest of the day. Click the orb to focus.'
+    );
   });
 });
 

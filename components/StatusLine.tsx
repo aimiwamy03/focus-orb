@@ -17,7 +17,7 @@ export function StatusLine({
     <div
       data-testid="status-line"
       className={`pointer-events-none z-20 w-fit max-w-[min(36rem,80vw)] shrink-0 text-center font-normal tracking-wide transition-colors duration-200 ${
-        hovered ? 'text-orb-text' : 'text-orb-dim'
+        hovered ? 'text-white/[0.85]' : 'text-white/45'
       }`}
     >
       <div className="text-[12px] leading-5">
@@ -32,8 +32,8 @@ export function StatusLine({
                 rel="noreferrer"
                 className={`pointer-events-auto underline underline-offset-2 ${
                   hovered
-                    ? 'text-orb-text decoration-orb-dim'
-                    : 'text-orb-dim decoration-orb-quiet'
+                    ? 'text-white/[0.85] decoration-white/50'
+                    : 'text-white/50 decoration-white/40'
                 }`}
               >
                 Join
@@ -46,7 +46,7 @@ export function StatusLine({
         <div
           data-testid="status-detail"
           data-text-clear
-          className="mt-1 inline-block text-[10px] leading-4 text-orb-dim"
+          className="mt-1 inline-block text-[10px] leading-4 text-white/70"
         >
           {detail}
         </div>
