@@ -1,16 +1,36 @@
-'use client';
-
 import { Suspense } from 'react';
+import { connection } from 'next/server';
+import { auth } from '@/lib/auth';
 import { Orb } from '@/components/Orb';
+import { PublicHome } from '@/components/PublicHome';
+import { showsAppShell } from '@/lib/legal';
+import { interpretAuthSession, shouldUseGoogleFromSession } from '@/lib/onboarding';
 
-function OrbWrapper() {
-  return <Orb />;
-}
-
-export default function Home() {
+function OrbShell() {
   return (
-    <Suspense fallback={<div className="w-screen h-screen bg-black" />}>
-      <OrbWrapper />
+    <Suspense fallback={<div className="h-screen w-screen bg-black" />}>
+      <Orb />
     </Suspense>
   );
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  if (showsAppShell(params)) return <OrbShell />;
+
+  try {
+    await connection();
+    const session = await auth();
+    if (shouldUseGoogleFromSession(interpretAuthSession(session))) {
+      return <OrbShell />;
+    }
+  } catch {
+    // Unconfigured auth still shows the public homepage.
+  }
+
+  return <PublicHome current="home" />;
 }

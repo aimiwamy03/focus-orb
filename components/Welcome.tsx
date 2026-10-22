@@ -1,6 +1,10 @@
 'use client';
 
-import { LegalLinks } from './LegalLinks';
+import {
+  ABOUT_LABEL,
+  PRIVACY_LABEL,
+  TERMS_LABEL,
+} from '@/lib/legal';
 import {
   CONNECT_LABEL,
   SAMPLE_DAY_LINK,
@@ -37,6 +41,18 @@ export function Welcome({ onConnect, googleConfigured }: WelcomeProps) {
             >
               {SAMPLE_DAY_LINK}
             </a>
+            <span className="mx-2 text-orb-quiet">·</span>
+            <a href="/about" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+              {ABOUT_LABEL}
+            </a>
+            <span className="mx-2 text-orb-quiet">·</span>
+            <a href="/privacy" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+              {PRIVACY_LABEL}
+            </a>
+            <span className="mx-2 text-orb-quiet">·</span>
+            <a href="/terms" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+              {TERMS_LABEL}
+            </a>
           </span>
         ) : (
           <span data-text-clear className="inline-block space-y-2">
@@ -50,11 +66,20 @@ export function Welcome({ onConnect, googleConfigured }: WelcomeProps) {
             >
               {SAMPLE_DAY_LINK}
             </a>
+            <span className="mx-2 text-orb-quiet">·</span>
+            <a href="/about" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+              {ABOUT_LABEL}
+            </a>
+            <span className="mx-2 text-orb-quiet">·</span>
+            <a href="/privacy" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+              {PRIVACY_LABEL}
+            </a>
+            <span className="mx-2 text-orb-quiet">·</span>
+            <a href="/terms" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+              {TERMS_LABEL}
+            </a>
           </span>
         )}
-      </div>
-      <div className="pointer-events-auto mt-4 flex justify-center">
-        <LegalLinks testId="welcome-legal" />
       </div>
     </div>
   );
