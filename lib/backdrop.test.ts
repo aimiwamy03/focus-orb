@@ -74,6 +74,9 @@ describe('brand files', () => {
       expect(existsSync(path), path).toBe(true);
       expect(statSync(path).size).toBeGreaterThan(200);
     }
+    const avif = statSync(join(ROOT, 'public/backdrop.avif')).size;
+    expect(avif).toBeGreaterThan(100_000);
+    expect(avif).toBeLessThan(420_000);
     expect(existsSync(join(ROOT, 'app/favicon.ico'))).toBe(true);
     const layout = readFileSync(join(ROOT, 'app/layout.tsx'), 'utf8');
     expect(layout).toContain('ICON_HREFS.svg');
