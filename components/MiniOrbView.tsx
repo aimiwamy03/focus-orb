@@ -98,7 +98,7 @@ export function MiniOrbView({ status, canvasRef, onClick, style }: MiniOrbViewPr
           textAlign: 'center',
           fontSize: 11,
           lineHeight: `${MINI_STATUS_LINE}px`,
-          color: '#b4b4b4',
+          color: 'rgba(255,255,255,0.5)',
           pointerEvents: 'none',
           letterSpacing: '0.04em',
           zIndex: 1,

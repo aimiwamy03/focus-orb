@@ -7,8 +7,7 @@ export const KEEP_GOING_LABEL = 'Keep going';
 export const END_LABEL = 'End';
 export const START_LABEL = 'Start';
 export const TAKE_BREAK_LABEL = 'Take a break';
-export const ANOTHER_ROUND_LABEL = 'Start another';
-export const DONE_LABEL = 'Done';
+export const ANOTHER_ROUND_LABEL = 'Another round';
 export const UNTIL_MEETING_LABEL = 'Until next meeting';
 export const FALLBACK_TASK = 'Focus';
 export const BREAK_MINUTES = 5;
@@ -110,15 +109,9 @@ export function resolveDuration(
   return capDuration(DEFAULT_FOCUS_MINUTES, untilMinutes);
 }
 
-export function formatCompleted(
-  minutes: number,
-  task: string,
-  planned: number = minutes
-): string {
+export function formatCompleted(minutes: number, task: string): string {
   const label = task.trim() || FALLBACK_TASK;
-  const spent = Math.max(1, Math.round(minutes));
-  const total = Math.max(spent, Math.round(planned));
-  return `Focused ${spent} of ${total} min on ${label}`;
+  return `Nice. ${formatCompactDuration(minutes)} on ${label}`;
 }
 
 export function remainingMinutes(minutesLeft: number): number {

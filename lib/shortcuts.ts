@@ -4,7 +4,7 @@ export const SHORTCUTS_LABEL = 'Shortcuts';
 export const GOT_IT_LABEL = 'Got it';
 export const ENTER_HINT = 'Enter to start';
 export const SPACE_HINT = 'Space to pause';
-export const FULLSCREEN_LABEL = 'Fullscreen';
+export const FULLSCREEN_LABEL = 'Full';
 
 export const SHORTCUT_ROWS = [
   { key: 'F', action: 'fullscreen' },
@@ -31,12 +31,6 @@ export function shouldShowShortcutsCard(input: {
   firstOpen: boolean;
   miniOnly: boolean;
   seen: boolean;
-  surface?: string | null;
 }): boolean {
-  return (
-    !input.firstOpen &&
-    !input.miniOnly &&
-    !input.seen &&
-    input.surface === 'ask'
-  );
+  return !input.firstOpen && !input.miniOnly && !input.seen;
 }

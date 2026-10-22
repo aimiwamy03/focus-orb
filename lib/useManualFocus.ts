@@ -13,7 +13,6 @@ interface FocusSession {
 export interface CompletedFocus {
   task: string;
   minutes: number;
-  planned: number;
 }
 
 export function useManualFocus() {
@@ -62,11 +61,7 @@ export function useManualFocus() {
 
       if (remaining <= 0) {
         if (session.kind === 'focus') {
-          setCompleted({
-            task: session.task,
-            minutes: session.duration,
-            planned: session.duration,
-          });
+          setCompleted({ task: session.task, minutes: session.duration });
         }
         setSession(null);
         setTimeRemaining(null);
@@ -102,29 +97,17 @@ export function useManualFocus() {
   }, []);
 
   const stopFocus = useCallback(() => {
-    setSession((current) => {
-      if (current?.kind === 'focus') {
-        const elapsed = (Date.now() - current.startTime) / (1000 * 60);
-        const spent = Math.max(1, Math.min(current.duration, Math.round(elapsed) || 1));
-        setCompleted({
-          task: current.task,
-          minutes: spent,
-          planned: current.duration,
-        });
-      } else {
-        setCompleted(null);
-      }
-      return null;
-    });
+    setSession(null);
+    setCompleted(null);
   }, []);
 
   const dismissCompleted = useCallback(() => {
     setCompleted(null);
   }, []);
 
-  const seedCompleted = useCallback((task: string, minutes: number, planned = minutes) => {
+  const seedCompleted = useCallback((task: string, minutes: number) => {
     setSession(null);
-    setCompleted({ task, minutes, planned });
+    setCompleted({ task, minutes });
   }, []);
 
   return {
