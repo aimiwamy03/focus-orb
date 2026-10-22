@@ -6,6 +6,7 @@ import { mockWhoopSummary, parseWhoopQuery } from './whoop.mock';
 import {
   cachedSummaryIsFresh,
   clearCachedWhoopSummary,
+  DEFAULT_WHOOP_MODE,
   hideWhoopLineForToday,
   isWhoopLineHidden,
   loadCachedWhoopSummary,
@@ -24,12 +25,19 @@ export function useWhoop() {
   const searchParams = useSearchParams();
   const mockKey = parseWhoopQuery(searchParams.get('whoop'));
   const [nowMs] = useState(() => Date.now());
-  const [mode, setModeState] = useState<WhoopMode>(loadWhoopMode);
-  const [showNumbers, setShowNumbersState] = useState(loadWhoopShowNumbers);
-  const [hidden, setHidden] = useState(isWhoopLineHidden);
-  const [fetched, setFetched] = useState<WhoopCachedSummary | null>(loadCachedWhoopSummary);
+  const [mode, setModeState] = useState<WhoopMode>(DEFAULT_WHOOP_MODE);
+  const [showNumbers, setShowNumbersState] = useState(true);
+  const [hidden, setHidden] = useState(false);
+  const [fetched, setFetched] = useState<WhoopCachedSummary | null>(null);
   const mockSummary = mockKey ? mockWhoopSummary(mockKey, nowMs) : null;
   const summary = mockSummary ?? fetched;
+
+  useEffect(() => {
+    setModeState(loadWhoopMode());
+    setShowNumbersState(loadWhoopShowNumbers());
+    setHidden(isWhoopLineHidden());
+    if (!mockKey) setFetched(loadCachedWhoopSummary());
+  }, [mockKey]);
 
   useEffect(() => {
     if (mockKey) return;

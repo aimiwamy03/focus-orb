@@ -13,6 +13,53 @@ function fail(message) {
   process.exitCode = 1;
 }
 
+function channel(v) {
+  const s = v / 255;
+  return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+}
+
+function lum(r, g, b) {
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function contrast(fg, bg) {
+  const a = lum(fg.r, fg.g, fg.b);
+  const b = lum(bg.r, bg.g, bg.b);
+  const lighter = Math.max(a, b);
+  const darker = Math.min(a, b);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function parseRgb(color) {
+  const m = String(color).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  return m ? { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) } : null;
+}
+
+const ORB_BG = { r: 22, g: 22, b: 22 };
+
+async function measureMutedType(el, label) {
+  const { fontSize, color, className } = await el.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { fontSize: parseFloat(style.fontSize), color: style.color, className: node.className };
+  });
+  if (fontSize < 18) fail(`${label} too small at ${fontSize}px`);
+  if (/rounded-full/.test(className) || /\bbadge\b/.test(className)) {
+    fail(`${label} should stay plain text, got ${className}`);
+  }
+  const rgb = parseRgb(color);
+  if (!rgb) fail(`${label} color unreadable: ${color}`);
+  const ratio = contrast(rgb, ORB_BG);
+  if (ratio < 6) fail(`${label} contrast ${ratio.toFixed(2)}:1 is under 6:1 (${color})`);
+  return { fontSize, color, ratio };
+}
+
+async function assertNoIssueBadge(page, label) {
+  const visible = page.getByText(/^\d+\s+Issues?$/);
+  if ((await visible.count()) > 0 && (await visible.first().isVisible())) {
+    fail(`Next.js issue badge on ${label}: "${(await visible.first().innerText()).trim()}"`);
+  }
+}
+
 async function publish(page, fileName) {
   const dest = path.join(ARTIFACTS, fileName);
   await page.screenshot({ path: dest });
@@ -60,14 +107,14 @@ const LINES = {
 };
 
 const OFFERS = {
-  green: '50m',
-  yellow: '40m',
-  red: '25m',
-  sleep: '30m',
-  debt: '30m',
-  strain: '50m',
-  workout: '20m',
-  late: '25m',
+  green: 'WHOOP suggests 50m',
+  yellow: 'WHOOP suggests 40m',
+  red: 'WHOOP suggests 25m',
+  sleep: 'WHOOP suggests 30m',
+  debt: 'WHOOP suggests 30m',
+  strain: 'WHOOP suggests 50m',
+  workout: 'WHOOP suggests 20m',
+  late: 'WHOOP suggests 25m',
 };
 
 const browser = await chromium.launch({ args: ['--use-gl=angle'] });
@@ -76,24 +123,27 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 
 for (const [key, line] of Object.entries(LINES)) {
   await open(page, `/?whoop=${key}`);
+  await assertNoIssueBadge(page, `whoop=${key}`);
   const prompt = page.getByTestId('focus-prompt');
   if ((await prompt.count()) !== 1) fail(`Ask did not load for whoop=${key}`);
   const whoopLine = page.getByTestId('whoop-line');
   if ((await whoopLine.count()) !== 1) fail(`Missing WHOOP line for ${key}`);
   const text = (await whoopLine.textContent())?.trim();
   if (text !== line) fail(`whoop=${key} line: expected "${line}", got "${text}"`);
-  const color = await whoopLine.evaluate((el) => getComputedStyle(el).color);
-  if (color.includes('rgb(0,') || color.includes('green') || color.includes('red')) {
-    fail(`WHOOP line should stay muted, got ${color} for ${key}`);
-  }
-  const fontSize = await whoopLine.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-  if (fontSize < 16.5) fail(`WHOOP line too small at ${fontSize}px for ${key}`);
+  const lineMeasure = await measureMutedType(whoopLine, `whoop=${key} line`);
+  console.log(
+    `whoop=${key} line ${lineMeasure.fontSize}px ${lineMeasure.ratio.toFixed(2)}:1 ${lineMeasure.color}`
+  );
   if (OFFERS[key]) {
     const offer = page.getByTestId('whoop-offer');
     if ((await offer.count()) !== 1) fail(`Missing WHOOP offer for ${key}`);
     if ((await offer.textContent()) !== OFFERS[key]) {
       fail(`whoop=${key} offer: expected ${OFFERS[key]}, got ${await offer.textContent()}`);
     }
+    const offerMeasure = await measureMutedType(offer, `whoop=${key} offer`);
+    console.log(
+      `whoop=${key} offer ${offerMeasure.fontSize}px ${offerMeasure.ratio.toFixed(2)}:1 ${offerMeasure.color}`
+    );
   }
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
@@ -103,8 +153,31 @@ for (const [key, line] of Object.entries(LINES)) {
 }
 
 await open(page, '/?whoop=disconnected');
+await assertNoIssueBadge(page, 'whoop=disconnected');
 if ((await page.getByTestId('whoop-line').count()) !== 0) {
   fail('Disconnected mock should not show a WHOOP line');
+}
+
+await open(page, '/?whoop=red');
+await page.keyboard.press('ArrowRight');
+await page.keyboard.press('ArrowRight');
+if ((await page.getByTestId('whoop-offer').getAttribute('data-highlighted')) !== 'true') {
+  fail('Right arrow should reach WHOOP suggests 25m');
+}
+await page.keyboard.press('Enter');
+await page.waitForTimeout(150);
+if ((await page.getByTestId('whoop-offer').getAttribute('data-highlighted')) !== 'true') {
+  fail('Enter on WHOOP suggests 25m should keep the offer selected');
+}
+if ((await page.getByTestId('focus-start').getAttribute('data-highlighted')) === 'true') {
+  fail('Picking the WHOOP offer should not jump to Start');
+}
+
+await open(page, '/?whoop=yellow');
+await page.getByTestId('whoop-offer').click();
+await page.waitForTimeout(150);
+if ((await page.getByTestId('whoop-offer').getAttribute('data-highlighted')) !== 'true') {
+  fail('Clicking WHOOP suggests 40m should highlight the offer');
 }
 
 await open(page, '/?mock=back-to-back&whoop=red');
@@ -117,11 +190,18 @@ if ((await page.getByTestId('sample-day-label').count()) !== 1) {
 
 await open(page, '/?whoop=green&settings=1');
 await page.waitForTimeout(400);
+await assertNoIssueBadge(page, 'settings suggest');
 if ((await page.getByTestId('whoop-settings').count()) !== 1) {
   fail('Settings WHOOP section missing');
 }
 if ((await page.getByTestId('whoop-mode-value').textContent()) !== 'Suggest only') {
   fail('Default mode should be Suggest only');
+}
+if (!(await page.getByTestId('whoop-mode').textContent())?.includes('‹')) {
+  fail('Mode row should show ‹ value ›');
+}
+if (!(await page.getByTestId('whoop-mode-hint').textContent())?.includes('You still start')) {
+  fail('Suggest only should explain that nothing starts on its own');
 }
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('ArrowRight');
@@ -129,8 +209,12 @@ await page.waitForTimeout(200);
 if ((await page.getByTestId('whoop-mode-value').textContent()) !== 'Adapt defaults') {
   fail('Right arrow should move to Adapt defaults');
 }
+if (!(await page.getByTestId('whoop-mode-hint').textContent())?.includes('Pre-fills')) {
+  fail('Adapt defaults should explain the pre-fill');
+}
 
 await open(page, '/?whoop=disconnected&settings=1');
+await assertNoIssueBadge(page, 'settings disconnected');
 if ((await page.getByTestId('whoop-status').textContent()) !== 'WHOOP disconnected') {
   fail('Disconnected settings status missing');
 }
@@ -139,6 +223,7 @@ if (!(await page.getByTestId('whoop-connect').textContent())?.includes('Reconnec
 }
 
 await open(page, '/?whoop=calibrating&settings=1');
+await assertNoIssueBadge(page, 'settings calibrating');
 if ((await page.getByTestId('whoop-status').textContent()) !== 'WHOOP is still learning you') {
   fail('Calibrating settings status missing');
 }
@@ -163,6 +248,7 @@ const shots = [
 
 for (const [search, file, extra] of shots) {
   await open(page, search, extra);
+  await assertNoIssueBadge(page, file);
   await publish(page, file);
 }
 
@@ -187,6 +273,7 @@ const mobileShots = [
 
 for (const [search, file, extra] of mobileShots) {
   await open(mobile, search, extra);
+  await assertNoIssueBadge(mobile, file);
   await publish(mobile, file);
 }
 

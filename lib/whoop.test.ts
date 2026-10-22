@@ -13,8 +13,10 @@ import {
   shouldStopWhoopNudge,
   suggestWhoop,
   whoopLineKey,
+  whoopOfferLabel,
   whoopQuietLine,
   whoopSettingsStatus,
+  WHOOP_MODE_HINTS,
   WHOOP_LEARNING_LABEL,
   WHOOP_NO_DATA_LABEL,
   WHOOP_DISCONNECTED_LABEL,
@@ -279,6 +281,14 @@ describe('settings copy and mode', () => {
     expect(cycleWhoopMode('suggest', 1)).toBe('adapt');
     expect(cycleWhoopMode('adapt', 1)).toBe('off');
     expect(cycleWhoopMode('suggest', -1)).toBe('off');
+  });
+
+  it('labels the offer and explains each mode', () => {
+    expect(whoopOfferLabel(25)).toBe('WHOOP suggests 25m');
+    expect(WHOOP_MODE_HINTS.suggest).toMatch(/quiet length/i);
+    expect(WHOOP_MODE_HINTS.suggest).toMatch(/still start/i);
+    expect(WHOOP_MODE_HINTS.adapt).toMatch(/pre-fills/i);
+    expect(WHOOP_MODE_HINTS.off).toMatch(/connected/i);
   });
 });
 

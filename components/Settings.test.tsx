@@ -179,9 +179,15 @@ describe('Settings sheet', () => {
       />
     );
     expect(screen.getByTestId('whoop-mode-value').textContent).toBe('Suggest only');
+    expect(screen.getByTestId('whoop-mode').textContent).toMatch(/Mode/);
+    expect(screen.getByTestId('whoop-mode').textContent).toMatch(/‹/);
+    expect(screen.getByTestId('whoop-mode').textContent).toMatch(/›/);
+    expect(screen.getByTestId('whoop-mode-hint').textContent).toMatch(/quiet length/i);
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(setWhoopMode).toHaveBeenCalledWith('adapt');
+    screen.getByTestId('whoop-mode-next').click();
+    expect(setWhoopMode).toHaveBeenLastCalledWith('adapt');
   });
 
   it('labels a disconnected WHOOP and reconnects on Enter', () => {

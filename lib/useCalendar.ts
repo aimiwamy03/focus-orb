@@ -13,7 +13,7 @@ import {
   sameCalendarIds,
   saveSelectedCalendarIds,
 } from './calendars';
-import { interpretAuthSession, shouldUseGoogleFromSession } from './onboarding';
+import { interpretAuthSession, isGoogleConfigured, shouldUseGoogleFromSession } from './onboarding';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const STORAGE_KEY = 'focusOrb:calendarUrl';
@@ -90,7 +90,7 @@ export function useCalendar() {
   // signed-in user must be detected from the NextAuth session, not only
   // from focusOrb:authMethod.
   useEffect(() => {
-    if (mockScenario || mockCalendars) return;
+    if (mockScenario || mockCalendars || !isGoogleConfigured()) return;
 
     let cancelled = false;
 

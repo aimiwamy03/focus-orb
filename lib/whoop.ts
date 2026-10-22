@@ -14,6 +14,16 @@ export const WHOOP_MODE_LABELS: Record<WhoopMode, string> = {
   adapt: 'Adapt defaults',
 };
 
+export const WHOOP_MODE_HINTS: Record<WhoopMode, string> = {
+  off: 'Keeps WHOOP connected without changing home.',
+  suggest: 'Offers a quiet length. You still start.',
+  adapt: 'Pre-fills the WHOOP length and break.',
+};
+
+export function whoopOfferLabel(minutes: number): string {
+  return `WHOOP suggests ${minutes}m`;
+}
+
 export const DEFAULT_WHOOP_MODE: WhoopMode = 'suggest';
 
 export const WHOOP_STATES = [

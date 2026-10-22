@@ -10,6 +10,7 @@ import {
   googleJwtNeedsRefresh,
   isGoogleAuthConfigured,
   refreshGoogleAccessToken,
+  unconfiguredSessionBody,
 } from './googleAuth';
 
 describe('Google auth env aliases', () => {
@@ -45,6 +46,10 @@ describe('Google auth env aliases', () => {
         GOOGLE_CLIENT_SECRET: 'secret',
       })
     ).toBe(false);
+  });
+
+  it('returns an empty session body instead of letting NextAuth 500', () => {
+    expect(unconfiguredSessionBody()).toBeNull();
   });
 
   it('requests calendar.readonly so events can load after sign-in', () => {

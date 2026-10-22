@@ -17,6 +17,7 @@ export const TYPE_SCALE = {
   key: { min: 14, vw: 0, add: 14, max: 14 },
   logHeading: { min: 26, vw: 0.2, add: 25, max: 28 },
   logBody: { min: 17, vw: 0.15, add: 16, max: 18 },
+  whoop: { min: 18, vw: 0.2, add: 17.5, max: 20 },
 } as const satisfies Record<string, FluidType>;
 
 export function fluidPx(rule: FluidType, viewW: number): number {

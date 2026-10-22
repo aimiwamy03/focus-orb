@@ -5,6 +5,7 @@ import { KeyHint } from './KeyHint';
 import {
   WHOOP_CONNECT_LABEL,
   WHOOP_DISCONNECT_LABEL,
+  WHOOP_MODE_HINTS,
   WHOOP_MODE_LABELS,
   WHOOP_RECONNECT_LABEL,
   WHOOP_SECTION_LABEL,
@@ -106,19 +107,43 @@ export function WhoopSettings({
 
       {connected ? (
         <>
-          <div
-            data-testid="whoop-mode"
-            data-highlighted={rows[rowIndex] === 'mode' ? 'true' : 'false'}
-            className="flex items-center justify-between rounded bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text"
-          >
-            <span>
-              Mode{' '}
-              <span data-testid="whoop-mode-value">{WHOOP_MODE_LABELS[mode]}</span>
-            </span>
-            <span className="inline-flex items-center gap-1 text-orb-quiet">
-              <KeyHint label="←" />
-              <KeyHint label="→" />
-            </span>
+          <div className="space-y-1">
+            <div
+              data-testid="whoop-mode"
+              data-highlighted={rows[rowIndex] === 'mode' ? 'true' : 'false'}
+              className="flex items-center justify-between rounded bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text"
+            >
+              <span>Mode</span>
+              <span className="inline-flex items-center gap-1.5 text-orb-quiet">
+                <button
+                  type="button"
+                  aria-label="Previous mode"
+                  data-testid="whoop-mode-prev"
+                  onClick={() => setMode(cycleWhoopMode(mode, -1))}
+                  className="px-1 text-orb-quiet"
+                >
+                  ‹
+                </button>
+                <span data-testid="whoop-mode-value" className="text-orb-text">
+                  {WHOOP_MODE_LABELS[mode]}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next mode"
+                  data-testid="whoop-mode-next"
+                  onClick={() => setMode(cycleWhoopMode(mode, 1))}
+                  className="px-1 text-orb-quiet"
+                >
+                  ›
+                </button>
+              </span>
+            </div>
+            <p
+              data-testid="whoop-mode-hint"
+              className="px-1 text-[length:var(--type-status)] leading-snug text-orb-quiet"
+            >
+              {WHOOP_MODE_HINTS[mode]}
+            </p>
           </div>
           <label
             data-testid="whoop-show-numbers"
