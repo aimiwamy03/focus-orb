@@ -15,7 +15,8 @@ describe('fluid type scale at the 1280px baseline', () => {
     expect(fluidPx(TYPE_SCALE.hint, w)).toBeGreaterThanOrEqual(14);
     expect(fluidPx(TYPE_SCALE.chrome, w)).toBeGreaterThanOrEqual(15);
     expect(fluidPx(TYPE_SCALE.key, w)).toBeGreaterThanOrEqual(14);
-    expect(fluidPx(TYPE_SCALE.logHeading, w)).toBeGreaterThanOrEqual(28);
+    expect(fluidPx(TYPE_SCALE.logHeading, w)).toBeGreaterThanOrEqual(26);
+    expect(fluidPx(TYPE_SCALE.logHeading, w)).toBeLessThanOrEqual(28);
     expect(fluidPx(TYPE_SCALE.logBody, w)).toBeGreaterThanOrEqual(17);
     expect(fluidPx(TYPE_SCALE.logBody, w)).toBeLessThanOrEqual(18);
   });
@@ -27,7 +28,8 @@ describe('fluid type scale at the 1280px baseline', () => {
     expect(fluidPx(TYPE_SCALE.chip, 686)).toBeGreaterThanOrEqual(15);
     expect(fluidPx(TYPE_SCALE.hint, 686)).toBeGreaterThanOrEqual(14);
     expect(fluidPx(TYPE_SCALE.chrome, 686)).toBeGreaterThanOrEqual(15);
-    expect(fluidPx(TYPE_SCALE.logHeading, 686)).toBeGreaterThanOrEqual(28);
+    expect(fluidPx(TYPE_SCALE.logHeading, 686)).toBeGreaterThanOrEqual(26);
+    expect(fluidPx(TYPE_SCALE.logHeading, 686)).toBeLessThanOrEqual(28);
     expect(fluidPx(TYPE_SCALE.logBody, 686)).toBeGreaterThanOrEqual(17);
   });
 

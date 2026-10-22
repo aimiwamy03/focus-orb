@@ -21,7 +21,8 @@
   --type-hint: clamp(14px, 0.2vw + 13px, 15px);
   --type-chrome: clamp(15px, 0.15vw + 13.5px, 16px);
   --type-key: 14px;
-  --type-log-heading: clamp(28px, 1.2vw + 18px, 36px);
+  --type-log-heading: clamp(26px, 0.2vw + 25px, 28px);
+  --color-log-accent: #8eb4c8;
   --type-log-body: clamp(17px, 0.15vw + 16px, 18px);
   --stack-gap: clamp(0.35rem, 1.1vh, 0.7rem);
   --stack-pad: clamp(0.4rem, 1.2vh, 1rem);

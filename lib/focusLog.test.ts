@@ -131,9 +131,14 @@ describe('aggregation and copy', () => {
     expect(formatLogRange(new Date(2026, 9, 22, 11, 50), new Date(2026, 9, 22, 12, 15))).toBe(
       '11:50am-12:15pm'
     );
+    expect(formatLogRange(new Date(2026, 9, 22, 21, 1, 10), new Date(2026, 9, 22, 21, 1, 40))).toBe(
+      '9:01pm'
+    );
     expect(formatFocusedMinutes(25, 25, 'completed')).toBe('25 min');
     expect(formatFocusedMinutes(18, 25, 'ended-early')).toBe('18 of 25 min');
     expect(formatFocusedMinutes(18, 50, 'ended-session')).toBe('18 of 50 min');
+    expect(formatFocusedMinutes(20 / 60, 25, 'ended-early')).toBe('<1 min');
+    expect(formatDayFocused(20 / 60)).toBe('<1m');
     expect(formatDayFocused(95)).toBe('1h 35m');
     expect(formatLogDayHeading('Today', 95)).toBe('Today, 1h 35m focused');
     expect(dayLabel(now, now)).toBe('Today');

@@ -143,6 +143,39 @@ if ((await page.getByTestId('focus-log-early-today-review').count()) !== 1) {
 if ((await page.locator('[data-testid^="focus-log-row-"][data-highlighted="true"]').count()) !== 1) {
   fail('A row should start highlighted');
 }
+const meta = await page.getByTestId('focus-log-meta-today-voice').textContent();
+if (!meta || !meta.includes('2:10-2:35pm') || !meta.includes('25 min')) {
+  fail(`Session should be one line with range and minutes, got ${meta}`);
+}
+const highlightStyle = await page.getByTestId('focus-log-row-today-review').evaluate((el) => {
+  const style = getComputedStyle(el);
+  return {
+    radius: Math.max(...style.borderRadius.split(' ').map((value) => Number.parseFloat(value) || 0)),
+    boxShadow: style.boxShadow,
+  };
+});
+if (highlightStyle.radius > 4) {
+  fail(`Highlighted row should not be a pill, radius ${highlightStyle.radius}`);
+}
+if (highlightStyle.boxShadow && highlightStyle.boxShadow !== 'none') {
+  fail(`Highlighted row should not have a ring, got ${highlightStyle.boxShadow}`);
+}
+const lefts = await page.evaluate(() => {
+  const left = (node) => Math.round(node.getBoundingClientRect().left);
+  return {
+    heading: left(document.querySelector('[data-testid="focus-log-day-Today"] h3')),
+    byTask: left(document.querySelector('[data-testid="focus-log-by-task-write the spec"] button')),
+    row: left(document.querySelector('[data-testid="focus-log-task-today-review"]')),
+    clipped: document.querySelector('[data-testid="focus-log-day-Today"] h3').scrollWidth >
+      document.querySelector('[data-testid="focus-log-day-Today"] h3').clientWidth + 1,
+  };
+});
+if (Math.abs(lefts.heading - lefts.row) > 1 || Math.abs(lefts.byTask - lefts.row) > 1) {
+  fail(`Left edges should match. heading ${lefts.heading} byTask ${lefts.byTask} row ${lefts.row}`);
+}
+if (lefts.clipped) {
+  fail('Today heading is clipped at 1280');
+}
 await shot(page, 'days_1280x800');
 await page.keyboard.press('ArrowDown');
 await page.waitForTimeout(150);
@@ -153,9 +186,23 @@ await shot(page, 'days_686x386');
 await page.keyboard.press('ArrowDown');
 await page.waitForTimeout(150);
 await shot(page, 'highlight_686x386');
+await page.setViewportSize({ width: 500, height: 386 });
+await page.waitForTimeout(200);
+const narrow = await page.evaluate(() => {
+  const heading = document.querySelector('[data-testid="focus-log-day-Today"] h3');
+  const panel = document.querySelector('[data-testid="focus-log"]');
+  return {
+    headingOverflow: heading.scrollWidth > heading.clientWidth + 1,
+    panelOverflow: panel.scrollWidth > panel.clientWidth + 1,
+  };
+});
+if (narrow.headingOverflow || narrow.panelOverflow) {
+  fail('Narrow log clipped on the right');
+}
+await shot(page, 'highlight_500');
 
 const task = page.locator('[data-testid^="focus-log-task-"]').first();
-const label = ((await task.locator('div').first().textContent()) || '').trim();
+const label = ((await task.getAttribute('title')) || (await task.textContent()) || '').trim();
 await task.click();
 await page.waitForTimeout(300);
 if ((await page.getByTestId('focus-log').count()) !== 0) {
@@ -212,7 +259,11 @@ if ((await page.getByTestId('focus-log').count()) !== 1) {
   fail('Ended-early block should be in the log');
 }
 const recorded = await page.locator('[data-testid^="focus-log-row-"]').first().textContent();
-if (!recorded || !recorded.includes('finish voice ai post') || !recorded.includes('of 25 min')) {
+if (
+  !recorded ||
+  !recorded.includes('finish voice ai post') ||
+  !(recorded.includes('of 25 min') || recorded.includes('<1 min'))
+) {
   fail(`Ended-early row missing task or early minutes: ${recorded}`);
 }
 if (!recorded.includes('ended early')) {

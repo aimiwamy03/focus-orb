@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { choiceClass } from './ChoiceRow';
 import {
   DELETE_LABEL,
   DELETE_LOG_PROMPT,
@@ -16,6 +15,18 @@ import {
   type FocusLogEntry,
   groupFocusLog,
 } from '@/lib/focusLog';
+
+const LOG_GRID = 'grid w-full min-w-0 grid-cols-[3px_minmax(0,1fr)_auto] items-center gap-x-3';
+
+function rowSurface(active: boolean): string {
+  return [
+    LOG_GRID,
+    'rounded-[4px] py-2',
+    active ? 'bg-white/[0.06]' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 export function FocusLog({
   entries,
@@ -85,21 +96,22 @@ export function FocusLog({
   }, [onClose, onDelete, pendingId, rows.length]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 p-3 sm:p-6">
+    <div className="fixed inset-0 min-w-0 overflow-hidden bg-black/80 p-3 z-50">
       <div
         data-testid="focus-log"
         data-interactive
         data-text-clear
-        className="flex h-full w-full cursor-auto flex-col overflow-hidden rounded-2xl px-5 py-5 sm:px-8 sm:py-6"
+        className="flex h-full min-w-0 w-full max-w-full cursor-auto flex-col overflow-hidden rounded-2xl px-4 py-4"
         style={{
           background: 'rgba(255,255,255,0.04)',
           backdropFilter: 'blur(18px)',
         }}
       >
-        <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
+        <div className={`${LOG_GRID} mb-2 shrink-0`}>
+          <span aria-hidden />
           <h2
             data-testid="focus-log-title"
-            className="text-[length:var(--type-log-heading)] font-semibold leading-tight text-orb-text"
+            className="min-w-0 break-words text-[length:var(--type-log-heading)] font-semibold leading-tight text-orb-text"
           >
             {LOG_LABEL}
           </h2>
@@ -108,127 +120,165 @@ export function FocusLog({
             data-testid="focus-log-close"
             aria-label="Close"
             onClick={onClose}
-            className="rounded-full px-3 py-1 text-[length:var(--type-log-body)] text-orb-quiet hover:text-orb-text"
+            className="shrink-0 justify-self-end px-1 text-[length:var(--type-log-body)] text-orb-quiet hover:text-orb-text"
           >
             Close
           </button>
         </div>
 
-        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div ref={listRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           {entries.length === 0 ? (
-            <p
-              data-testid="focus-log-empty"
-              className="text-[length:var(--type-log-body)] leading-snug text-orb-dim"
-            >
-              {LOG_EMPTY}
-            </p>
+            <div className={LOG_GRID}>
+              <span aria-hidden />
+              <p
+                data-testid="focus-log-empty"
+                className="col-span-2 min-w-0 break-words text-[length:var(--type-log-body)] leading-snug text-orb-dim"
+              >
+                {LOG_EMPTY}
+              </p>
+            </div>
           ) : (
             days.map((day) => (
-              <section key={day.key} data-testid={`focus-log-day-${day.label}`} className="mb-4 last:mb-2">
-                <h3 className="text-[length:var(--type-log-heading)] font-semibold leading-tight text-orb-text">
-                  {day.heading}
-                </h3>
+              <section
+                key={day.key}
+                data-testid={`focus-log-day-${day.label}`}
+                className="mb-3 last:mb-1"
+              >
+                <div className={`${LOG_GRID} mb-1`}>
+                  <span aria-hidden />
+                  <h3 className="col-span-2 min-w-0 break-words text-[length:var(--type-log-heading)] font-semibold leading-tight text-orb-text">
+                    {day.heading}
+                  </h3>
+                </div>
                 {day.isToday && day.entries.length === 0 ? (
-                  <p
-                    data-testid="focus-log-empty"
-                    className="mt-2 text-[length:var(--type-log-body)] text-orb-dim"
-                  >
-                    {LOG_EMPTY}
-                  </p>
-                ) : null}
-                {day.isToday && day.byTask.length > 0 ? (
-                  <div data-testid="focus-log-by-task" className="mt-2">
-                    <div className="text-[length:var(--type-log-body)] text-orb-quiet">{LOG_BY_TASK}</div>
-                    <ul className="mt-1 space-y-0.5">
-                      {day.byTask.map((item) => (
-                        <li
-                          key={item.task}
-                          className="flex justify-between gap-3 text-[length:var(--type-log-body)] text-orb-dim"
-                        >
-                          <button
-                            type="button"
-                            className="min-w-0 truncate text-left hover:text-orb-text"
-                            onClick={() => onPickTask(item.task)}
-                          >
-                            {item.task}
-                          </button>
-                          <span>{formatDayFocused(item.minutes)}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  <div className={LOG_GRID}>
+                    <span aria-hidden />
+                    <p
+                      data-testid="focus-log-empty"
+                      className="col-span-2 min-w-0 break-words text-[length:var(--type-log-body)] text-orb-dim"
+                    >
+                      {LOG_EMPTY}
+                    </p>
                   </div>
                 ) : null}
-                <ul className="mt-2 space-y-1.5">
+                {day.isToday && day.byTask.length > 0 ? (
+                  <div data-testid="focus-log-by-task" className="mb-1">
+                    <div className={LOG_GRID}>
+                      <span aria-hidden />
+                      <div className="col-span-2 text-[length:var(--type-log-body)] text-orb-quiet">
+                        {LOG_BY_TASK}
+                      </div>
+                    </div>
+                    {day.byTask.map((item) => (
+                      <div
+                        key={item.task}
+                        data-testid={`focus-log-by-task-${item.task}`}
+                        className={`${LOG_GRID} py-0.5 text-[length:var(--type-log-body)] text-orb-dim`}
+                      >
+                        <span aria-hidden />
+                        <button
+                          type="button"
+                          title={item.task}
+                          className="min-w-0 truncate text-left hover:text-orb-text"
+                          onClick={() => onPickTask(item.task)}
+                        >
+                          {item.task}
+                        </button>
+                        <span className="shrink-0 tabular-nums">{formatDayFocused(item.minutes)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <ul>
                   {day.entries.map((entry) => {
                     const globalIndex = rows.findIndex((row) => row.id === entry.id);
                     const active = globalIndex === index;
                     const pending = pendingId === entry.id;
                     return (
-                      <li key={entry.id}>
+                      <li key={entry.id} className="min-w-0">
                         <div
                           data-testid={`focus-log-row-${entry.id}`}
                           data-highlighted={active ? 'true' : 'false'}
-                          className={`${choiceClass('button', active, false)} flex w-full items-start justify-between gap-3 px-3 py-1.5 text-left`}
+                          className={rowSurface(active)}
                           onMouseEnter={() => setIndex(globalIndex)}
                         >
+                          <span
+                            aria-hidden
+                            data-testid={`focus-log-accent-${entry.id}`}
+                            className="h-full min-h-[1.15em] w-[3px] self-stretch rounded-[1px]"
+                            style={{
+                              backgroundColor: active ? 'var(--color-log-accent)' : 'transparent',
+                            }}
+                          />
                           <button
                             type="button"
                             data-testid={`focus-log-task-${entry.id}`}
-                            className="min-w-0 flex-1 text-left"
+                            title={entry.task}
+                            className={`min-w-0 truncate text-left text-[length:var(--type-log-body)] ${
+                              active ? 'font-medium text-white' : 'text-orb-text'
+                            }`}
                             onClick={() => onPickTask(entry.task)}
                           >
-                            <div className="truncate text-[length:var(--type-log-body)] font-medium text-orb-text">
-                              {entry.task}
-                            </div>
-                            <div className="mt-0.5 text-[length:var(--type-log-body)] text-orb-dim">
-                              {formatLogRange(new Date(entry.startMs), new Date(entry.endMs))}
-                              {' · '}
-                              {formatFocusedMinutes(entry.minutes, entry.planned, entry.ended)}
-                              {entry.ended === 'ended-early' ? (
-                                <span
-                                  data-testid={`focus-log-early-${entry.id}`}
-                                  className="ml-2 text-orb-quiet"
-                                >
-                                  {LOG_ENDED_EARLY}
-                                </span>
-                              ) : null}
-                            </div>
+                            {entry.task}
                           </button>
-                          <button
-                            type="button"
-                            data-testid={`focus-log-delete-${entry.id}`}
-                            aria-label="Delete"
-                            onClick={() => setPendingId(entry.id)}
-                            className="shrink-0 px-1 text-[length:var(--type-log-body)] text-orb-quiet hover:text-orb-text"
+                          <div
+                            data-testid={`focus-log-meta-${entry.id}`}
+                            className={`flex min-w-0 shrink-0 items-center gap-2 text-[length:var(--type-log-body)] ${
+                              active ? 'text-white' : 'text-orb-dim'
+                            }`}
                           >
-                            x
-                          </button>
+                            <span className="whitespace-nowrap tabular-nums">
+                              {formatLogRange(new Date(entry.startMs), new Date(entry.endMs))}
+                              {'  '}
+                              {formatFocusedMinutes(entry.minutes, entry.planned, entry.ended)}
+                            </span>
+                            {entry.ended === 'ended-early' ? (
+                              <span
+                                data-testid={`focus-log-early-${entry.id}`}
+                                className="whitespace-nowrap text-orb-quiet"
+                              >
+                                {LOG_ENDED_EARLY}
+                              </span>
+                            ) : null}
+                            <button
+                              type="button"
+                              data-testid={`focus-log-delete-${entry.id}`}
+                              aria-label="Delete"
+                              onClick={() => setPendingId(entry.id)}
+                              className="shrink-0 px-0.5 text-orb-quiet hover:text-orb-text"
+                            >
+                              x
+                            </button>
+                          </div>
                         </div>
                         {pending ? (
                           <div
                             data-testid="focus-log-delete-confirm"
-                            className="mt-2 flex flex-wrap items-center justify-end gap-3 text-[length:var(--type-log-body)]"
+                            className={`${LOG_GRID} mt-1 text-[length:var(--type-log-body)]`}
                           >
-                            <span className="text-orb-dim">{DELETE_LOG_PROMPT}</span>
-                            <button
-                              type="button"
-                              data-testid="focus-log-delete-keep"
-                              onClick={() => setPendingId(null)}
-                              className={choiceClass('quiet', true, false)}
-                            >
-                              {KEEP_LOG_LABEL}
-                            </button>
-                            <button
-                              type="button"
-                              data-testid="focus-log-delete-yes"
-                              onClick={() => {
-                                onDelete(entry.id);
-                                setPendingId(null);
-                              }}
-                              className={choiceClass('quiet', false, false)}
-                            >
-                              {DELETE_LABEL}
-                            </button>
+                            <span aria-hidden />
+                            <span className="min-w-0 break-words text-orb-dim">{DELETE_LOG_PROMPT}</span>
+                            <div className="flex shrink-0 gap-3">
+                              <button
+                                type="button"
+                                data-testid="focus-log-delete-keep"
+                                onClick={() => setPendingId(null)}
+                                className="text-orb-text"
+                              >
+                                {KEEP_LOG_LABEL}
+                              </button>
+                              <button
+                                type="button"
+                                data-testid="focus-log-delete-yes"
+                                onClick={() => {
+                                  onDelete(entry.id);
+                                  setPendingId(null);
+                                }}
+                                className="text-orb-quiet"
+                              >
+                                {DELETE_LABEL}
+                              </button>
+                            </div>
                           </div>
                         ) : null}
                       </li>

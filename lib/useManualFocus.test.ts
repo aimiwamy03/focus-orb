@@ -29,6 +29,10 @@ describe('draftFocusEnd', () => {
       planned: 25,
       ended: 'ended-session',
     });
+    expect(draftFocusEnd(session, 'ended-early', session.startTime + 20_000).minutes).toBeCloseTo(
+      20 / 60,
+      5
+    );
   });
 });
 

@@ -27,8 +27,8 @@ export function draftFocusEnd(
   const elapsed = (nowMs - session.startTime) / (1000 * 60);
   const minutes =
     ended === 'completed'
-      ? Math.max(1, Math.round(session.duration))
-      : Math.max(1, Math.min(session.duration, Math.round(elapsed) || 1));
+      ? Math.max(0, session.duration)
+      : Math.max(0, Math.min(session.duration, elapsed));
   const endMs =
     ended === 'completed' ? session.startTime + session.duration * 60_000 : nowMs;
   return {

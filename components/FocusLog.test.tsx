@@ -40,6 +40,10 @@ describe('FocusLog panel', () => {
     );
     fireEvent.click(screen.getByTestId('focus-log-task-today-spec'));
     expect(onPickTask).toHaveBeenCalledWith('write the spec');
+    expect(screen.getByTestId('focus-log-meta-today-voice').textContent).toContain('2:10-2:35pm');
+    expect(screen.getByTestId('focus-log-meta-today-voice').textContent).toMatch(/25\smin/);
+    expect(screen.getByTestId('focus-log-task-today-voice').textContent).toBe('finish voice ai post');
+    expect(screen.getByTestId('focus-log-row-today-review').className).not.toMatch(/ring-2|rounded-full/);
   });
 
   it('asks before deleting a row and only tags ended-early sessions', () => {

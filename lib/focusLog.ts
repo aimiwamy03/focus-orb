@@ -80,6 +80,9 @@ export function formatLogClock(date: Date, withPeriod = false): string {
 export function formatLogRange(start: Date, end: Date): string {
   const startPeriod = period(start);
   const endPeriod = period(end);
+  if (formatLogClock(start) === formatLogClock(end) && startPeriod === endPeriod) {
+    return formatLogClock(start, true);
+  }
   if (startPeriod === endPeriod) {
     return `${formatLogClock(start)}-${formatLogClock(end)}${endPeriod}`;
   }
@@ -91,6 +94,7 @@ export function formatFocusedMinutes(
   planned: number,
   ended: FocusLogEnded
 ): string {
+  if (minutes < 1) return '<1 min';
   const spent = Math.max(1, Math.round(minutes));
   const total = Math.max(spent, Math.round(planned));
   if (ended !== 'completed' && spent < total) return `${spent} of ${total} min`;
@@ -98,6 +102,7 @@ export function formatFocusedMinutes(
 }
 
 export function formatDayFocused(minutes: number): string {
+  if (minutes > 0 && minutes < 1) return '<1m';
   const total = Math.max(0, Math.round(minutes));
   const hours = Math.floor(total / 60);
   const mins = total % 60;
