@@ -2,15 +2,7 @@
 
 import { useState } from 'react';
 import { signInWithGoogle } from '@/app/actions';
-import { CalendarInfo } from '@/lib/calendars';
-import { DURATION_CHIPS, DurationChoice, saveLastDuration } from '@/lib/focusPrompt';
-import {
-  DEFAULT_DURATION_LABEL,
-  SIGN_OUT_LABEL,
-  WARN_BEFORE_MEETINGS_LABEL,
-} from '@/lib/miniOrb';
-import { isGoogleConfigured } from '@/lib/onboarding';
-import { SETTINGS_BG } from '@/lib/palette';
+import { CalendarInfo, calendarLabelTags } from '@/lib/calendars';
 
 type AuthMethod = 'google' | 'ical' | null;
 
@@ -124,9 +116,15 @@ export function Settings({
                       />
                       <span>
                         {calendar.summary}
-                        {calendar.primary ? (
-                          <span className="text-orb-muted"> (primary)</span>
-                        ) : null}
+                        {calendarLabelTags(calendar).map((tag) => (
+                          <span
+                            key={tag}
+                            data-testid={`calendar-tag-${tag}`}
+                            className="text-orb-muted"
+                          >
+                            {' '}({tag})
+                          </span>
+                        ))}
                       </span>
                     </label>
                   ))}

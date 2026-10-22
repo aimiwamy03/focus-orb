@@ -4,6 +4,7 @@ import {
   fetchGoogleCalendarList,
   fetchMergedGoogleEvents,
   mergeEventsFromCalendars,
+  calendarLabelTags,
   parseGoogleCalendarList,
   parseGoogleEvents,
   resolveSelectedCalendarIds,
@@ -36,6 +37,46 @@ function jsonResponse(body: unknown, status = 200) {
     json: async () => body,
   };
 }
+
+describe('Amy\'s two Self calendars', () => {
+  const amyList = {
+    items: [
+      {
+        id: 'abc123@group.calendar.google.com',
+        summary: 'Self',
+        primary: true,
+        accessRole: 'owner',
+      },
+      {
+        id: 'xyz789@import.calendar.google.com',
+        summary: 'Self',
+        accessRole: 'reader',
+      },
+      {
+        id: 'en.usa#holiday@group.v.calendar.google.com',
+        summary: 'Holidays in United States',
+        accessRole: 'reader',
+      },
+    ],
+  };
+
+  it('keeps both Self entries and tags imported vs owned, plus holidays', () => {
+    const calendars = parseGoogleCalendarList(amyList);
+    expect(calendars.map((calendar) => calendar.summary)).toEqual([
+      'Self',
+      'Self',
+      'Holidays in United States',
+    ]);
+    expect(calendars[0].id).toBe('abc123@group.calendar.google.com');
+    expect(calendars[1].id).toBe('xyz789@import.calendar.google.com');
+    expect(calendarLabelTags(calendars[0])).toEqual(['primary']);
+    expect(calendarLabelTags(calendars[1])).toEqual(['imported']);
+    expect(calendarLabelTags(calendars[2])).toEqual(['holidays']);
+    expect(defaultSelectedCalendarIds(calendars)).toEqual([
+      'abc123@group.calendar.google.com',
+    ]);
+  });
+});
 
 describe('parseGoogleCalendarList / parseGoogleEvents', () => {
   it('maps mocked Google list and event payloads', () => {

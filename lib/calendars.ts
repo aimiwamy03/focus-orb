@@ -12,6 +12,26 @@ export interface GoogleCalendarListItem {
   id: string;
   summary?: string;
   primary?: boolean;
+  accessRole?: string;
+}
+
+export const IMPORT_CALENDAR_SUFFIX = '@import.calendar.google.com';
+export const HOLIDAY_CALENDAR_SUFFIX = '#holiday@group.v.calendar.google.com';
+
+export function isImportedCalendarId(id: string): boolean {
+  return id.endsWith(IMPORT_CALENDAR_SUFFIX);
+}
+
+export function isHolidayCalendarId(id: string): boolean {
+  return id === HOLIDAY_CALENDAR_SUFFIX || id.endsWith(HOLIDAY_CALENDAR_SUFFIX);
+}
+
+export function calendarLabelTags(calendar: Pick<CalendarInfo, 'id' | 'primary'>): string[] {
+  const tags: string[] = [];
+  if (isImportedCalendarId(calendar.id)) tags.push('imported');
+  if (isHolidayCalendarId(calendar.id)) tags.push('holidays');
+  if (calendar.primary) tags.push('primary');
+  return tags;
 }
 
 export interface GoogleEventItem {
@@ -29,6 +49,15 @@ export interface GoogleEventItem {
 
 export const MOCK_GOOGLE_CALENDARS: CalendarInfo[] = [
   { id: 'primary', summary: 'Personal', primary: true },
+  { id: 'amy-self@group.calendar.google.com', summary: 'Self', primary: true },
+  {
+    id: 'amy-self@import.calendar.google.com',
+    summary: 'Self',
+  },
+  {
+    id: 'en.usa#holiday@group.v.calendar.google.com',
+    summary: 'Holidays in United States',
+  },
   { id: 'work@company.com', summary: 'Work' },
 ];
 
