@@ -27,7 +27,7 @@ const SEED = {
     'write the spec',
     'review pr',
   ]),
-  'focusOrb:lastTask': 'Focus',
+  'focusOrb:lastTask': 'finish voice ai post',
 };
 
 async function shot(page, name) {
@@ -76,6 +76,9 @@ if (phase === 'after') {
 
   await open(page, '/?mock=empty&settings=1');
   await shot(page, 'settings_1280x800');
+
+  await open(page, '/?mock=empty');
+  await shot(page, 'ask_empty_suggestions_1280x800');
   await page.close();
 }
 

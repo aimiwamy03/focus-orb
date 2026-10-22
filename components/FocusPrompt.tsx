@@ -17,6 +17,7 @@ import {
   PromptSurface,
   START_LABEL,
   UNTIL_MEETING_LABEL,
+  visibleAskSuggestions,
 } from '@/lib/focusPrompt';
 import { ENTER_HINT, SPACE_HINT } from '@/lib/shortcuts';
 
@@ -100,6 +101,7 @@ export function FocusPrompt({
   if (surface === 'in-meeting' || surface === 'meeting-soon') return null;
 
   const focusing = formatFocusingCopy(task, focusMinutes ?? 0);
+  const suggestions = visibleAskSuggestions(recentTasks, task);
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -139,9 +141,9 @@ export function FocusPrompt({
             className="w-full bg-transparent text-center text-[length:var(--type-input)] text-orb-text outline-none placeholder:text-orb-placeholder"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.18)', paddingBottom: 8 }}
           />
-          {mounted && recentTasks.length > 0 ? (
-            <div className="flex flex-wrap justify-center gap-2">
-              {recentTasks.map((item) => (
+          {mounted && suggestions.length > 0 ? (
+            <div data-testid="recent-tasks" className="flex flex-wrap justify-center gap-2">
+              {suggestions.map((item) => (
                 <button
                   key={item}
                   type="button"

@@ -19,6 +19,8 @@ import {
   promptSurface,
   rememberTask,
   resolveDuration,
+  resolveStartTask,
+  visibleAskSuggestions,
   RECENT_TASKS_KEY,
   saveLastDuration,
   saveRecentTasks,
@@ -48,6 +50,44 @@ describe('rememberTask', () => {
     expect(rememberTask('  Write  ', ['Email', 'Write'])).toEqual(['Write', 'Email']);
     expect(rememberTask('   ', ['Email'])).toEqual(['Email']);
     expect(rememberTask(FALLBACK_TASK, ['Email'])).toEqual(['Email']);
+  });
+});
+
+describe('visibleAskSuggestions', () => {
+  it('shows up to three unique recents and hides the typed value', () => {
+    expect(
+      visibleAskSuggestions(
+        [
+          'finish voice ai post',
+          'write the spec',
+          'review pr',
+          'ship',
+          'finish voice ai post',
+        ],
+        ''
+      )
+    ).toEqual(['finish voice ai post', 'write the spec', 'review pr']);
+    expect(
+      visibleAskSuggestions(
+        ['finish voice ai post', 'write the spec', 'review pr'],
+        'finish voice ai post'
+      )
+    ).toEqual(['write the spec', 'review pr']);
+  });
+});
+
+describe('resolveStartTask', () => {
+  it('uses typed text, then last task, then the most recent suggestion, then Focus', () => {
+    expect(resolveStartTask('  Draft  ', 'finish voice ai post', ['older'])).toBe(
+      'Draft'
+    );
+    expect(resolveStartTask('', 'finish voice ai post', ['older'])).toBe(
+      'finish voice ai post'
+    );
+    expect(resolveStartTask('   ', '', ['write the spec', 'review pr'])).toBe(
+      'write the spec'
+    );
+    expect(resolveStartTask('', '', [])).toBe(FALLBACK_TASK);
   });
 });
 

@@ -18,6 +18,7 @@ import {
   promptSurface,
   rememberTask,
   resolveDuration,
+  resolveStartTask,
   saveLastDuration,
   saveLastTask,
   saveRecentTasks,
@@ -268,8 +269,6 @@ export function Orb() {
   useEffect(() => {
     setPopOutOnLeave(loadPopOutOnLeave());
     setRecentTasks(loadRecentTasks());
-    const storedTask = loadLastTask();
-    if (storedTask) setTaskDraft(storedTask);
     const storedDuration = loadLastDuration();
     if (storedDuration != null) setDurationChoice(storedDuration);
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -735,13 +734,13 @@ export function Orb() {
     choice: DurationChoice = durationChoice
   ) => {
     const minutes = resolveDuration(choice, untilMinutes);
-    const name = (taskName ?? taskDraft).trim() || loadLastTask() || FALLBACK_TASK;
+    const name = resolveStartTask(taskName ?? taskDraft, loadLastTask(), recentTasks);
     const nextRecent = rememberTask(name, recentTasks);
     setRecentTasks(nextRecent);
     saveRecentTasks(nextRecent);
     saveLastTask(name);
     saveLastDuration(choice);
-    setTaskDraft(name);
+    setTaskDraft('');
     setStopConfirm(false);
     dismissCompleted();
     startFocus(minutes, name);
@@ -761,7 +760,7 @@ export function Orb() {
       beginFocus(completed.task, durationChoice);
       return;
     }
-    beginFocus(loadLastTask() || taskDraft, loadLastDuration() ?? durationChoice);
+    beginFocus(taskDraft, loadLastDuration() ?? durationChoice);
   };
   handleOrbClickRef.current = handleOrbClick;
 
