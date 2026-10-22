@@ -11,7 +11,7 @@
     "test:e2e": "node e2e/menu-keys.mjs && node e2e/focus-log.mjs && node e2e/intro.mjs && node e2e/caret.mjs && node e2e/sample-day.mjs"
   },
   "dependencies": {
-    "next": "16.4.0",
+    "next": "16.4.2",
     "next-auth": "^5.0.0-beta.32",
     "react": "19.3.0",
     "react-dom": "19.3.0"
@@ -24,7 +24,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.2",
     "happy-dom": "^20.14.5",
     "playwright": "^1.64.0",
     "tailwindcss": "^4",
