@@ -65,7 +65,9 @@ import { Welcome } from './Welcome';
 import { MiniOrbView } from './MiniOrbView';
 import { KeyHint } from './KeyHint';
 import { ShortcutsCard } from './ShortcutsCard';
-import { isFirstOpen } from '@/lib/onboarding';
+import { isFirstOpen, isGoogleConfigured } from '@/lib/onboarding';
+import { SAMPLE_DAY_LABEL } from '@/lib/fixtures';
+import { signInWithGoogle } from '@/app/actions';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
 
@@ -186,7 +188,7 @@ export function Orb() {
     authMethod: calendar.authMethod,
   });
 
-  const showChrome = !firstOpen && !miniOnly && (showOverlay || hoverParam);
+  const showChrome = !firstOpen && !miniOnly && !showSettings && (showOverlay || hoverParam);
 
   const surface = promptSurface({
     firstOpen,
@@ -664,12 +666,14 @@ export function Orb() {
         firstOpen,
         miniOnly,
         seen: loadShortcutsCardSeen(),
+        surface,
       })
     ) {
+      setShowShortcutsCard(false);
       return;
     }
     setShowShortcutsCard(true);
-  }, [firstOpen, miniOnly]);
+  }, [firstOpen, miniOnly, surface]);
 
   const toggleFullscreen = () => {
     markHintSeen('fullscreen');
@@ -704,6 +708,9 @@ export function Orb() {
         e.preventDefault();
         if (miniWindow.isOpen) miniWindow.close();
         else void miniWindow.open();
+      } else if (e.key === 'Escape' && miniOnlyRef.current) {
+        e.preventDefault();
+        setMiniOnly(false);
       }
     };
     
@@ -738,7 +745,8 @@ export function Orb() {
     setStopConfirm(false);
     dismissCompleted();
     startFocus(minutes, name);
-    bumpHint('click');
+    dismissShortcutsCard();
+    bumpHint('hover');
   };
 
   const handleOrbClick = () => {
@@ -787,6 +795,17 @@ export function Orb() {
   useEffect(() => {
     if (settingsParam) setShowSettings(true);
   }, [settingsParam]);
+
+  const triedPipRef = useRef(false);
+  useEffect(() => {
+    if (!miniOnly) {
+      triedPipRef.current = false;
+      return;
+    }
+    if (miniWindow.isOpen || !pipSupported || triedPipRef.current) return;
+    triedPipRef.current = true;
+    void miniWindow.open();
+  }, [miniOnly, miniWindow.isOpen, miniWindow.open, pipSupported]);
 
   useEffect(() => {
     const onFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
@@ -846,17 +865,29 @@ export function Orb() {
           type="button"
           data-testid="floating-restore"
           onClick={() => setMiniOnly(false)}
-          className="absolute inset-0 z-30 flex items-center justify-center text-xs tracking-wide text-white/40 hover:text-white/60"
+          className="absolute inset-0 z-30 flex items-center justify-center text-xs tracking-wide text-orb-quiet hover:text-orb-dim"
         >
           {FLOATING_RESTORE_LABEL}
         </button>
       ) : firstOpen ? (
-        <Welcome onConnect={() => setShowSettings(true)} />
+        <Welcome
+          googleConfigured={isGoogleConfigured()}
+          onConnect={() => {
+            if (isGoogleConfigured()) {
+              calendar.selectAuthMethod('google');
+              void signInWithGoogle();
+              return;
+            }
+            setShowSettings(true);
+          }}
+        />
       ) : (
         <div
           ref={stackRef}
           data-testid="bottom-stack"
-          className="absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2.5 px-4 pb-4 pt-1"
+          className={`absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2.5 px-4 pb-4 pt-1 ${
+            showSettings ? 'invisible pointer-events-none' : ''
+          }`}
         >
           {surface === 'meeting-soon' || surface === 'in-meeting' || !surface ? (
             <StatusLine
@@ -881,6 +912,7 @@ export function Orb() {
               focusMinutes={manualTimeRemaining}
               completedTask={completed?.task}
               completedMinutes={completed?.minutes}
+              completedPlanned={completed?.planned}
               onStart={() => beginFocus(taskDraft, durationChoice)}
               onKeepGoing={() => setStopConfirm(false)}
               onEnd={() => {
@@ -889,9 +921,18 @@ export function Orb() {
               }}
               onBreak={startBreak}
               onAnotherRound={() => beginFocus(completed?.task || taskDraft, durationChoice)}
+              onDone={dismissCompleted}
               chromeVisible={showChrome}
             />
           )}
+          {calendar.mockScenario ? (
+            <div
+              data-testid="sample-day-label"
+              className="text-[11px] tracking-wide text-orb-quiet"
+            >
+              {SAMPLE_DAY_LABEL}
+            </div>
+          ) : null}
           {showShortcutsCard ? (
             <StackBoundary>
               <ShortcutsCard onDismiss={dismissShortcutsCard} />
@@ -931,36 +972,31 @@ export function Orb() {
                       void miniWindow.open();
                     }
                   }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-orb-quiet hover:text-orb-dim"
                   aria-pressed={miniWindow.isOpen}
                 >
                   {POP_OUT_LABEL}
                   <KeyHint label="P" />
                 </button>
-                <button
-                  type="button"
-                  data-testid="mini-only"
-                  onClick={async () => {
-                    if (miniOnly) {
-                      setMiniOnly(false);
-                      return;
-                    }
-                    const ok = miniWindow.isOpen || (await miniWindow.open());
-                    if (ok) setMiniOnly(true);
-                  }}
-                  className="px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
-                  aria-pressed={miniOnly}
-                >
-                  {MINI_ONLY_LABEL}
-                </button>
+                {miniWindow.isOpen ? (
+                  <button
+                    type="button"
+                    data-testid="mini-only"
+                    onClick={() => setMiniOnly((open) => !open)}
+                    className="px-3 py-1.5 text-xs text-orb-quiet hover:text-orb-dim"
+                    aria-pressed={miniOnly}
+                  >
+                    {MINI_ONLY_LABEL}
+                  </button>
+                ) : null}
               </>
             ) : null}
             <button
               type="button"
               data-testid="fullscreen-toggle"
               onClick={toggleFullscreen}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
-              aria-label="Full screen"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-orb-quiet hover:text-orb-dim"
+              aria-label="Fullscreen"
               aria-pressed={isFullscreen}
             >
               {FULLSCREEN_LABEL}
@@ -970,7 +1006,7 @@ export function Orb() {
               type="button"
               data-testid="settings-gear"
               onClick={() => setShowSettings(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white/40 hover:text-white/70"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-orb-quiet hover:text-orb-dim"
               aria-label="Settings"
             >
               ⚙
@@ -981,9 +1017,10 @@ export function Orb() {
       ) : null}
 
       <Hints
-        active={!firstOpen}
+        active={!firstOpen && !miniOnly}
         chromeVisible={showChrome}
         revision={hintRev}
+        teach={surface === 'ask'}
         banner={
           !pipSupported && !firstOpen
             ? { id: 'chrome', text: CHROME_HINT }
@@ -1012,7 +1049,6 @@ export function Orb() {
       {showSettings && (
         <Settings 
           onClose={() => setShowSettings(false)}
-          onStartFocus={(minutes) => beginFocus(taskDraft, minutes)}
           calendarUrl={calendar.calendarUrl}
           setCalendarUrl={calendar.setCalendarUrl}
           scatterWindow={calendar.scatterWindow}
@@ -1030,6 +1066,9 @@ export function Orb() {
             setPopOutOnLeave(value);
             savePopOutOnLeave(value);
           }}
+          defaultDuration={durationChoice}
+          setDefaultDuration={setDurationChoice}
+          userEmail={calendar.userEmail}
         />
       )}
     </div>

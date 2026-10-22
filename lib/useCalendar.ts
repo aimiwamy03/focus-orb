@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { parseICS, expandRecurringEvents, findNextEvent, NextEventInfo, CalendarEvent } from './calendar';
 import { buildDayModel, DayModel, minutesBetween } from './day';
-import { getMockEvents, isMockScenario, parseNowParam } from './fixtures';
+import { getMockEvents, isMockScenario, resolveDemoNow } from './fixtures';
 import {
   CalendarInfo,
   getMockGoogleEventsByCalendar,
@@ -38,8 +38,9 @@ export function useCalendar() {
   const [scatterWindow, setScatterWindow] = useState<number>(15);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [nextEvent, setNextEvent] = useState<NextEventInfo | null>(null);
-  const [now, setNow] = useState(() => parseNowParam(nowParam));
-  const [day, setDay] = useState<DayModel>(() => emptyDay(parseNowParam(nowParam)));
+  const [now, setNow] = useState(() => resolveDemoNow(nowParam, mockScenario));
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [day, setDay] = useState<DayModel>(() => emptyDay(resolveDemoNow(nowParam, mockScenario)));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
@@ -49,13 +50,13 @@ export function useCalendar() {
 
   // Pin or tick the clock. Mock fixtures never depend on wall time.
   useEffect(() => {
-    const pinned = parseNowParam(nowParam);
+    const pinned = resolveDemoNow(nowParam, mockScenario);
     setNow(pinned);
-    if (nowParam) return;
+    if (nowParam || mockScenario) return;
 
     const interval = setInterval(() => setNow(new Date()), CLOCK_INTERVAL);
     return () => clearInterval(interval);
-  }, [nowParam]);
+  }, [nowParam, mockScenario]);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -101,6 +102,7 @@ export function useCalendar() {
         if (cancelled) return;
 
         const storedMethod = localStorage.getItem(AUTH_METHOD_KEY);
+        setUserEmail(view.email);
         if (shouldUseGoogleFromSession(view)) {
           setAuthMethod('google');
           localStorage.setItem(AUTH_METHOD_KEY, 'google');
@@ -364,5 +366,6 @@ export function useCalendar() {
     calendars,
     selectedCalendarIds,
     toggleCalendar,
+    userEmail,
   };
 }

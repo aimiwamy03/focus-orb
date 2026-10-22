@@ -15,16 +15,32 @@ import {
 describe('shouldShowShortcutsCard', () => {
   it('shows once after calendar or sample day, then never again', () => {
     expect(
-      shouldShowShortcutsCard({ firstOpen: true, miniOnly: false, seen: false })
+      shouldShowShortcutsCard({ firstOpen: true, miniOnly: false, seen: false, surface: 'ask' })
     ).toBe(false);
     expect(
-      shouldShowShortcutsCard({ firstOpen: false, miniOnly: false, seen: false })
+      shouldShowShortcutsCard({ firstOpen: false, miniOnly: false, seen: false, surface: 'ask' })
     ).toBe(true);
     expect(
-      shouldShowShortcutsCard({ firstOpen: false, miniOnly: false, seen: true })
+      shouldShowShortcutsCard({ firstOpen: false, miniOnly: false, seen: true, surface: 'ask' })
     ).toBe(false);
     expect(
-      shouldShowShortcutsCard({ firstOpen: false, miniOnly: true, seen: false })
+      shouldShowShortcutsCard({ firstOpen: false, miniOnly: true, seen: false, surface: 'ask' })
+    ).toBe(false);
+    expect(
+      shouldShowShortcutsCard({
+        firstOpen: false,
+        miniOnly: false,
+        seen: false,
+        surface: 'focusing',
+      })
+    ).toBe(false);
+    expect(
+      shouldShowShortcutsCard({
+        firstOpen: false,
+        miniOnly: false,
+        seen: false,
+        surface: 'meeting-soon',
+      })
     ).toBe(false);
   });
 });

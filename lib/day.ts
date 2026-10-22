@@ -188,7 +188,7 @@ export function formatClock(date: Date): string {
 }
 
 export function formatClockRange(start: Date, end: Date): string {
-  return `${formatClock(start)}–${formatClock(end)}`;
+  return `${formatClock(start)}-${formatClock(end)}`;
 }
 
 export function isHeadsUp(model: DayModel, now: Date): boolean {
@@ -218,7 +218,7 @@ export function statusLineText(model: DayModel, now: Date): string {
     return 'Clear for the rest of the day.';
   }
 
-  return `Free until ${formatClock(model.nextBusy.start)}. Click the orb to focus.`;
+  return `Free until ${formatClock(model.nextBusy.start)}.`;
 }
 
 export function focusingLine(minutesLeft: number): string {
@@ -239,7 +239,7 @@ export function orbClickMinutes(model: DayModel, now: Date): number | null {
 export function hoverDetailText(model: DayModel, now: Date): string {
   const upcoming = model.events.filter((event) => event.end > now).slice(0, 3);
   if (upcoming.length === 0) return '';
-  return upcoming.map((event) => `${formatClock(event.start)} ${event.summary}`).join(' . ');
+  return upcoming.map((event) => `${formatClock(event.start)} ${event.summary}`).join(' / ');
 }
 
 /**
@@ -320,7 +320,7 @@ export function afterMeetingNudge(model: DayModel, now: Date): AfterMeetingNudge
         minutes: DEFAULT_FOCUS_MINUTES,
       };
     return {
-      text: 'Clear for the rest of the day. Click the orb to focus.',
+      text: 'Clear for the rest of the day.',
       focus,
       endedEvent: ended,
     };
@@ -333,7 +333,7 @@ export function afterMeetingNudge(model: DayModel, now: Date): AfterMeetingNudge
   if (!focus) return null;
 
   return {
-    text: `Free for ${formatCompactDuration(gap)}. Click the orb to focus.`,
+    text: `Free for ${formatCompactDuration(gap)}.`,
     focus,
     endedEvent: ended,
   };

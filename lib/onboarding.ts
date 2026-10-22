@@ -25,11 +25,22 @@ export function isFirstOpen({
 export interface AuthSessionView {
   signedIn: boolean;
   hasGoogleAccess: boolean;
+  email: string | null;
 }
+
+export function isGoogleConfigured(
+  value: string | undefined = process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED
+): boolean {
+  return value === 'true';
+}
+
+export const WELCOME_LINE = 'A quiet timer that watches your calendar.';
+export const CONNECT_LABEL = 'Connect your calendar';
+export const SAMPLE_DAY_LINK = 'Try a sample day';
 
 export function interpretAuthSession(payload: unknown): AuthSessionView {
   if (!payload || typeof payload !== 'object') {
-    return { signedIn: false, hasGoogleAccess: false };
+    return { signedIn: false, hasGoogleAccess: false, email: null };
   }
 
   const session = payload as {
@@ -37,11 +48,15 @@ export function interpretAuthSession(payload: unknown): AuthSessionView {
     accessToken?: unknown;
   };
 
-  const signedIn = Boolean(session.user && (session.user.email || session.user.name));
+  const email =
+    typeof session.user?.email === 'string' && session.user.email.trim()
+      ? session.user.email
+      : null;
+  const signedIn = Boolean(session.user && (email || session.user.name));
   const hasGoogleAccess =
     typeof session.accessToken === 'string' && session.accessToken.length > 0;
 
-  return { signedIn, hasGoogleAccess };
+  return { signedIn, hasGoogleAccess, email };
 }
 
 export function shouldUseGoogleFromSession(view: AuthSessionView): boolean {
