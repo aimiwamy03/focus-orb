@@ -146,6 +146,7 @@ if (!idleStatus || (!idleStatus.includes('Free') && !idleStatus.includes('Meetin
 }
 await publish(mini, 'sample_day_mini_open.png');
 await mini.getByTestId('duration-50m').click();
+await mini.getByTestId('focus-start').click();
 await mini.waitForTimeout(500);
 const focusStatus = await pip.getByTestId('mini-status').textContent();
 if (!focusStatus || !focusStatus.toLowerCase().includes('focus')) {

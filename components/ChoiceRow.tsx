@@ -26,6 +26,7 @@ export function ChoiceRow({
   testId,
   tone = 'button',
   underlined = -1,
+  confirmOnClick = true,
 }: {
   items: ChoiceItem[];
   highlighted: number;
@@ -34,6 +35,7 @@ export function ChoiceRow({
   testId: string;
   tone?: 'button' | 'chip' | 'quiet';
   underlined?: number;
+  confirmOnClick?: boolean;
 }) {
   return (
     <div
@@ -62,7 +64,7 @@ export function ChoiceRow({
             onClick={() => {
               if (item.disabled) return;
               onHighlight(index);
-              onConfirm(index);
+              if (confirmOnClick) onConfirm(index);
             }}
             className={hitClass(Boolean(item.disabled))}
           >

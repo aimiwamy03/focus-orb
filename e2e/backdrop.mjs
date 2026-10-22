@@ -265,6 +265,7 @@ await tips.close();
 const focus = await open(browser, '/?mock=empty', { width: 1280, height: 800 });
 await focus.getByTestId('focus-task').fill('write the spec');
 await focus.getByTestId('duration-50m').click();
+await focus.getByTestId('focus-start').click();
 await focus.waitForSelector('[data-testid="focus-task-name"]');
 await focus.waitForTimeout(400);
 if ((await focus.getByTestId('star-dust-backdrop').count()) !== 1) {

@@ -159,15 +159,14 @@ describe('canUseDocumentPip', () => {
 });
 
 describe('formatMiniStatus extra lines', () => {
-  it('uses Click to stop when the second click is armed', () => {
+  it('keeps the focus countdown when a session is running', () => {
     const { now, model } = modelFor('open-afternoon', '11:00');
     expect(
       formatMiniStatus(model, now, {
         isManualFocus: true,
         focusMinutes: 32,
-        stopArmed: true,
       })
-    ).toBe('Click to stop');
+    ).toBe('Focus 32m');
   });
 
   it('is Clear when the day is empty', () => {

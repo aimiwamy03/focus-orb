@@ -533,6 +533,7 @@ export function FocusPrompt({
             }
             onHighlight={(index) => highlightIndex(durationOffset + index)}
             onConfirm={(index) => confirmIndex(durationOffset + index)}
+            confirmOnClick={false}
           />
           {whoopIndex >= 0 && whoopOfferMinutes != null ? (
             <button
