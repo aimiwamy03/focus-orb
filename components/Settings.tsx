@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signInWithGoogle } from '@/app/actions';
 import { SHOW_AGENDA_LABEL } from '@/lib/agenda';
 import { CalendarInfo, calendarLabelTags } from '@/lib/calendars';
@@ -20,6 +20,8 @@ import {
 } from '@/lib/focusLog';
 import { SHOW_BACKDROP_LABEL } from '@/lib/backdrop';
 import { INTRO_SOUND_LABEL, PLAY_INTRO_LABEL } from '@/lib/intro';
+import type { WhoopConnectionStatus, WhoopMode } from '@/lib/whoop';
+import { WhoopSettings } from './WhoopSettings';
 
 type AuthMethod = 'google' | 'ical' | null;
 
@@ -51,6 +53,14 @@ interface SettingsProps {
   setIntroSound?: (value: boolean) => void;
   showBackdrop?: boolean;
   setShowBackdrop?: (value: boolean) => void;
+  whoopConnected?: boolean;
+  whoopStatus?: WhoopConnectionStatus;
+  whoopMode?: WhoopMode;
+  setWhoopMode?: (mode: WhoopMode) => void;
+  whoopShowNumbers?: boolean;
+  setWhoopShowNumbers?: (value: boolean) => void;
+  onWhoopConnect?: () => void;
+  onWhoopDisconnect?: () => void;
 }
 
 export function Settings({
@@ -80,12 +90,32 @@ export function Settings({
   setIntroSound,
   showBackdrop = true,
   setShowBackdrop,
+  whoopConnected = false,
+  whoopStatus = 'disconnected',
+  whoopMode = 'suggest',
+  setWhoopMode,
+  whoopShowNumbers = true,
+  setWhoopShowNumbers,
+  onWhoopConnect,
+  onWhoopDisconnect,
 }: SettingsProps) {
   const [tempUrl, setTempUrl] = useState(calendarUrl);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [clearLogConfirm, setClearLogConfirm] = useState(false);
   const configured = isGoogleConfigured();
+
+  useEffect(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const handleSave = () => {
     setCalendarUrl(tempUrl);
@@ -214,6 +244,19 @@ export function Settings({
             </div>
           ) : null}
         </div>
+
+        {setWhoopMode && setWhoopShowNumbers && onWhoopConnect && onWhoopDisconnect ? (
+          <WhoopSettings
+            connected={whoopConnected}
+            status={whoopStatus}
+            mode={whoopMode}
+            setMode={setWhoopMode}
+            showNumbers={whoopShowNumbers}
+            setShowNumbers={setWhoopShowNumbers}
+            onConnect={onWhoopConnect}
+            onDisconnect={onWhoopDisconnect}
+          />
+        ) : null}
 
         <div className="space-y-2">
           <label className="text-[length:var(--type-status)] font-medium text-orb-dim">

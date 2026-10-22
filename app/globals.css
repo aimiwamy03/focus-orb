@@ -24,6 +24,7 @@
   --type-log-heading: clamp(26px, 0.2vw + 25px, 28px);
   --color-log-accent: #8eb4c8;
   --type-log-body: clamp(17px, 0.15vw + 16px, 18px);
+  --type-whoop: clamp(18px, 0.2vw + 17.5px, 20px);
   --stack-gap: clamp(0.35rem, 1.1vh, 0.7rem);
   --stack-pad: clamp(0.4rem, 1.2vh, 1rem);
   --btn-px: clamp(1rem, 1.2vw, 1.35rem);
@@ -479,6 +480,26 @@ body {
 .ask-suggestion:hover {
   color: #ececee;
   border-bottom-color: oklch(0.78 0.08 230);
+}
+
+.whoop-offer {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 0 4px;
+  font: inherit;
+  font-size: var(--type-whoop);
+  line-height: 1.4;
+  color: var(--color-orb-quiet);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.whoop-offer[data-highlighted='true'] {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
 }
 
 @font-face {

@@ -18,6 +18,18 @@ describe('isFirstOpen', () => {
     ).toBe(true);
   });
 
+  it('skips the welcome screen for a WHOOP mock without sign-in', () => {
+    expect(
+      isFirstOpen({
+        mockScenario: null,
+        isGoogleConnected: false,
+        calendarUrl: '',
+        authMethod: null,
+        whoopDemo: true,
+      })
+    ).toBe(false);
+  });
+
   it('hides the mock onboarding after Google sign-in, even before localStorage is set', () => {
     expect(
       isFirstOpen({

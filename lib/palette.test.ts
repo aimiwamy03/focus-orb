@@ -44,6 +44,11 @@ describe('palette tokens meet WCAG AA on the orb background', () => {
     expect(PALETTE_TOKENS.highlightFill).toBe(HIGHLIGHT_FILL);
   });
 
+  it('keeps the WHOOP quiet line readable at 18px with at least 6:1', () => {
+    expect(meetsAaContrast(ORB_TEXT_QUIET, ORB_BG, 18)).toBe(true);
+    expect(contrastRatio(ORB_TEXT_QUIET, ORB_BG)).toBeGreaterThanOrEqual(6);
+  });
+
   it('keeps highlighted text AA on the highlight fill', () => {
     expect(meetsAaContrast(ORB_TEXT, HIGHLIGHT_FILL, 15)).toBe(true);
     expect(contrastRatio(HIGHLIGHT_RING, ORB_BG)).toBeGreaterThanOrEqual(4.5);

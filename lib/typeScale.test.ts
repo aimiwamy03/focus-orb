@@ -19,6 +19,9 @@ describe('fluid type scale at the 1280px baseline', () => {
     expect(fluidPx(TYPE_SCALE.logHeading, w)).toBeLessThanOrEqual(28);
     expect(fluidPx(TYPE_SCALE.logBody, w)).toBeGreaterThanOrEqual(17);
     expect(fluidPx(TYPE_SCALE.logBody, w)).toBeLessThanOrEqual(18);
+    expect(TYPE_SCALE.whoop.min).toBeGreaterThanOrEqual(18);
+    expect(fluidPx(TYPE_SCALE.whoop, w)).toBeGreaterThanOrEqual(18);
+    expect(fluidPx(TYPE_SCALE.whoop, 375)).toBeGreaterThanOrEqual(18);
   });
 
   it('stays readable at Amy\'s 686px window', () => {

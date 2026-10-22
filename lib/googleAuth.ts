@@ -49,6 +49,11 @@ export function isGoogleAuthConfigured(
   return Boolean(googleClientId(env) && googleClientSecret(env) && authSecret(env));
 }
 
+/** NextAuth 500s with no AUTH_SECRET. Return an empty session instead. */
+export function unconfiguredSessionBody(): null {
+  return null;
+}
+
 export function applyGoogleAccountToToken(
   token: GoogleToken,
   account: GoogleAccountTokens | null | undefined

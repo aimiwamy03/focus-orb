@@ -28,12 +28,17 @@ import {
 } from '@/lib/focusPrompt';
 import { createMenuState, reduceMenu, type MenuState } from '@/lib/menuKey';
 import { SPACE_HINT } from '@/lib/shortcuts';
+import { whoopOfferLabel } from '@/lib/whoop';
 import { ChoiceItem, ChoiceRow, choiceClass } from './ChoiceRow';
 import { KeyHint } from './KeyHint';
 
 interface FocusPromptProps {
   surface: PromptSurface;
   contextLine?: string | null;
+  whoopLine?: string | null;
+  whoopOfferMinutes?: number | null;
+  whoopAdapt?: boolean;
+  onHideWhoopLine?: () => void;
   task: string;
   onTaskChange: (value: string) => void;
   recentTasks: string[];
@@ -64,6 +69,7 @@ interface FocusPromptProps {
 type MenuItem = ChoiceItem & {
   action:
     | 'duration'
+    | 'whoop'
     | 'start'
     | 'recent'
     | 'keep'
@@ -105,7 +111,8 @@ function itemsFor(
   untilMinutes: number | null,
   joinUrl: string | null | undefined,
   suggestions: string[],
-  keepSessionLabel: string
+  keepSessionLabel: string,
+  whoopOfferMinutes: number | null
 ): MenuItem[] {
   if (surface === 'ask') {
     return [
@@ -116,6 +123,16 @@ function itemsFor(
         value: name,
       })),
       ...durationItems(untilMinutes),
+      ...(whoopOfferMinutes != null
+        ? [
+            {
+              id: 'whoop-offer',
+              label: whoopOfferLabel(whoopOfferMinutes),
+              action: 'whoop' as const,
+              value: whoopOfferMinutes,
+            },
+          ]
+        : []),
       { id: 'focus-start', label: START_LABEL, action: 'start' },
     ];
   }
@@ -161,6 +178,10 @@ function defaultIndex(surface: PromptSurface, items: MenuItem[], choice: Duratio
 export function FocusPrompt({
   surface,
   contextLine,
+  whoopLine = null,
+  whoopOfferMinutes = null,
+  whoopAdapt = false,
+  onHideWhoopLine,
   task,
   onTaskChange,
   recentTasks,
@@ -192,8 +213,16 @@ export function FocusPrompt({
 
   const suggestions = useMemo(() => visibleAskSuggestions(recentTasks, task), [recentTasks, task]);
   const items = useMemo(
-    () => itemsFor(surface, untilMinutes, joinUrl, mounted ? suggestions : [], sessionKeepLabel),
-    [surface, untilMinutes, joinUrl, mounted, suggestions, sessionKeepLabel]
+    () =>
+      itemsFor(
+        surface,
+        untilMinutes,
+        joinUrl,
+        mounted ? suggestions : [],
+        sessionKeepLabel,
+        surface === 'ask' ? whoopOfferMinutes : null
+      ),
+    [surface, untilMinutes, joinUrl, mounted, suggestions, sessionKeepLabel, whoopOfferMinutes]
   );
   const durations = useMemo(() => durationItems(untilMinutes), [untilMinutes]);
   const [menu, setMenu] = useState<MenuState>(() =>
@@ -269,6 +298,10 @@ export function FocusPrompt({
       handlersRef.current.onStart(undefined, duration);
       return;
     }
+    if (item.action === 'whoop') {
+      handlersRef.current.onChoiceChange(item.value as DurationChoice);
+      return;
+    }
     if (item.action === 'start') {
       handlersRef.current.onStart();
       return;
@@ -316,6 +349,7 @@ export function FocusPrompt({
   const cancelMenu = () => {
     const { surface: kind } = handlersRef.current;
     if (kind === 'ask') {
+      onHideWhoopLine?.();
       inputRef.current?.blur();
       return;
     }
@@ -328,7 +362,7 @@ export function FocusPrompt({
   const highlightIndex = (index: number) => {
     setMenu((current) => ({ ...current, index, focus: 'row' }));
     const item = handlersRef.current.items[index];
-    if (item?.action === 'duration' && !item.disabled) {
+    if ((item?.action === 'duration' || item?.action === 'whoop') && !item.disabled) {
       handlersRef.current.onChoiceChange(item.value as DurationChoice);
     }
   };
@@ -362,7 +396,7 @@ export function FocusPrompt({
           event.key === 'Tab')
       ) {
         const item = handlersRef.current.items[result.state.index];
-        if (item?.action === 'duration' && !item.disabled) {
+        if ((item?.action === 'duration' || item?.action === 'whoop') && !item.disabled) {
           handlersRef.current.onChoiceChange(item.value as DurationChoice);
         }
       }
@@ -379,6 +413,7 @@ export function FocusPrompt({
 
   const focusing = formatFocusingCopy(task, focusMinutes ?? 0);
   const durationOffset = items.findIndex((item) => item.action === 'duration');
+  const whoopIndex = items.findIndex((item) => item.action === 'whoop');
   const startIndex = items.findIndex((item) => item.action === 'start');
   const durationHighlight =
     durationOffset >= 0 && items[menu.index]?.action === 'duration'
@@ -398,7 +433,15 @@ export function FocusPrompt({
       data-surface={surface}
       className="relative z-20 flex w-[min(32rem,92vw)] shrink-0 cursor-auto flex-col items-center gap-[length:var(--stack-gap)] text-center"
     >
-      {surface === 'ask' && contextLine ? (
+      {surface === 'ask' && whoopLine ? (
+        <div
+          data-testid="whoop-line"
+          data-text-clear
+          className="text-[length:var(--type-whoop)] leading-snug text-orb-quiet"
+        >
+          {whoopLine}
+        </div>
+      ) : surface === 'ask' && contextLine ? (
         <div
           data-testid="prompt-context"
           data-text-clear
@@ -483,9 +526,40 @@ export function FocusPrompt({
             tone="chip"
             items={durations}
             highlighted={durationHighlight}
+            underlined={
+              whoopAdapt && typeof choice === 'number'
+                ? durations.findIndex((item) => item.value === choice)
+                : -1
+            }
             onHighlight={(index) => highlightIndex(durationOffset + index)}
             onConfirm={(index) => confirmIndex(durationOffset + index)}
           />
+          {whoopIndex >= 0 && whoopOfferMinutes != null ? (
+            <button
+              type="button"
+              tabIndex={-1}
+              data-testid="whoop-offer"
+              data-highlighted={menu.index === whoopIndex ? 'true' : 'false'}
+              data-whoop-adapt={
+                whoopAdapt && choice === whoopOfferMinutes ? 'true' : 'false'
+              }
+              data-text-clear
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => highlightIndex(whoopIndex)}
+              onClick={() => {
+                highlightIndex(whoopIndex);
+                confirmIndex(whoopIndex);
+              }}
+              className={`whoop-offer cursor-pointer border-0 bg-transparent p-0 text-[length:var(--type-whoop)] leading-snug text-orb-quiet ${
+                menu.index === whoopIndex ||
+                (whoopAdapt && choice === whoopOfferMinutes)
+                  ? 'underline decoration-1 underline-offset-[6px]'
+                  : ''
+              }`}
+            >
+              {whoopOfferLabel(whoopOfferMinutes)}
+            </button>
+          ) : null}
           <div
             data-testid="menu-hint"
             data-text-clear

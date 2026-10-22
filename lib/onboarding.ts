@@ -5,6 +5,7 @@ export interface FirstOpenState {
   isGoogleConnected: boolean;
   calendarUrl: string;
   authMethod: AuthMethod;
+  whoopDemo?: boolean;
 }
 
 export function isFirstOpen({
@@ -12,9 +13,11 @@ export function isFirstOpen({
   isGoogleConnected,
   calendarUrl,
   authMethod,
+  whoopDemo = false,
 }: FirstOpenState): boolean {
   return (
     !mockScenario &&
+    !whoopDemo &&
     !isGoogleConnected &&
     !calendarUrl &&
     authMethod !== 'google' &&
