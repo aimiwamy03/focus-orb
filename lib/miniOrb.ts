@@ -195,9 +195,12 @@ export function savePopOutOnLeave(value: boolean): void {
   else localStorage.removeItem(POP_OUT_ON_LEAVE_KEY);
 }
 
-export const FLOATING_RESTORE_LABEL = 'Floating, click to restore';
+export const FLOATING_RESTORE_LABEL = 'Open floating orb';
 export const POP_OUT_LABEL = 'Pop out';
 export const MINI_ONLY_LABEL = 'Mini only';
+export const WARN_BEFORE_MEETINGS_LABEL = 'Warn me before meetings';
+export const DEFAULT_DURATION_LABEL = 'Default duration';
+export const SIGN_OUT_LABEL = 'Sign out';
 export const POP_OUT_ON_LEAVE_LABEL = 'Pop out when I leave this tab';
 export const CHROME_HINT = 'Pop out works in Chrome';
 export const LEAVE_TAB_HINT = 'Click Pop out to keep the orb with you';

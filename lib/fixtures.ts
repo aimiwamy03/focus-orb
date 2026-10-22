@@ -15,6 +15,9 @@ export function isMockScenario(value: string | null): value is MockScenario {
   return !!value && (MOCK_SCENARIOS as readonly string[]).includes(value);
 }
 
+export const SAMPLE_DAY_NOW = '11:30';
+export const SAMPLE_DAY_LABEL = 'Sample day';
+
 export function parseNowParam(nowParam: string | null, base: Date = new Date()): Date {
   if (!nowParam) return new Date(base);
   const match = nowParam.match(/^(\d{1,2}):(\d{2})$/);
@@ -25,6 +28,16 @@ export function parseNowParam(nowParam: string | null, base: Date = new Date()):
   const pinned = new Date(base);
   pinned.setHours(hours, minutes, 0, 0);
   return pinned;
+}
+
+export function resolveDemoNow(
+  nowParam: string | null,
+  mockScenario: string | null,
+  base: Date = new Date()
+): Date {
+  if (nowParam) return parseNowParam(nowParam, base);
+  if (mockScenario) return parseNowParam(SAMPLE_DAY_NOW, base);
+  return new Date(base);
 }
 
 function at(now: Date, hours: number, minutes: number): Date {

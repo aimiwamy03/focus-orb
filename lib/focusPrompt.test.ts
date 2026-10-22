@@ -91,7 +91,10 @@ describe('copy', () => {
       countdown: '32m left',
     });
     expect(formatFocusingCopy('Deep work', 32.4).countdown).toBe('33m left');
-    expect(formatCompleted(50, 'Deep work')).toBe('Nice. 50m on Deep work');
+    expect(formatCompleted(50, 'Deep work')).toBe('Focused 50 of 50 min on Deep work');
+    expect(formatCompleted(18, 'Write the spec', 50)).toBe(
+      'Focused 18 of 50 min on Write the spec'
+    );
     expect(formatBreakCopy(4.2)).toBe('Break 5m');
     expect(formatBreakCopy(5)).toBe('Break 5m');
     expect(formatMeetingSoonCopy(4.2)).toBe('Meeting in 5m');

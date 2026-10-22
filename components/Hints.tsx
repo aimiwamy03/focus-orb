@@ -8,12 +8,15 @@ const HINTS_KEY = 'focusOrb:hints';
 const HINT_MS = 8000;
 
 export const HINTS = [
-  { id: 'click', text: 'Click the orb to focus' },
   { id: 'hover', text: 'Hover for details' },
-  { id: 'fullscreen', text: 'Press F for full screen' },
 ] as const;
 
-export type HintId = (typeof HINTS)[number]['id'] | 'chrome' | 'leave-tab';
+export type HintId =
+  | (typeof HINTS)[number]['id']
+  | 'chrome'
+  | 'leave-tab'
+  | 'fullscreen'
+  | 'click';
 
 function loadSeen(): Record<string, boolean> {
   if (typeof localStorage === 'undefined') return {};
@@ -34,6 +37,7 @@ interface HintsProps {
   chromeVisible: boolean;
   revision?: number;
   banner?: { id: HintId; text: string } | null;
+  teach?: boolean;
 }
 
 export function Hints({
@@ -41,6 +45,7 @@ export function Hints({
   chromeVisible,
   revision = 0,
   banner = null,
+  teach = false,
 }: HintsProps) {
   const [seen, setSeen] = useState<Record<string, boolean>>({});
   const [ready, setReady] = useState(false);
@@ -52,8 +57,8 @@ export function Hints({
   }, [revision]);
 
   const bannerNext =
-    banner && !seen[banner.id] ? banner : null;
-  const next = bannerNext ?? HINTS.find((hint) => !seen[hint.id]);
+    teach && banner && !seen[banner.id] ? banner : null;
+  const next = teach ? bannerNext ?? HINTS.find((hint) => !seen[hint.id]) : null;
 
   useEffect(() => {
     if (!active || !ready || !next || helpOpen) return;
@@ -89,7 +94,7 @@ export function Hints({
         type="button"
         data-testid="help-toggle"
         onClick={() => setHelpOpen((open) => !open)}
-        className={`fixed top-4 left-4 z-40 rounded-full px-3 py-1.5 text-xs text-white/40 transition-opacity duration-300 hover:text-white/60 ${
+        className={`fixed top-4 left-4 z-40 rounded-full px-3 py-1.5 text-xs text-orb-quiet transition-opacity duration-300 hover:text-orb-dim ${
           chromeVisible
             ? 'visible opacity-100'
             : 'invisible pointer-events-none opacity-0'
@@ -104,7 +109,7 @@ export function Hints({
         <div
           data-testid="short-help"
           data-text-clear
-          className="fixed top-14 left-4 z-40 max-w-xs space-y-1.5 text-[11px] leading-5 text-white/55"
+          className="fixed top-14 left-4 z-40 max-w-xs space-y-1.5 text-[11px] leading-5 text-orb-dim"
         >
           {SHORTCUT_ROWS.map((row) => (
             <div key={row.key} className="flex items-center gap-2">
@@ -117,7 +122,7 @@ export function Hints({
         <div
           data-testid="hint"
           data-text-clear
-          className="fixed top-14 left-4 z-40 text-[11px] leading-5 text-white/45"
+          className="fixed top-14 left-4 z-40 text-[11px] leading-5 text-orb-quiet"
         >
           {next.text}
         </div>
