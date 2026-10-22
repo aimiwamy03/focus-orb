@@ -32,7 +32,7 @@ export function calendarLabelTags(calendar: Pick<CalendarInfo, 'id' | 'primary'>
   const tags: string[] = [];
   if (isImportedCalendarId(calendar.id)) tags.push('imported');
   if (isHolidayCalendarId(calendar.id)) tags.push('holidays');
-  if (calendar.primary) tags.push('primary');
+  if (calendar.primary === true) tags.push('primary');
   return tags;
 }
 
@@ -50,8 +50,17 @@ export interface GoogleEventItem {
 }
 
 export const MOCK_GOOGLE_CALENDARS: CalendarInfo[] = [
-  { id: 'primary', summary: 'Personal', primary: true, backgroundColor: '#4285f4' },
-  { id: 'amy-self@group.calendar.google.com', summary: 'Self', primary: true, backgroundColor: '#33b679' },
+  {
+    id: 'primary',
+    summary: 'Events/Reminders',
+    primary: true,
+    backgroundColor: '#4285f4',
+  },
+  {
+    id: 'amy-self@group.calendar.google.com',
+    summary: 'Self',
+    backgroundColor: '#33b679',
+  },
   {
     id: 'amy-self@import.calendar.google.com',
     summary: 'Self',
@@ -63,6 +72,11 @@ export const MOCK_GOOGLE_CALENDARS: CalendarInfo[] = [
     backgroundColor: '#f4511e',
   },
   { id: 'work@company.com', summary: 'Work', backgroundColor: '#f6bf26' },
+  {
+    id: 'remind-event@group.calendar.google.com',
+    summary: 'Remind/Event',
+    backgroundColor: '#0b8043',
+  },
 ];
 
 export function defaultSelectedCalendarIds(calendars: CalendarInfo[]): string[] {
@@ -114,7 +128,7 @@ export function parseGoogleCalendarList(payload: {
     .map((item) => ({
       id: item.id,
       summary: item.summary || item.id,
-      primary: !!item.primary,
+      primary: item.primary === true,
       ...(item.backgroundColor ? { backgroundColor: item.backgroundColor } : {}),
     }));
 }

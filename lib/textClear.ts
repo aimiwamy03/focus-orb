@@ -8,10 +8,20 @@ export interface ClearRect {
   bottom: number;
 }
 
+export function isVisibleClearTarget(el: Element): boolean {
+  const win = el.ownerDocument?.defaultView;
+  if (!win) return true;
+  const style = win.getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  if (Number.parseFloat(style.opacity) === 0) return false;
+  return true;
+}
+
 export function collectTextClearRects(root: ParentNode = document): ClearRect[] {
   const nodes = root.querySelectorAll('[data-text-clear]');
   const rects: ClearRect[] = [];
   for (const node of nodes) {
+    if (!isVisibleClearTarget(node)) continue;
     const r = (node as HTMLElement).getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) continue;
     rects.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });

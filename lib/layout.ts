@@ -18,8 +18,9 @@ export const STACK_TOP_PAD = 56;
 export const STACK_GAP = 20;
 export const MIN_RADIUS = 52;
 export const MIN_RADIUS_COMPACT = 28;
-export const STACK_TOP_PAD_COMPACT = 24;
+export const STACK_TOP_PAD_COMPACT = 48;
 export const STACK_GAP_COMPACT = 10;
+export const ORB_EDGE_PAD = 4;
 
 export function stackInsets(viewH: number): { topPad: number; gap: number } {
   if (viewH < MIN_FIT_HEIGHT) {
@@ -46,28 +47,36 @@ export function firstOverlappingPair(rects: Rect[]): [number, number] | null {
   return null;
 }
 
+export function orbDiskRect(layout: OrbLayout): Rect {
+  return {
+    left: layout.centerX - layout.radius,
+    top: layout.centerY - layout.radius,
+    right: layout.centerX + layout.radius,
+    bottom: layout.centerY + layout.radius,
+  };
+}
+
 export function orbLayout(
   viewW: number,
   viewH: number,
   stackH: number
 ): OrbLayout {
   const { topPad, gap } = stackInsets(viewH);
-  const reserved = Math.max(0, stackH) + topPad + gap;
-  const availableH = Math.max(80, viewH - reserved);
-  const maxFromViewport = ORB_RADIUS_RATIO * Math.min(viewW, viewH);
-  const maxFromStack = availableH * 0.42;
-  const floor = viewH < MIN_FIT_HEIGHT ? MIN_RADIUS_COMPACT : MIN_RADIUS;
-  let radius = Math.max(floor, Math.min(maxFromViewport, maxFromStack));
-  let centerY = topPad + availableH / 2;
   const stackTop = viewH - Math.max(0, stackH);
-  const maxUp = Math.max(floor, centerY - 4);
-  const maxDown = Math.max(floor, stackTop - centerY - 1);
-  radius = Math.min(radius, maxUp, maxDown);
-  if (centerY - radius < 4) centerY = radius + 4;
-  if (centerY + radius > stackTop) centerY = Math.max(radius + 4, stackTop - radius);
+  const bandTop = topPad;
+  const bandBottom = Math.max(bandTop + 16, stackTop - gap);
+  const availableH = Math.max(16, bandBottom - bandTop);
+  const maxFromViewport = ORB_RADIUS_RATIO * Math.min(viewW, viewH);
+  const maxFromBand = availableH / 2;
+  const maxFromWidth = Math.max(8, viewW / 2 - ORB_EDGE_PAD);
+  const maxFit = Math.max(8, Math.min(maxFromViewport, maxFromBand, maxFromWidth));
+  const radius = maxFit
+  const centerX = viewW / 2;
+  let centerY = bandTop + availableH / 2;
+  centerY = Math.min(bandBottom - radius, Math.max(bandTop + radius, centerY));
   return {
     radius,
-    centerX: viewW / 2,
+    centerX,
     centerY,
     availableH,
   };

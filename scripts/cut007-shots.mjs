@@ -75,6 +75,9 @@ if (phase === 'after') {
   await shot(page, 'completed_1280x800');
 
   await open(page, '/?mockCalendars=1&settings=1');
+  const signOut = page.getByTestId('sign-out');
+  if (await signOut.count()) await signOut.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
   await shot(page, 'settings_1280x800');
 
   await open(

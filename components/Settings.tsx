@@ -86,12 +86,13 @@ export function Settings({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
       <div
-        className="mx-4 max-h-[90vh] w-full max-w-md space-y-6 overflow-y-auto rounded-lg p-6"
+        data-testid="settings-sheet"
+        className="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 w-full max-w-md flex-col rounded-lg"
         style={{ backgroundColor: SETTINGS_BG }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between px-6 pb-4 pt-6">
           <h2 className="text-[length:var(--type-heading)] font-semibold text-orb-text">
             Settings
           </h2>
@@ -104,6 +105,10 @@ export function Settings({
           </button>
         </div>
 
+        <div
+          data-testid="settings-body"
+          className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6"
+        >
         <div className="space-y-2">
           <label className="text-[length:var(--type-status)] font-medium text-orb-dim">
             Calendars
@@ -282,6 +287,7 @@ export function Settings({
             </button>
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   );

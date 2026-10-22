@@ -4,8 +4,10 @@ import {
   firstOverlappingPair,
   fullyInsideViewport,
   MIN_FIT_HEIGHT,
+  orbDiskRect,
   orbLayout,
   rectsOverlap,
+  stackInsets,
 } from './layout';
 
 describe('rectsOverlap', () => {
@@ -51,6 +53,21 @@ describe('orbLayout fits the bottom stack', () => {
     expect(layout.centerY + layout.radius).toBeLessThanOrEqual(386 - stack + 1);
     expect(layout.radius).toBeGreaterThanOrEqual(28);
     expect(layout.radius).toBeLessThan(orbLayout(1280, 800, stackAsk).radius);
+  });
+
+  it.each([
+    [686, 386, 240],
+    [1024, 768, 280],
+    [1280, 640, 280],
+  ])('keeps a full round disk on a %i x %i canvas above the stack', (width, height, stack) => {
+    const layout = orbLayout(width, height, stack);
+    const disk = orbDiskRect(layout);
+    const { topPad } = stackInsets(height);
+    expect(fullyInsideViewport(disk, width, height)).toBe(true);
+    expect(disk.top).toBeGreaterThanOrEqual(topPad - 0.5);
+    expect(disk.bottom).toBeLessThanOrEqual(height - stack + 1);
+    expect(disk.right - disk.left).toBeCloseTo(2 * layout.radius, 5);
+    expect(disk.bottom - disk.top).toBeCloseTo(2 * layout.radius, 5);
   });
 
   it('treats a vertical stack as non overlapping', () => {

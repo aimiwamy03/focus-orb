@@ -5,6 +5,7 @@ import {
   fetchMergedGoogleEvents,
   mergeEventsFromCalendars,
   calendarLabelTags,
+  MOCK_GOOGLE_CALENDARS,
   parseGoogleCalendarList,
   parseGoogleEvents,
   resolveSelectedCalendarIds,
@@ -38,13 +39,18 @@ function jsonResponse(body: unknown, status = 200) {
   };
 }
 
-describe('Amy\'s two Self calendars', () => {
+describe("Amy's calendar list", () => {
   const amyList = {
     items: [
       {
+        id: 'events-reminders@google.com',
+        summary: 'Events/Reminders',
+        primary: true,
+        accessRole: 'owner',
+      },
+      {
         id: 'abc123@group.calendar.google.com',
         summary: 'Self',
-        primary: true,
         accessRole: 'owner',
       },
       {
@@ -57,24 +63,45 @@ describe('Amy\'s two Self calendars', () => {
         summary: 'Holidays in United States',
         accessRole: 'reader',
       },
+      { id: 'work@company.com', summary: 'Work', accessRole: 'owner' },
+      {
+        id: 'remind-event@group.calendar.google.com',
+        summary: 'Remind/Event',
+        accessRole: 'owner',
+      },
     ],
   };
 
-  it('keeps both Self entries and tags imported vs owned, plus holidays', () => {
+  it('tags only the Google primary calendar, plus imported and holidays', () => {
     const calendars = parseGoogleCalendarList(amyList);
     expect(calendars.map((calendar) => calendar.summary)).toEqual([
+      'Events/Reminders',
       'Self',
       'Self',
       'Holidays in United States',
+      'Work',
+      'Remind/Event',
     ]);
-    expect(calendars[0].id).toBe('abc123@group.calendar.google.com');
-    expect(calendars[1].id).toBe('xyz789@import.calendar.google.com');
+    expect(calendars.filter((calendar) => calendar.primary)).toHaveLength(1);
     expect(calendarLabelTags(calendars[0])).toEqual(['primary']);
-    expect(calendarLabelTags(calendars[1])).toEqual(['imported']);
-    expect(calendarLabelTags(calendars[2])).toEqual(['holidays']);
+    expect(calendarLabelTags(calendars[1])).toEqual([]);
+    expect(calendarLabelTags(calendars[2])).toEqual(['imported']);
+    expect(calendarLabelTags(calendars[3])).toEqual(['holidays']);
+    expect(calendarLabelTags(calendars[4])).toEqual([]);
+    expect(calendarLabelTags(calendars[5])).toEqual([]);
     expect(defaultSelectedCalendarIds(calendars)).toEqual([
-      'abc123@group.calendar.google.com',
+      'events-reminders@google.com',
     ]);
+  });
+
+  it('does not mark an owned Self calendar as primary in the mock fixture', () => {
+    const tagged = MOCK_GOOGLE_CALENDARS.filter((calendar) =>
+      calendarLabelTags(calendar).includes('primary')
+    );
+    expect(tagged.map((calendar) => calendar.summary)).toEqual(['Events/Reminders']);
+    const self = MOCK_GOOGLE_CALENDARS.filter((calendar) => calendar.summary === 'Self');
+    expect(self).toHaveLength(2);
+    expect(self.some((calendar) => calendar.primary)).toBe(false);
   });
 });
 

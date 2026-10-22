@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { orbLayout } from './layout';
+import { fullyInsideViewport, orbDiskRect, orbLayout } from './layout';
 import {
   backingMatchesCss,
   drawnCenterCss,
@@ -44,6 +44,22 @@ describe('sizeOrbCanvas', () => {
     expect(canvas.width).toBe(1200);
     expect(canvas.height).toBe(1132);
     expect(backingMatchesCss(canvas, sized)).toBe(true);
+  });
+});
+
+describe('orb disk vs canvas', () => {
+  it.each([
+    [686, 386, 240],
+    [1024, 768, 280],
+    [1280, 640, 280],
+  ])('fits the full sphere in a %i x %i canvas', (width, height, stack) => {
+    const layout = orbLayout(width, height, stack);
+    const css = { width, height, dpr: 1 };
+    const buffer = { width, height };
+    const drawn = drawnCenterCss(layout, buffer, css, 1);
+    const disk = orbDiskRect({ ...layout, centerX: drawn.x, centerY: drawn.y });
+    expect(fullyInsideViewport(disk, width, height)).toBe(true);
+    expect(layout.radius * 2).toBeLessThanOrEqual(Math.min(width, height));
   });
 });
 
