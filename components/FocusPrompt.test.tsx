@@ -219,6 +219,34 @@ describe('game-menu rows', () => {
     expect(document.activeElement).not.toBe(input);
   });
 
+  it('shows a muted WHOOP line and offer, and hides the line on Escape', () => {
+    const onHideWhoopLine = vi.fn();
+    renderPrompt('ask', {
+      whoopLine: 'Recovery 28%. Shorter blocks today.',
+      whoopOfferMinutes: 25,
+      onHideWhoopLine,
+    });
+    const line = screen.getByTestId('whoop-line');
+    expect(line.textContent).toBe('Recovery 28%. Shorter blocks today.');
+    expect(line.className).toContain('text-orb-quiet');
+    expect(line.className).not.toMatch(/bg-|rounded-full|badge/);
+    expect(screen.getByTestId('whoop-offer').textContent).toBe('25m');
+    expect(screen.queryByTestId('prompt-context')).toBeNull();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onHideWhoopLine).toHaveBeenCalledTimes(1);
+  });
+
+  it('underlines the WHOOP length in Adapt', () => {
+    renderPrompt('ask', {
+      whoopLine: 'Recovery 82%. Good day for deep work.',
+      whoopOfferMinutes: 50,
+      whoopAdapt: true,
+      choice: 50,
+    });
+    expect(screen.getByTestId('duration-50m').getAttribute('data-whoop-adapt')).toBe('true');
+    expect(screen.getByTestId('whoop-offer').getAttribute('data-whoop-adapt')).toBe('true');
+  });
+
   it('offers End session on a break and confirms from the prompt', () => {
     const { onOpenSession } = renderPrompt('break', { focusMinutes: 5 });
     expect(screen.getByTestId('focus-break').textContent).toBe('Break 5m');

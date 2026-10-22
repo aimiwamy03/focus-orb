@@ -148,4 +148,73 @@ describe('Settings sheet', () => {
     fireEvent.click(screen.getByTestId('clear-log-yes'));
     expect(onClearLog).toHaveBeenCalledTimes(1);
   });
+
+  it('shows a WHOOP section with keys and cycles the mode', () => {
+    const setWhoopMode = vi.fn();
+    const onWhoopConnect = vi.fn();
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod="google"
+        selectAuthMethod={() => {}}
+        isGoogleConnected
+        disconnectGoogle={async () => {}}
+        calendars={MOCK_GOOGLE_CALENDARS}
+        selectedCalendarIds={['primary']}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        whoopConnected
+        whoopStatus="ok"
+        whoopMode="suggest"
+        setWhoopMode={setWhoopMode}
+        whoopShowNumbers
+        setWhoopShowNumbers={() => {}}
+        onWhoopConnect={onWhoopConnect}
+        onWhoopDisconnect={() => {}}
+      />
+    );
+    expect(screen.getByTestId('whoop-mode-value').textContent).toBe('Suggest only');
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(setWhoopMode).toHaveBeenCalledWith('adapt');
+  });
+
+  it('labels a disconnected WHOOP and reconnects on Enter', () => {
+    const onWhoopConnect = vi.fn();
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod={null}
+        selectAuthMethod={() => {}}
+        isGoogleConnected={false}
+        disconnectGoogle={async () => {}}
+        calendars={[]}
+        selectedCalendarIds={[]}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        whoopConnected={false}
+        whoopStatus="disconnected"
+        whoopMode="suggest"
+        setWhoopMode={() => {}}
+        whoopShowNumbers
+        setWhoopShowNumbers={() => {}}
+        onWhoopConnect={onWhoopConnect}
+        onWhoopDisconnect={() => {}}
+      />
+    );
+    expect(screen.getByTestId('whoop-status').textContent).toBe('WHOOP disconnected');
+    expect(screen.getByTestId('whoop-connect').textContent).toContain('Reconnect');
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onWhoopConnect).toHaveBeenCalledTimes(1);
+  });
 });

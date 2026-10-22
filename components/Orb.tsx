@@ -106,6 +106,8 @@ import {
 } from '@/lib/backdrop';
 import { SAMPLE_DAY_LABEL } from '@/lib/fixtures';
 import { signInWithGoogle } from '@/app/actions';
+import { recordWhoopNudge } from '@/lib/whoop';
+import { useWhoop } from '@/lib/useWhoop';
 import { StarDustBackdrop } from './StarDustBackdrop';
 
 const PARTICLE_COUNT = 135000; // Total random points in disk (increased for finer dots)
@@ -149,6 +151,7 @@ export function Orb() {
   const plannedParam = searchParams.get('planned');
   const introParam = searchParams.get('intro');
   const introFreeze = parseIntroFreeze(searchParams.get('t'));
+  const whoop = useWhoop();
   const pipSupported = useSyncExternalStore(
     () => () => {},
     () => canUseDocumentPip() && !forceUnsupported,
@@ -261,6 +264,7 @@ export function Orb() {
     isGoogleConnected: calendar.isGoogleConnected,
     calendarUrl: calendar.calendarUrl,
     authMethod: calendar.authMethod,
+    whoopDemo: whoop.demo,
   });
 
   const showChrome =
@@ -405,6 +409,11 @@ export function Orb() {
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
   }, []);
+
+  useEffect(() => {
+    if (whoop.mode !== 'adapt' || whoop.offerMinutes == null) return;
+    setDurationChoice(whoop.offerMinutes);
+  }, [whoop.mode, whoop.offerMinutes]);
 
   const openMiniRef = useRef(miniWindow.open);
   const pipOpenRef = useRef(miniWindow.isOpen);
@@ -897,6 +906,9 @@ export function Orb() {
     saveRecentTasks(nextRecent);
     saveLastTask(name);
     saveLastDuration(choice);
+    if (whoop.offerMinutes != null) {
+      recordWhoopNudge(whoop.suggestion?.lineKey ?? null, minutes, whoop.offerMinutes);
+    }
     setTaskDraft('');
     setStopConfirm(false);
     setSessionConfirm(false);
@@ -1115,6 +1127,10 @@ export function Orb() {
                   ? formatMeetingSoonCopy(minutesBetween(now, day.nextEvent.start))
                   : statusLineText(day, now)
               }
+              whoopLine={surface === 'ask' ? whoop.line : null}
+              whoopOfferMinutes={surface === 'ask' && whoop.mode !== 'off' ? whoop.offerMinutes : null}
+              whoopAdapt={whoop.mode === 'adapt'}
+              onHideWhoopLine={whoop.hideLine}
               task={surface === 'focusing' || surface === 'stop-confirm' ? activeTask : taskDraft}
               onTaskChange={setTaskDraft}
               recentTasks={recentTasks}
@@ -1137,7 +1153,7 @@ export function Orb() {
                 setStopConfirm(false);
                 stopFocus();
               }}
-              onBreak={startBreak}
+              onBreak={() => startBreak(whoop.breakMinutes ?? undefined)}
               onAnotherRound={() => beginFocus(completed?.task || taskDraft, durationChoice)}
               onJoin={() => {
                 const url = extractJoinUrl(day.nextEvent);
@@ -1341,6 +1357,14 @@ export function Orb() {
             setIntroSound(value);
             saveIntroSound(value);
           }}
+          whoopConnected={Boolean(whoop.summary?.connected)}
+          whoopStatus={whoop.summary?.status ?? 'disconnected'}
+          whoopMode={whoop.mode}
+          setWhoopMode={whoop.setMode}
+          whoopShowNumbers={whoop.showNumbers}
+          setWhoopShowNumbers={whoop.setShowNumbers}
+          onWhoopConnect={whoop.connect}
+          onWhoopDisconnect={whoop.disconnect}
         />
       )}
 

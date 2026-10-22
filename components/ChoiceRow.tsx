@@ -25,6 +25,7 @@ export function ChoiceRow({
   onConfirm,
   testId,
   tone = 'button',
+  underlined = -1,
 }: {
   items: ChoiceItem[];
   highlighted: number;
@@ -32,6 +33,7 @@ export function ChoiceRow({
   onConfirm: (index: number) => void;
   testId: string;
   tone?: 'button' | 'chip' | 'quiet';
+  underlined?: number;
 }) {
   return (
     <div
@@ -50,6 +52,7 @@ export function ChoiceRow({
             tabIndex={-1}
             data-testid={item.id}
             data-highlighted={active ? 'true' : 'false'}
+            data-whoop-adapt={underlined === index ? 'true' : 'false'}
             disabled={item.disabled}
             aria-pressed={active}
             onMouseDown={keepButtonUnfocused}
@@ -63,7 +66,15 @@ export function ChoiceRow({
             }}
             className={hitClass(Boolean(item.disabled))}
           >
-            <span className={choiceClass(tone, active, Boolean(item.disabled))}>{item.label}</span>
+            <span
+              className={`${choiceClass(tone, active, Boolean(item.disabled))} ${
+                underlined === index
+                  ? 'underline decoration-1 underline-offset-[6px]'
+                  : ''
+              }`}
+            >
+              {item.label}
+            </span>
           </button>
         );
       })}

@@ -133,12 +133,12 @@ export function useManualFocus(options?: { onFocusEnded?: (draft: FocusLogDraft)
     });
   }, []);
 
-  const startBreak = useCallback(() => {
+  const startBreak = useCallback((minutes: number = BREAK_MINUTES) => {
     recordedStartRef.current = null;
     setCompleted(null);
     setSession({
       startTime: Date.now(),
-      duration: BREAK_MINUTES,
+      duration: Math.max(1, minutes),
       task: 'Break',
       kind: 'break',
     });
