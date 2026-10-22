@@ -18,5 +18,6 @@ describe('ShortcutsCard', () => {
     screen.getByTestId('shortcuts-got-it').click();
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('shortcuts-got-it').textContent).toBe(GOT_IT_LABEL);
+    expect(card.textContent).not.toMatch(/Voice/i);
   });
 });

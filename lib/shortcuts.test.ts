@@ -6,6 +6,7 @@ import {
   loadShortcutsCardSeen,
   saveShortcutsCardSeen,
   SHORTCUT_ROWS,
+  SHORTCUT_TIPS_ROWS,
   SHORTCUTS_CARD_KEY,
   SHORTCUTS_LABEL,
   shouldShowShortcutsCard,
@@ -73,6 +74,7 @@ describe('shortcuts storage and copy', () => {
   it('lists the chrome shortcuts and has no em dashes', () => {
     expect(SHORTCUT_ROWS).toHaveLength(7);
     expect(SHORTCUT_ROWS.map((row) => row.key)).toEqual(['F', 'S', 'Space', 'V', 'P', 'M', 'L']);
+    expect(SHORTCUT_TIPS_ROWS.map((row) => row.key)).toEqual(['F', 'S', 'Space', 'P', 'M', 'L']);
     const copy = [
       SHORTCUTS_LABEL,
       GOT_IT_LABEL,

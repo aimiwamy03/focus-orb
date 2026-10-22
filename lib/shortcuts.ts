@@ -18,6 +18,8 @@ export const SHORTCUT_ROWS = [
 
 export type ShortcutId = (typeof SHORTCUT_ROWS)[number]['id'];
 
+export const SHORTCUT_TIPS_ROWS = SHORTCUT_ROWS.filter((row) => row.key !== 'V');
+
 export function isShortcutKey(key: string): boolean {
   return (
     key === 'f' ||

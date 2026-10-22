@@ -1290,7 +1290,7 @@ export function Orb() {
       />
 
       <VoiceMicButton
-        visible={!firstOpen && !miniOnly && !showSettings && !showLog && !showIntro}
+        visible={!firstOpen && !miniOnly && !showSettings && !showLog && !showIntro && !showShortcutsCard}
         holding={voice.phase === 'listening'}
         onHoldStart={voice.holdStart}
         onHoldEnd={voice.holdEnd}

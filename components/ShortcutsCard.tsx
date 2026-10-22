@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import {
   GOT_IT_LABEL,
-  SHORTCUT_ROWS,
+  SHORTCUT_TIPS_ROWS,
   SHORTCUTS_CARD_MS,
 } from '@/lib/shortcuts';
 import { KeyHint } from './KeyHint';
@@ -25,7 +25,7 @@ export function ShortcutsCard({ onDismiss }: ShortcutsCardProps) {
       className="fixed top-4 right-4 z-40 space-y-2 text-[length:var(--type-hint)] leading-5 text-orb-dim [text-shadow:0_0_14px_rgba(0,0,0,0.9),0_1px_2px_rgba(0,0,0,0.8)]"
     >
       <ul className="space-y-2">
-        {SHORTCUT_ROWS.map((row) => (
+        {SHORTCUT_TIPS_ROWS.map((row) => (
           <li key={row.id} className="flex items-center justify-end gap-2">
             <span>{row.action}</span>
             <KeyHint label={row.key} />
