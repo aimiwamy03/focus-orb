@@ -23,6 +23,7 @@ import {
   SKIP_LABEL,
   START_LABEL,
   UNTIL_MEETING_LABEL,
+  suggestionMatchesInput,
   visibleAskSuggestions,
 } from '@/lib/focusPrompt';
 import { createMenuState, reduceMenu, type MenuState } from '@/lib/menuKey';
@@ -272,7 +273,9 @@ export function FocusPrompt({
       return;
     }
     if (item.action === 'recent') {
-      handlersRef.current.onStart(String(item.value ?? item.label));
+      handlersRef.current.onTaskChange(String(item.value ?? item.label));
+      inputRef.current?.focus();
+      setMenu((current) => ({ ...current, focus: 'input' }));
       return;
     }
     if (item.action === 'keep') {
@@ -398,7 +401,8 @@ export function FocusPrompt({
         <div
           data-testid="prompt-context"
           data-text-clear
-          className="text-[length:var(--type-status)] leading-snug text-orb-quiet"
+          className="text-[length:var(--type-status)] leading-snug"
+          style={{ color: '#8a8a90' }}
         >
           {contextLine}
         </div>
@@ -426,22 +430,27 @@ export function FocusPrompt({
             style={{ borderBottom: '1px solid rgba(255,255,255,0.18)', paddingBottom: 8 }}
           />
           {mounted && suggestions.length > 0 ? (
-            <div data-testid="recent-tasks" className="flex flex-wrap justify-center gap-2">
+            <div data-testid="recent-tasks" className="ask-suggestions">
               {suggestions.map((item, index) => {
-                const active = menu.index === index;
+                const keyboardOnRecent =
+                  menu.focus === 'row' && items[menu.index]?.action === 'recent';
+                const active = keyboardOnRecent
+                  ? menu.index === index
+                  : suggestionMatchesInput(item, task);
                 return (
                   <button
                     key={item}
                     type="button"
                     tabIndex={-1}
+                    title={item}
                     data-testid={`recent-${item}`}
                     data-highlighted={active ? 'true' : 'false'}
                     onMouseDown={(event) => event.preventDefault()}
                     onMouseEnter={() => highlightIndex(index)}
                     onClick={() => onTaskChange(item)}
-                    className={choiceClass('quiet', active, false)}
+                    className="ask-suggestion"
                   >
-                    {item}
+                    <span className="ask-suggestion-label">{item}</span>
                   </button>
                 );
               })}

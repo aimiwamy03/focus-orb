@@ -1,10 +1,15 @@
 import { chromium } from 'playwright';
-import { mkdir } from 'node:fs/promises';
+import { copyFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
-const BASE = process.env.MENU_BASE || 'http://127.0.0.1:3000';
+const BASE = process.env.MENU_BASE || 'http://localhost:3000';
 const OUT = process.env.MENU_SHOTS || '/opt/cursor/artifacts/menu-keys';
+const ARTIFACTS = '/opt/cursor/artifacts';
 await mkdir(OUT, { recursive: true });
+await mkdir(ARTIFACTS, { recursive: true });
+
+const LONG_TASK =
+  'Write the production agent launch recap and send it to the lab before standup';
 
 const SEED = {
   'focusOrb:shortcutsCard': '1',
@@ -16,9 +21,9 @@ const SEED = {
     'leave-tab': true,
   }),
   'focusOrb:recentTasks': JSON.stringify([
+    's',
+    LONG_TASK,
     'finish voice ai post',
-    'write the spec',
-    'review pr',
   ]),
 };
 
@@ -44,12 +49,76 @@ async function highlighted(page, testId) {
   return page.locator(`[data-testid="${testId}"]`).getAttribute('data-highlighted');
 }
 
-const browser = await chromium.launch({ args: ['--use-gl=angle'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+async function publish(page, fileName) {
+  const dest = path.join(ARTIFACTS, fileName);
+  await page.screenshot({ path: dest });
+  await copyFile(dest, path.join(OUT, fileName));
+}
 
-await open(page, '/?mock=empty');
-const askReady = await page.getByTestId('focus-prompt').count();
+const browser = await chromium.launch({ args: ['--use-gl=angle'] });
+const homePage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+
+await open(homePage, '/?mock=empty');
+const askReady = await homePage.getByTestId('focus-prompt').count();
 if (!askReady) fail('Ask screen did not load');
+
+const suggestionRow = homePage.getByTestId('recent-tasks');
+if ((await suggestionRow.count()) !== 1) fail('Ask suggestions should render in one row');
+const suggestionClass = await suggestionRow.getAttribute('class');
+if (suggestionClass !== 'ask-suggestions') {
+  fail(`Suggestion row should be plain ask-suggestions, got ${suggestionClass}`);
+}
+const highlightedSuggestions = await homePage.locator('[data-testid^="recent-"][data-highlighted="true"]').count();
+if (highlightedSuggestions !== 0) {
+  fail('Initial Ask should not highlight a suggestion');
+}
+const firstSuggestionClass = await homePage.getByTestId('recent-s').getAttribute('class');
+if (!firstSuggestionClass || firstSuggestionClass.includes('rounded-full') || firstSuggestionClass.includes('ring-2')) {
+  fail(`Suggestion should be plain text, got ${firstSuggestionClass}`);
+}
+await publish(homePage, 'ask_suggestions_none.png');
+
+await homePage.keyboard.press('ArrowLeft');
+await homePage.keyboard.press('ArrowLeft');
+await homePage.waitForTimeout(150);
+if ((await homePage.getByTestId(`recent-${LONG_TASK}`).getAttribute('data-highlighted')) !== 'true' &&
+    (await homePage.getByTestId('recent-finish voice ai post').getAttribute('data-highlighted')) !== 'true') {
+  fail('Arrowing onto a suggestion should show keyboard highlight');
+}
+const keyboardHit = homePage.locator('[data-testid^="recent-"][data-highlighted="true"]');
+if ((await keyboardHit.count()) !== 1) fail('Exactly one suggestion should be keyboard-highlighted');
+const underline = await keyboardHit.evaluate((el) => {
+  const style = getComputedStyle(el);
+  const color = style.borderBottomColor;
+  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)/);
+  return {
+    color,
+    paddingBottom: style.paddingBottom,
+    bluish: rgb ? Number(rgb[3]) > Number(rgb[1]) : /oklch|lab/i.test(color),
+  };
+});
+if (!underline.bluish) {
+  fail(`Keyboard focus should use the agenda-blue underline, got ${JSON.stringify(underline)}`);
+}
+await publish(homePage, 'ask_suggestions_keyboard.png');
+
+const longSuggestion = homePage.getByTestId(`recent-${LONG_TASK}`);
+const truncated = await longSuggestion.evaluate((el) => {
+  const label = el.querySelector('.ask-suggestion-label') || el;
+  return {
+    overflow: label.scrollWidth > label.clientWidth + 1,
+    ellipsis: getComputedStyle(label).textOverflow === 'ellipsis',
+  };
+});
+if (!truncated.ellipsis || !truncated.overflow) {
+  fail(`Long suggestion should truncate, got ${JSON.stringify(truncated)}`);
+}
+await publish(homePage, 'ask_suggestions_truncate.png');
+await homePage.close();
+
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await open(page, '/?mock=empty');
+if (!(await page.getByTestId('focus-prompt').count())) fail('Ask screen did not reload');
 
 const initialChip = await highlighted(page, 'duration-50m');
 if (initialChip !== 'true') fail(`50m should start highlighted, got ${initialChip}`);

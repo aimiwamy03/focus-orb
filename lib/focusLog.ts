@@ -25,18 +25,38 @@ export interface FocusLogDay {
   byTask: FocusLogTaskTotal[];
 }
 
+export interface FocusChartDay {
+  key: string;
+  startMs: number;
+  date: Date;
+  minutes: number;
+  isToday: boolean;
+  label: string;
+}
+
+export interface FocusChartSummary {
+  total: number;
+  average: number;
+  max: number;
+  hasData: boolean;
+  best: FocusChartDay | null;
+}
+
 export const FOCUS_LOG_KEY = 'focusOrb:focusLog';
 export const FOCUS_LOG_MOCK_KEY = 'focusOrb:focusLog:mock';
 export const LOG_LABEL = 'Log';
 export const LOG_EMPTY = 'No focus yet today. Your sessions will show up here.';
-export const LOG_ENDED_EARLY = 'ended early';
-export const LOG_BY_TASK = 'By task';
 export const CLEAR_LOG_LABEL = 'Clear log';
 export const CLEAR_LOG_PROMPT = 'Clear the focus log?';
-export const DELETE_LOG_PROMPT = 'Delete this session?';
 export const KEEP_LOG_LABEL = 'Keep';
-export const DELETE_LABEL = 'Delete';
 export const CLEAR_LABEL = 'Clear';
+export const LOG_RANGE_DASH = '–';
+export const LOG_DOT = '·';
+export const CHART_DAYS = 14;
+export const CHART_TITLE = 'Last 14 days';
+export const CHART_EMPTY = 'Your focus will chart here.';
+export const LONG_LOG_TASK =
+  'Write the production agent launch recap and send it to the lab before standup';
 
 export function focusLogKey(input: { email?: string | null; mock?: boolean }): string {
   if (input.mock) return FOCUS_LOG_MOCK_KEY;
@@ -84,9 +104,27 @@ export function formatLogRange(start: Date, end: Date): string {
     return formatLogClock(start, true);
   }
   if (startPeriod === endPeriod) {
-    return `${formatLogClock(start)}-${formatLogClock(end)}${endPeriod}`;
+    return `${formatLogClock(start)}${LOG_RANGE_DASH}${formatLogClock(end)}${endPeriod}`;
   }
-  return `${formatLogClock(start, true)}-${formatLogClock(end, true)}`;
+  return `${formatLogClock(start, true)}${LOG_RANGE_DASH}${formatLogClock(end, true)}`;
+}
+
+export function isStoppedEarly(ended: FocusLogEnded): boolean {
+  return ended !== 'completed';
+}
+
+export function formatSessionTime(start: Date, end: Date, ended: FocusLogEnded): string {
+  if (isStoppedEarly(ended)) return formatLogClock(start, true);
+  return formatLogRange(start, end);
+}
+
+export function formatSessionSpent(minutes: number): string {
+  if (minutes < 1) return '<1 min';
+  return `${Math.max(1, Math.round(minutes))} min`;
+}
+
+export function formatSessionPlannedSuffix(planned: number): string {
+  return ` / ${Math.max(0, Math.round(planned))}`;
 }
 
 export function formatFocusedMinutes(
@@ -94,11 +132,14 @@ export function formatFocusedMinutes(
   planned: number,
   ended: FocusLogEnded
 ): string {
-  if (minutes < 1) return '<1 min';
-  const spent = Math.max(1, Math.round(minutes));
-  const total = Math.max(spent, Math.round(planned));
-  if (ended !== 'completed' && spent < total) return `${spent} of ${total} min`;
-  return `${spent} min`;
+  const spent = formatSessionSpent(minutes);
+  if (!isStoppedEarly(ended)) return spent;
+  return `${spent}${formatSessionPlannedSuffix(planned)}`;
+}
+
+export function sessionBarPercent(minutes: number, planned: number): number {
+  if (planned <= 0) return minutes > 0 ? 100 : 4;
+  return Math.min(100, Math.max(4, (minutes / planned) * 100));
 }
 
 export function formatDayFocused(minutes: number): string {
@@ -109,10 +150,6 @@ export function formatDayFocused(minutes: number): string {
   if (hours <= 0) return `${mins}m`;
   if (mins <= 0) return `${hours}h`;
   return `${hours}h ${mins}m`;
-}
-
-export function formatLogDayHeading(label: string, minutes: number): string {
-  return `${label}, ${formatDayFocused(minutes)} focused`;
 }
 
 export function formatLogDate(date: Date): string {
@@ -150,7 +187,7 @@ export function groupFocusLog(entries: FocusLogEntry[], now: Date = new Date()):
     buckets.set(key, list);
   }
   const todayKey = startOfLocalDay(now).getTime();
-  if (entries.length > 0 && !buckets.has(todayKey)) {
+  if (!buckets.has(todayKey)) {
     buckets.set(todayKey, []);
   }
   return [...buckets.entries()]
@@ -163,13 +200,76 @@ export function groupFocusLog(entries: FocusLogEntry[], now: Date = new Date()):
       return {
         key: String(key),
         label,
-        heading: minutes > 0 ? formatLogDayHeading(label, minutes) : label,
+        heading: label,
         isToday,
         minutes,
         entries: dayEntries.sort((a, b) => b.startMs - a.startMs),
         byTask: isToday ? taskTotals(dayEntries) : [],
       };
     });
+}
+
+export function chartFocusDays(
+  entries: FocusLogEntry[],
+  now: Date = new Date(),
+  count: number = CHART_DAYS
+): FocusChartDay[] {
+  const today = startOfLocalDay(now);
+  const buckets = new Map<number, number>();
+  for (const entry of entries) {
+    const key = startOfLocalDay(new Date(entry.startMs)).getTime();
+    buckets.set(key, (buckets.get(key) ?? 0) + entry.minutes);
+  }
+  const days: FocusChartDay[] = [];
+  for (let offset = count - 1; offset >= 0; offset--) {
+    const date = addDays(today, -offset);
+    const startMs = date.getTime();
+    days.push({
+      key: String(startMs),
+      startMs,
+      date,
+      minutes: buckets.get(startMs) ?? 0,
+      isToday: offset === 0,
+      label: offset === 0 ? 'Today' : formatLogDate(date),
+    });
+  }
+  return days;
+}
+
+export function summarizeChart(days: FocusChartDay[]): FocusChartSummary {
+  const total = days.reduce((sum, day) => sum + day.minutes, 0);
+  const active = days.filter((day) => day.minutes > 0);
+  const average = active.length === 0 ? 0 : active.reduce((sum, day) => sum + day.minutes, 0) / active.length;
+  const max = days.reduce((high, day) => Math.max(high, day.minutes), 0);
+  let best: FocusChartDay | null = null;
+  for (const day of days) {
+    if (day.minutes <= 0) continue;
+    if (
+      !best ||
+      day.minutes > best.minutes ||
+      (day.minutes === best.minutes && day.startMs > best.startMs)
+    ) {
+      best = day;
+    }
+  }
+  return { total, average, max, hasData: active.length > 0, best };
+}
+
+export function chartBarHeight(minutes: number, max: number, plot = 140, stub = 2): number {
+  if (minutes <= 0 || max <= 0) return stub;
+  return Math.max(stub, Math.round((minutes / max) * plot));
+}
+
+export function formatChartAvg(minutes: number): string {
+  return `Avg ${formatDayFocused(Math.round(minutes))} a day`;
+}
+
+export function formatChartBest(day: FocusChartDay): string {
+  return `Best: ${formatLogDate(day.date)}, ${formatDayFocused(day.minutes)}`;
+}
+
+export function formatChartTooltip(date: Date, minutes: number): string {
+  return `${formatLogDate(date)} ${LOG_DOT} ${formatDayFocused(minutes)}`;
 }
 
 function isEntry(value: unknown): value is FocusLogEntry {
@@ -237,37 +337,62 @@ export function atLocal(day: Date, hours: number, minutes = 0): Date {
   return next;
 }
 
+function fixtureEntry(
+  id: string,
+  day: Date,
+  startH: number,
+  startM: number,
+  minutes: number,
+  planned: number,
+  task: string,
+  ended: FocusLogEnded
+): FocusLogEntry {
+  const start = atLocal(day, startH, startM);
+  return {
+    id,
+    task,
+    startMs: start.getTime(),
+    endMs: start.getTime() + minutes * 60_000,
+    minutes,
+    planned,
+    ended,
+  };
+}
+
 export function getFocusLogFixture(now: Date = new Date()): FocusLogEntry[] {
   const today = startOfLocalDay(now);
   const yesterday = addDays(now, -1);
   const earlier = addDays(now, -3);
-  const entry = (
-    id: string,
-    day: Date,
-    startH: number,
-    startM: number,
-    minutes: number,
-    planned: number,
-    task: string,
-    ended: FocusLogEnded
-  ): FocusLogEntry => {
-    const start = atLocal(day, startH, startM);
-    return {
-      id,
-      task,
-      startMs: start.getTime(),
-      endMs: start.getTime() + minutes * 60_000,
-      minutes,
-      planned,
-      ended,
-    };
-  };
   return [
-    entry('today-voice', today, 14, 10, 25, 25, 'finish voice ai post', 'completed'),
-    entry('today-spec', today, 10, 0, 50, 50, 'write the spec', 'completed'),
-    entry('today-review', today, 16, 5, 20, 50, 'review pr', 'ended-early'),
-    entry('yday-voice', yesterday, 9, 30, 50, 50, 'finish voice ai post', 'completed'),
-    entry('yday-lab', yesterday, 13, 0, 90, 90, 'Production Agent Lab', 'completed'),
-    entry('older-plan', earlier, 11, 0, 25, 25, 'plan the week', 'completed'),
+    fixtureEntry('today-voice', today, 14, 10, 25, 25, 'finish voice ai post', 'completed'),
+    fixtureEntry('today-spec', today, 10, 0, 50, 50, 'write the spec', 'completed'),
+    fixtureEntry('today-review', today, 16, 5, 20, 50, 'review pr', 'ended-early'),
+    fixtureEntry('yday-voice', yesterday, 9, 30, 50, 50, 'finish voice ai post', 'completed'),
+    fixtureEntry('yday-lab', yesterday, 13, 0, 90, 90, 'Production Agent Lab', 'completed'),
+    fixtureEntry('older-plan', earlier, 11, 0, 25, 25, 'plan the week', 'completed'),
+  ];
+}
+
+export function getFocusLogRedesignFixture(now: Date = new Date()): FocusLogEntry[] {
+  const yesterday = addDays(now, -1);
+  const hourDay = addDays(now, -2);
+  const earlier = addDays(now, -3);
+  return [
+    fixtureEntry('yday-done', yesterday, 21, 1, 25, 25, 's', 'completed'),
+    fixtureEntry('yday-early-a', yesterday, 21, 1, 1, 25, 's', 'ended-early'),
+    fixtureEntry('yday-early-b', yesterday, 21, 0, 1, 25, 's', 'ended-early'),
+    fixtureEntry('hour-long', hourDay, 10, 0, 65, 90, LONG_LOG_TASK, 'completed'),
+    fixtureEntry('older-plan', earlier, 11, 0, 25, 25, 'plan the week', 'completed'),
+  ];
+}
+
+export function getFocusLogChartFixture(now: Date = new Date()): FocusLogEntry[] {
+  const today = startOfLocalDay(now);
+  return [
+    ...getFocusLogRedesignFixture(now),
+    fixtureEntry('today-chart', today, 9, 0, 25, 25, 'morning pages', 'completed'),
+    fixtureEntry('d5', addDays(now, -5), 10, 0, 50, 50, 'write the spec', 'completed'),
+    fixtureEntry('d8', addDays(now, -8), 14, 0, 40, 50, 'review pr', 'ended-early'),
+    fixtureEntry('d12', addDays(now, -12), 11, 0, 90, 90, 'Production Agent Lab', 'completed'),
   ];
 }

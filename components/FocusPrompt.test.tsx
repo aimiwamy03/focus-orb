@@ -75,11 +75,24 @@ describe('Ask task field', () => {
     expect(screen.queryByTestId('recent-ship')).toBeNull();
   });
 
-  it('hides a suggestion that matches the typed value and fills on click', () => {
+  it('keeps a matching suggestion visible and fills the input on click', () => {
     const { onTaskChange } = renderAsk('finish voice ai post');
-    expect(screen.queryByTestId('recent-finish voice ai post')).toBeNull();
+    expect(screen.getByTestId('recent-finish voice ai post').getAttribute('data-highlighted')).toBe(
+      'true'
+    );
+    expect(screen.getByTestId('recent-write the spec').getAttribute('data-highlighted')).toBe(
+      'false'
+    );
     screen.getByTestId('recent-write the spec').click();
     expect(onTaskChange).toHaveBeenCalledWith('write the spec');
+  });
+
+  it('renders suggestions as plain text without a pill', () => {
+    renderAsk('');
+    const suggestion = screen.getByTestId('recent-finish voice ai post');
+    expect(suggestion.className).toBe('ask-suggestion');
+    expect(suggestion.className).not.toMatch(/rounded-full|ring-2|bg-orb-highlight/);
+    expect(screen.getByTestId('recent-tasks').className).toBe('ask-suggestions');
   });
 
   it('shows the idle Ask menu hint near the chips', () => {
@@ -130,6 +143,16 @@ describe('game-menu rows', () => {
     expect(onChoiceChange).toHaveBeenCalledWith(90);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('fills the input when Enter confirms a highlighted suggestion', () => {
+    const { onTaskChange, onStart } = renderAsk('');
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(screen.getByTestId('recent-review pr').getAttribute('data-highlighted')).toBe('true');
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onTaskChange).toHaveBeenCalledWith('review pr');
+    expect(onStart).not.toHaveBeenCalled();
   });
 
   it('lets empty-input arrows move chips and reach Start', () => {

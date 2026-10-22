@@ -24,6 +24,7 @@ import {
   rememberTask,
   resolveDuration,
   resolveStartTask,
+  suggestionMatchesInput,
   visibleAskSuggestions,
   RECENT_TASKS_KEY,
   saveLastDuration,
@@ -58,7 +59,7 @@ describe('rememberTask', () => {
 });
 
 describe('visibleAskSuggestions', () => {
-  it('shows up to three unique recents and hides the typed value', () => {
+  it('shows up to three unique recents and keeps the typed match visible', () => {
     expect(
       visibleAskSuggestions(
         [
@@ -76,7 +77,9 @@ describe('visibleAskSuggestions', () => {
         ['finish voice ai post', 'write the spec', 'review pr'],
         'finish voice ai post'
       )
-    ).toEqual(['write the spec', 'review pr']);
+    ).toEqual(['finish voice ai post', 'write the spec', 'review pr']);
+    expect(suggestionMatchesInput('finish voice ai post', 'finish voice ai post')).toBe(true);
+    expect(suggestionMatchesInput('write the spec', 'finish voice ai post')).toBe(false);
   });
 });
 

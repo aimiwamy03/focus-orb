@@ -39,7 +39,6 @@ import { CURSOR_HIDE_MS, isKeepCursorTarget, shouldHideCursor } from '@/lib/curs
 import {
   LOG_LABEL,
   clearFocusLog,
-  deleteFocusLogEntry,
   focusLogKey,
   loadFocusLog,
   recordFocusLog,
@@ -1279,7 +1278,6 @@ export function Orb() {
             setTaskDraft(task);
             setShowLog(false);
           }}
-          onDelete={(id) => setFocusLog(deleteFocusLogEntry(logKey, id))}
         />
       ) : null}
     </div>

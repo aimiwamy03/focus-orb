@@ -42,3 +42,345 @@ body {
 * {
   box-sizing: border-box;
 }
+
+.focus-log {
+  font-family: -apple-system, 'Helvetica Neue', system-ui, sans-serif;
+  width: 100%;
+  max-width: 920px;
+  background: #121213;
+  border: 1px solid #1f1f21;
+  border-radius: 16px;
+  padding: 28px 28px 20px;
+  color: #ececee;
+}
+
+.focus-log-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-areas: 'list chart';
+  column-gap: 28px;
+  align-items: stretch;
+  margin-top: 28px;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.focus-log-days {
+  grid-area: list;
+}
+
+.focus-log-chart {
+  grid-area: chart;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 759px) {
+  .focus-log-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: 'chart' 'list';
+    row-gap: 28px;
+  }
+
+  .focus-log-chart {
+    max-width: none;
+  }
+}
+
+.focus-log-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.focus-log-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #ececee;
+}
+
+.focus-log-close {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #2a2a2d;
+  border-radius: 8px;
+  background: transparent;
+  color: #b4b4b9;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.focus-log-close:hover {
+  background: #1c1c1e;
+  color: #ececee;
+}
+
+.focus-log-close:focus-visible,
+.focus-log-row[data-highlighted='true'] {
+  outline: 1px solid #ececee;
+  outline-offset: 2px;
+}
+
+.focus-log-row[data-highlighted='true'] {
+  outline-color: #2a2a2d;
+  outline-offset: -1px;
+}
+
+.focus-log-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #8a8a90;
+}
+
+.focus-log-chart-summary span {
+  white-space: nowrap;
+}
+
+.focus-log-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  font-size: 13px;
+  color: #8a8a90;
+  text-align: center;
+}
+
+.focus-log-chart-max {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #6e6e74;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-log-chart-plot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 140px;
+  margin-top: 4px;
+  overflow: visible;
+  border-bottom: 1px solid #222225;
+}
+
+.focus-log-chart-baseline {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: #222225;
+}
+
+.focus-log-chart-bar {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: center;
+  height: 140px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.focus-log-chart-bar-fill {
+  width: 8px;
+  border-radius: 1px 1px 0 0;
+}
+
+.focus-log-chart-bar:focus-visible .focus-log-chart-bar-fill {
+  outline: 1px solid #ececee;
+  outline-offset: 1px;
+}
+
+.focus-log-chart-tooltip {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border: 1px solid #2a2a2d;
+  border-radius: 6px;
+  background: #1c1c1e;
+  color: #ececee;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.focus-log-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6e6e74;
+}
+
+.focus-log-day + .focus-log-day {
+  margin-top: 32px;
+}
+
+.focus-log-day-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ececee;
+}
+
+.focus-log-day-label {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.focus-log-day-total {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.focus-log-day-rule {
+  margin: 10px 0 0;
+  border: 0;
+  border-top: 1px solid #222225;
+}
+
+.focus-log-empty {
+  margin: 16px 0 0;
+  font-size: 14px;
+  color: #8a8a90;
+}
+
+.focus-log-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) auto;
+  column-gap: 16px;
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px solid #1a1a1c;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-log-time {
+  font-size: 13px;
+  color: #8a8a90;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.focus-log-task {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  color: #ececee;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.focus-log-duration {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-log-bar {
+  width: 48px;
+  height: 4px;
+  background: #26262a;
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.focus-log-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.focus-log-duration-label {
+  min-width: 72px;
+  text-align: right;
+  font-size: 15px;
+  font-weight: 500;
+  color: #ececee;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.focus-log-duration-early {
+  color: #b4b4b9;
+}
+
+.focus-log-duration-planned {
+  color: #6e6e74;
+  font-weight: 400;
+}
+
+.ask-suggestions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ask-suggestion {
+  min-width: 0;
+  max-width: 16rem;
+  overflow: visible;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 0 4px;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  color: #8a8a90;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.ask-suggestion-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-suggestion[data-highlighted='true'],
+.ask-suggestion:hover {
+  color: #ececee;
+  border-bottom-color: oklch(0.78 0.08 230);
+}

@@ -80,10 +80,9 @@ export function saveLastTask(task: string): void {
 
 export function visibleAskSuggestions(
   recent: string[],
-  typed: string,
+  _typed: string = '',
   limit: number = MAX_ASK_SUGGESTIONS
 ): string[] {
-  const current = typed.trim().toLowerCase();
   const seen = new Set<string>();
   const out: string[] = [];
   for (const item of recent) {
@@ -91,12 +90,16 @@ export function visibleAskSuggestions(
     if (!name || name === FALLBACK_TASK) continue;
     const key = name.toLowerCase();
     if (seen.has(key)) continue;
-    if (current && key === current) continue;
     seen.add(key);
     out.push(name);
     if (out.length >= limit) break;
   }
   return out;
+}
+
+export function suggestionMatchesInput(name: string, typed: string): boolean {
+  const current = typed.trim().toLowerCase();
+  return Boolean(current) && name.trim().toLowerCase() === current;
 }
 
 export function resolveStartTask(
