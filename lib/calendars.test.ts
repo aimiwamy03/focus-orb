@@ -91,7 +91,14 @@ describe("Amy's calendar list", () => {
     expect(calendarLabelTags(calendars[5])).toEqual([]);
     expect(defaultSelectedCalendarIds(calendars)).toEqual([
       'events-reminders@google.com',
+      'abc123@group.calendar.google.com',
+      'xyz789@import.calendar.google.com',
+      'work@company.com',
+      'remind-event@group.calendar.google.com',
     ]);
+    expect(defaultSelectedCalendarIds(calendars)).not.toContain(
+      'en.usa#holiday@group.v.calendar.google.com'
+    );
   });
 
   it('does not mark an owned Self calendar as primary in the mock fixture', () => {
@@ -112,7 +119,7 @@ describe('parseGoogleCalendarList / parseGoogleEvents', () => {
       { id: 'primary', summary: 'Personal', primary: true },
       { id: 'work@company.com', summary: 'Work', primary: false },
     ]);
-    expect(defaultSelectedCalendarIds(calendars)).toEqual(['primary']);
+    expect(defaultSelectedCalendarIds(calendars)).toEqual(['primary', 'work@company.com']);
 
     const personal = parseGoogleEvents({ items: [personalEvent] });
     expect(personal[0].summary).toBe('Lunch');
@@ -170,13 +177,35 @@ describe('mocked Google API', () => {
     expect(onlyPrimary.map((event) => event.summary)).toEqual(['Lunch']);
     expect(onlyPrimary.some((event) => event.summary === 'Sprint planning')).toBe(false);
   });
+
+  it('keeps events from other calendars when an imported reader calendar fails', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes('/calendars/primary/events')) {
+        return jsonResponse({ items: [personalEvent] });
+      }
+      if (url.includes('import.calendar.google.com')) {
+        return jsonResponse({ error: 'forbidden' }, 403);
+      }
+      return jsonResponse({ error: 'unexpected' }, 404);
+    });
+    const events = await fetchMergedGoogleEvents(
+      'mock-token',
+      ['primary', 'xyz789@import.calendar.google.com'],
+      {
+        timeMin: '2026-10-09T00:00:00.000Z',
+        timeMax: '2026-10-09T23:59:59.999Z',
+      },
+      fetchImpl
+    );
+    expect(events.map((event) => event.summary)).toEqual(['Lunch']);
+  });
 });
 
 describe('resolveSelectedCalendarIds', () => {
   const calendars = parseGoogleCalendarList(calendarListPayload);
 
-  it('defaults to the primary calendar', () => {
-    expect(resolveSelectedCalendarIds(calendars, null)).toEqual(['primary']);
+  it('defaults to every non-holiday calendar, imported included', () => {
+    expect(resolveSelectedCalendarIds(calendars, null)).toEqual(['primary', 'work@company.com']);
   });
 
   it('keeps a stored selection that still exists', () => {

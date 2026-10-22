@@ -10,6 +10,7 @@ export const AGENDA_LEFT = 24;
 export const AGENDA_ORB_PAD = 16;
 export const AGENDA_SOFT_ACCENT = AGENDA_ACCENT;
 export const AGENDA_EMPTY_TODAY = 'Nothing else today.';
+export const AGENDA_EMPTY_TOMORROW = 'Nothing tomorrow.';
 export const SHOW_AGENDA_KEY = 'focusOrb:showAgenda';
 export const SHOW_AGENDA_LABEL = 'Show agenda';
 
@@ -134,7 +135,7 @@ export function buildAgenda(events: CalendarEvent[], now: Date): AgendaSection[]
     key,
     weekday: formatWeekday(day),
     dayNumber: key === 'today' ? day.getDate() : null,
-    heading: key === 'today' ? formatWeekday(day) : key === 'tomorrow' ? 'TOMORROW' : formatWeekday(day),
+    heading: formatWeekday(day),
     emptyLabel: dayEvents.length === 0 ? emptyLabel : null,
     items: dayEvents.map((event, index) => toItem(event, now, index, nextStart)),
   });
@@ -142,14 +143,11 @@ export function buildAgenda(events: CalendarEvent[], now: Date): AgendaSection[]
   const todaySection = make('today', today, leftover, AGENDA_EMPTY_TODAY);
   const tomorrowEvents = eventsOnDay(usable, tomorrow);
   const nextEvents = eventsOnDay(usable, nextDay);
-  const sections = [todaySection];
-  if (tomorrowEvents.length > 0) {
-    sections.push(make('tomorrow', tomorrow, tomorrowEvents, null));
-  }
-  if (nextEvents.length > 0) {
-    sections.push(make('nextday', nextDay, nextEvents, null));
-  }
-  return sections;
+  return [
+    todaySection,
+    make('tomorrow', tomorrow, tomorrowEvents, AGENDA_EMPTY_TOMORROW),
+    ...(nextEvents.length > 0 ? [make('nextday', nextDay, nextEvents, null)] : []),
+  ];
 }
 
 export function visibleAgendaSections(
@@ -183,7 +181,8 @@ export function shouldShowAgenda(input: {
     input.surface === 'ask' ||
     input.surface === 'break' ||
     input.surface === 'completed' ||
-    input.surface === 'meeting-soon'
+    input.surface === 'meeting-soon' ||
+    input.surface === 'session-confirm'
   ) {
     return true;
   }

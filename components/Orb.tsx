@@ -18,8 +18,11 @@ import { orbLayout, textClearCloudRadius, type OrbLayout } from '@/lib/layout';
 import {
   DurationChoice,
   FALLBACK_TASK,
+  type PromptSurface,
   formatMeetingSoonCopy,
   formatMiniFocusStatus,
+  KEEP_FOCUSING_LABEL,
+  KEEP_RESTING_LABEL,
   loadLastDuration,
   loadLastTask,
   loadRecentTasks,
@@ -32,6 +35,7 @@ import {
   saveRecentTasks,
   untilMeetingDuration,
 } from '@/lib/focusPrompt';
+import { CURSOR_HIDE_MS, isKeepCursorTarget, shouldHideCursor } from '@/lib/cursor';
 import { collectTextClearRects, textClearAlpha, textClearRectsOnDisk } from '@/lib/textClear';
 import {
   breathGlow,
@@ -130,6 +134,8 @@ export function Orb() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [orbHovered, setOrbHovered] = useState(false);
   const [stopConfirm, setStopConfirm] = useState(false);
+  const [sessionConfirm, setSessionConfirm] = useState(false);
+  const [hideCursor, setHideCursor] = useState(false);
   const [skipHeadsUp, setSkipHeadsUp] = useState(false);
   const [taskDraft, setTaskDraft] = useState('');
   const [recentTasks, setRecentTasks] = useState<string[]>([]);
@@ -143,8 +149,12 @@ export function Orb() {
   const [showAgenda, setShowAgenda] = useState(true);
   const [viewSize, setViewSize] = useState({ w: 1280, h: 800 });
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const cursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const handleOrbClickRef = useRef<() => void>(() => {});
   const miniOnlyRef = useRef(false);
+  const firstOpenRef = useRef(false);
+  const settingsOpenRef = useRef(false);
+  const surfaceRef = useRef<PromptSurface | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
   const layoutRef = useRef<OrbLayout>({
@@ -183,6 +193,7 @@ export function Orb() {
     startFocus,
     startBreak,
     stopFocus,
+    endSession,
     dismissCompleted,
     seedCompleted,
   } = useManualFocus();
@@ -210,6 +221,7 @@ export function Orb() {
     isFocusing: isManualFocus,
     isBreak: Boolean(isBreak),
     stopConfirm,
+    sessionConfirm,
     completed: Boolean(completed),
     headsUp: isHeadsUp(day, now),
     skipHeadsUp,
@@ -241,7 +253,10 @@ export function Orb() {
 
   miniOnlyRef.current = miniOnly;
   askDimRef.current =
-    surface === 'ask' || surface === 'completed' || surface === 'break';
+    surface === 'ask' ||
+    surface === 'completed' ||
+    surface === 'break' ||
+    (surface === 'session-confirm' && Boolean(isBreak));
   miniDrawRef.current = {
     scatter,
     density,
@@ -264,7 +279,8 @@ export function Orb() {
     surface === 'ask' ||
     surface === 'break' ||
     surface === 'completed' ||
-    surface === 'meeting-soon';
+    surface === 'meeting-soon' ||
+    surface === 'session-confirm';
   const mountAgenda =
     showAgenda &&
     !firstOpen &&
@@ -792,6 +808,7 @@ export function Orb() {
     saveLastDuration(choice);
     setTaskDraft('');
     setStopConfirm(false);
+    setSessionConfirm(false);
     dismissCompleted();
     startFocus(minutes, name);
     dismissShortcutsCard();
@@ -800,7 +817,10 @@ export function Orb() {
 
   const handleOrbClick = () => {
     if (firstOpen) return;
-    if (isBreak) return;
+    if (isBreak) {
+      setSessionConfirm((open) => !open);
+      return;
+    }
     if (isManualFocus) {
       setStopConfirm((open) => !open);
       return;
@@ -869,24 +889,53 @@ export function Orb() {
   }, []);
 
   useEffect(() => {
-    const onFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
+    const onFullscreen = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+      setHideCursor(false);
+    };
     document.addEventListener('fullscreenchange', onFullscreen);
     return () => document.removeEventListener('fullscreenchange', onFullscreen);
   }, []);
 
+  firstOpenRef.current = firstOpen;
+  settingsOpenRef.current = showSettings;
+  surfaceRef.current = surface;
+  miniOnlyRef.current = miniOnly;
+
+  useEffect(() => {
+    setHideCursor(false);
+  }, [surface, showSettings, firstOpen, miniOnly]);
+
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      const overInteractive = isKeepCursorTarget(event.target);
+      setHideCursor(false);
+      if (cursorTimeoutRef.current) clearTimeout(cursorTimeoutRef.current);
+      cursorTimeoutRef.current = setTimeout(() => {
+        setHideCursor(
+          shouldHideCursor({
+            surface: surfaceRef.current,
+            stillMs: CURSOR_HIDE_MS,
+            overInteractive,
+            firstOpen: firstOpenRef.current,
+            miniOnly: miniOnlyRef.current,
+            settingsOpen: settingsOpenRef.current,
+          })
+        );
+      }, CURSOR_HIDE_MS);
+    };
+    window.addEventListener('pointermove', onMove);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      if (cursorTimeoutRef.current) clearTimeout(cursorTimeoutRef.current);
+    };
+  }, []);
+
   return (
     <div 
-      className={`relative h-screen w-screen overflow-hidden ${
-        firstOpen ||
-        showChrome ||
-        orbHovered ||
-        miniOnly ||
-        surface === 'ask' ||
-        surface === 'stop-confirm' ||
-        surface === 'completed'
-          ? ''
-          : 'cursor-none'
-      }`}
+      data-testid="orb-root"
+      data-cursor-hidden={hideCursor ? 'true' : 'false'}
+      className={`relative h-screen w-screen overflow-hidden ${hideCursor ? 'cursor-none' : ''}`}
       data-satellites={day.remainingInRun.length}
       onMouseMove={(e) => {
         const over = isOverOrb(e.clientX, e.clientY);
@@ -981,7 +1030,7 @@ export function Orb() {
               completedMinutes={completed?.minutes}
               completedPlanned={completed?.planned}
               joinUrl={extractJoinUrl(day.nextEvent)}
-              onStart={() => beginFocus(taskDraft, durationChoice)}
+              onStart={(taskName) => beginFocus(taskName ?? taskDraft, durationChoice)}
               onKeepGoing={() => setStopConfirm(false)}
               onEnd={() => {
                 setStopConfirm(false);
@@ -994,6 +1043,14 @@ export function Orb() {
                 if (url) window.open(url, '_blank', 'noreferrer');
               }}
               onSkip={() => setSkipHeadsUp(true)}
+              onOpenSession={() => setSessionConfirm(true)}
+              onKeepSession={() => setSessionConfirm(false)}
+              onEndSession={() => {
+                setSessionConfirm(false);
+                setStopConfirm(false);
+                endSession();
+              }}
+              sessionKeepLabel={isBreak ? KEEP_RESTING_LABEL : KEEP_FOCUSING_LABEL}
               chromeVisible={showChrome}
               keyboardActive={!showSettings}
             />

@@ -18,8 +18,9 @@ export function Agenda({
     <aside
       data-testid="agenda"
       data-text-clear
-      className={`pointer-events-none absolute z-20 max-h-[min(78vh,36rem)] overflow-hidden rounded-2xl px-4 py-5 transition-opacity duration-300 ${
-        faded ? 'opacity-0' : 'opacity-100'
+      data-interactive
+      className={`absolute z-20 max-h-[min(78vh,36rem)] cursor-auto overflow-hidden rounded-2xl px-4 py-5 transition-opacity duration-300 ${
+        faded ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
       style={{
         left: AGENDA_LEFT,

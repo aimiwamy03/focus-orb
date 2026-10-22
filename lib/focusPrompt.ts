@@ -3,6 +3,10 @@ import { formatCompactDuration } from './tab';
 
 export const ASK_PROMPT = 'What do you want to focus on?';
 export const END_EARLY_PROMPT = 'End focus early?';
+export const END_SESSION_PROMPT = 'End session?';
+export const END_SESSION_LABEL = 'End session';
+export const KEEP_RESTING_LABEL = 'Keep resting';
+export const KEEP_FOCUSING_LABEL = 'Keep focusing';
 export const KEEP_GOING_LABEL = 'Keep going';
 export const END_LABEL = 'End';
 export const START_LABEL = 'Start';
@@ -27,6 +31,7 @@ export type PromptSurface =
   | 'ask'
   | 'focusing'
   | 'stop-confirm'
+  | 'session-confirm'
   | 'completed'
   | 'break'
   | 'meeting-soon'
@@ -195,6 +200,7 @@ export function formatMiniFocusStatus(input: {
   minutes?: number | null;
 }): string | null {
   if (input.surface === 'stop-confirm') return 'End early?';
+  if (input.surface === 'session-confirm') return 'End session?';
   if (input.surface === 'break' && input.minutes != null) {
     return formatBreakCopy(input.minutes);
   }
@@ -210,6 +216,7 @@ export function promptSurface(input: {
   isFocusing: boolean;
   isBreak: boolean;
   stopConfirm: boolean;
+  sessionConfirm?: boolean;
   completed: boolean;
   headsUp: boolean;
   skipHeadsUp?: boolean;
@@ -217,6 +224,7 @@ export function promptSurface(input: {
 }): PromptSurface | null {
   if (input.firstOpen || input.miniOnly) return null;
   if (input.isFocusing && input.stopConfirm) return 'stop-confirm';
+  if ((input.isFocusing || input.isBreak) && input.sessionConfirm) return 'session-confirm';
   if (input.isFocusing) return 'focusing';
   if (input.isBreak) return 'break';
   if (input.completed) return 'completed';

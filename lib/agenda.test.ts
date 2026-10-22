@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { CalendarEvent } from './calendar';
 import {
   AGENDA_EMPTY_TODAY,
+  AGENDA_EMPTY_TOMORROW,
   AGENDA_SOFT_ACCENT,
   agendaClearsOrb,
   buildAgenda,
@@ -14,6 +15,17 @@ import {
   SHOW_AGENDA_KEY,
   visibleAgendaSections,
 } from './agenda';
+import {
+  AMY_PRIMARY_CALENDAR_ID,
+  AMY_SELF_IMPORT_ID,
+  amyImportedWeekCalendars,
+  amyImportedWeekNow,
+  defaultSelectedCalendarIds,
+  getAmyImportedWeekByCalendar,
+  mergeEventsFromCalendars,
+  parseGoogleDate,
+} from './calendars';
+import { buildDayModel, statusLineText } from './day';
 
 function at(day: Date, hours: number, minutes = 0): Date {
   const next = new Date(day);
@@ -85,17 +97,19 @@ describe('remainingToday and grouping', () => {
     expect(sections[0].items.map((item) => item.title)).toEqual(['Wrap-up']);
     expect(sections[0].items[0].isNext).toBe(true);
     expect(sections[0].items[0].color).toBe('#4285f4');
-    expect(sections[1].heading).toBe('TOMORROW');
+    expect(sections[1].heading).toBe('THURSDAY');
     expect(sections[1].items[0].timeLabel).toBe('10-10:30am');
     expect(sections[2].heading).toBe('FRIDAY');
     expect(sections[2].items[0].color).toBe(AGENDA_SOFT_ACCENT);
   });
 
-  it('reads empty today copy when nothing remains', () => {
+  it('reads empty today copy when nothing remains and still names tomorrow', () => {
     const sections = buildAgenda([morning], wednesday);
-    expect(sections).toHaveLength(1);
+    expect(sections.map((section) => section.key)).toEqual(['today', 'tomorrow']);
     expect(sections[0].emptyLabel).toBe(AGENDA_EMPTY_TODAY);
     expect(sections[0].items).toEqual([]);
+    expect(sections[1].heading).toBe('THURSDAY');
+    expect(sections[1].emptyLabel).toBe(AGENDA_EMPTY_TOMORROW);
   });
 
   it('drops the next-day section on a short viewport', () => {
@@ -109,6 +123,64 @@ describe('remainingToday and grouping', () => {
       'today',
       'tomorrow',
     ]);
+  });
+});
+
+describe("Amy's imported Thursday week", () => {
+  const now = amyImportedWeekNow();
+  const calendars = amyImportedWeekCalendars();
+  const selected = defaultSelectedCalendarIds(calendars);
+  const events = mergeEventsFromCalendars(getAmyImportedWeekByCalendar(now), selected);
+
+  it('selects the imported Self calendar with the primary', () => {
+    expect(selected).toEqual([AMY_PRIMARY_CALENDAR_ID, AMY_SELF_IMPORT_ID]);
+    expect(events.map((event) => event.summary)).toContain('Production Agent Lab - Workshop');
+  });
+
+  it('keeps Thursday as tomorrow with its own heading and the long workshop range', () => {
+    const sections = buildAgenda(events, now);
+    expect(sections.map((section) => section.key)).toEqual(['today', 'tomorrow', 'nextday']);
+    expect(sections[0].emptyLabel).toBe(AGENDA_EMPTY_TODAY);
+    expect(sections[1].heading).toBe('THURSDAY');
+    expect(sections[1].weekday).toBe('THURSDAY');
+    expect(sections[1].items.map((item) => item.title)).toEqual([
+      'Production Agent Lab - Workshop',
+      'Sleep',
+    ]);
+    expect(sections[1].items[0].timeLabel).toBe('10am-8pm');
+    expect(sections[2].heading).toBe('FRIDAY');
+    expect(sections[2].items.map((item) => item.title)).toEqual([
+      'Friday standup',
+      'Design review',
+      'Team sync',
+      'recap with myself',
+    ]);
+  });
+
+  it('does not skip an empty tomorrow just because Friday has events', () => {
+    const primaryOnly = mergeEventsFromCalendars(getAmyImportedWeekByCalendar(now), [
+      AMY_PRIMARY_CALENDAR_ID,
+    ]);
+    const sections = buildAgenda(primaryOnly, now);
+    expect(sections[1].heading).toBe('THURSDAY');
+    expect(sections[1].emptyLabel).toBe(AGENDA_EMPTY_TOMORROW);
+    expect(sections[2].heading).toBe('FRIDAY');
+  });
+
+  it('includes imported events on the status line when they are today', () => {
+    const thursdayMorning = new Date(now);
+    thursdayMorning.setDate(now.getDate() + 1);
+    thursdayMorning.setHours(9, 0, 0, 0);
+    const model = buildDayModel(events, thursdayMorning);
+    expect(statusLineText(model, thursdayMorning)).toContain('Production Agent Lab - Workshop');
+  });
+
+  it('reads a UTC calendar stamp without an offset as UTC', () => {
+    const start = parseGoogleDate({
+      dateTime: '2026-10-22T17:00:00',
+      timeZone: 'UTC',
+    });
+    expect(start.toISOString()).toBe('2026-10-22T17:00:00.000Z');
   });
 });
 
@@ -135,6 +207,7 @@ describe('visibility and copy', () => {
     expect(shouldShowAgenda({ ...base, surface: 'focusing', chromeVisible: true })).toBe(true);
     expect(shouldShowAgenda({ ...base, surface: 'completed' })).toBe(true);
     expect(shouldShowAgenda({ ...base, surface: 'meeting-soon' })).toBe(true);
+    expect(shouldShowAgenda({ ...base, surface: 'session-confirm' })).toBe(true);
     expect(shouldShowAgenda({ ...base, surface: 'in-meeting' })).toBe(false);
   });
 

@@ -48,16 +48,28 @@ describe('reduceMenu confirm row', () => {
 });
 
 describe('reduceMenu ask input vs chips', () => {
-  it('leaves Left/Right to the caret while the input is focused', () => {
+  it('leaves Left/Right to the caret while the input has text', () => {
     const start = askMenu();
-    const left = reduceMenu(start, { key: 'ArrowLeft', inInput: true });
+    const left = reduceMenu(start, { key: 'ArrowLeft', inInput: true, inputEmpty: false });
     expect(left.state.index).toBe(1);
     expect(left.state.focus).toBe('input');
     expect(left.preventDefault).toBe(false);
     expect(left.effect).toBe('none');
-    const right = reduceMenu(start, { key: 'ArrowRight', inInput: true });
+    const right = reduceMenu(start, { key: 'ArrowRight', inInput: true, inputEmpty: false });
     expect(right.state.index).toBe(1);
     expect(right.preventDefault).toBe(false);
+  });
+
+  it('moves chips with Left/Right when the input is empty', () => {
+    const start = askMenu();
+    const right = reduceMenu(start, { key: 'ArrowRight', inInput: true, inputEmpty: true });
+    expect(right.state.focus).toBe('row');
+    expect(right.state.index).toBe(2);
+    expect(right.preventDefault).toBe(true);
+    expect(right.effect).toBe('focus-row');
+    const left = reduceMenu(start, { key: 'ArrowLeft', inInput: true, inputEmpty: true });
+    expect(left.state.index).toBe(0);
+    expect(left.preventDefault).toBe(true);
   });
 
   it('moves to the chip row on Down, Up, or Tab', () => {
@@ -66,7 +78,7 @@ describe('reduceMenu ask input vs chips', () => {
     expect(down.state.focus).toBe('row');
     expect(down.effect).toBe('focus-row');
     expect(down.preventDefault).toBe(true);
-    expect(down.state.index).toBe(1);
+    expect(down.state.index).toBe(2);
 
     const tab = reduceMenu(start, { key: 'Tab', inInput: true });
     expect(tab.state.focus).toBe('row');
@@ -74,6 +86,8 @@ describe('reduceMenu ask input vs chips', () => {
 
     const up = reduceMenu(start, { key: 'ArrowUp', inInput: true });
     expect(up.state.focus).toBe('row');
+    expect(up.state.index).toBe(0);
+    expect(up.preventDefault).toBe(true);
   });
 
   it('moves chips with arrows once focus has left the input', () => {
@@ -102,10 +116,10 @@ describe('reduceMenu ask input vs chips', () => {
     expect(shift.effect).toBe('focus-input');
   });
 
-  it('does not confirm Enter while the caret is in the input', () => {
+  it('confirms Enter while the caret is in the input so Start can fire immediately', () => {
     const enter = reduceMenu(askMenu(), { key: 'Enter', inInput: true });
-    expect(enter.effect).toBe('none');
-    expect(enter.preventDefault).toBe(false);
+    expect(enter.effect).toBe('confirm');
+    expect(enter.preventDefault).toBe(true);
   });
 });
 
