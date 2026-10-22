@@ -42,15 +42,27 @@ export function Welcome({ onConnect, googleConfigured }: WelcomeProps) {
               {SAMPLE_DAY_LINK}
             </a>
             <span className="mx-2 text-orb-quiet">·</span>
-            <a href="/about" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+            <a
+              href="/about"
+              data-testid="welcome-about"
+              className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text"
+            >
               {ABOUT_LABEL}
             </a>
             <span className="mx-2 text-orb-quiet">·</span>
-            <a href="/privacy" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+            <a
+              href="/privacy"
+              data-testid="welcome-privacy"
+              className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text"
+            >
               {PRIVACY_LABEL}
             </a>
             <span className="mx-2 text-orb-quiet">·</span>
-            <a href="/terms" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+            <a
+              href="/terms"
+              data-testid="welcome-terms"
+              className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text"
+            >
               {TERMS_LABEL}
             </a>
           </span>
@@ -67,15 +79,27 @@ export function Welcome({ onConnect, googleConfigured }: WelcomeProps) {
               {SAMPLE_DAY_LINK}
             </a>
             <span className="mx-2 text-orb-quiet">·</span>
-            <a href="/about" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+            <a
+              href="/about"
+              data-testid="welcome-about"
+              className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text"
+            >
               {ABOUT_LABEL}
             </a>
             <span className="mx-2 text-orb-quiet">·</span>
-            <a href="/privacy" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+            <a
+              href="/privacy"
+              data-testid="welcome-privacy"
+              className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text"
+            >
               {PRIVACY_LABEL}
             </a>
             <span className="mx-2 text-orb-quiet">·</span>
-            <a href="/terms" className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text">
+            <a
+              href="/terms"
+              data-testid="welcome-terms"
+              className="pointer-events-auto text-orb-dim underline underline-offset-2 hover:text-orb-text"
+            >
               {TERMS_LABEL}
             </a>
           </span>

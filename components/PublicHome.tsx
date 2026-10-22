@@ -17,9 +17,9 @@ import { CONNECT_LABEL, SAMPLE_DAY_LINK, isGoogleConfigured } from '@/lib/onboar
 import { LegalChrome, LegalSection } from './LegalChrome';
 
 export function PublicHome({
-  current = 'home',
+  current = 'about',
 }: {
-  current?: 'home' | 'about';
+  current?: 'about';
 }) {
   const googleConfigured = isGoogleConfigured();
 
@@ -74,15 +74,13 @@ export function PublicHome({
         >
           {SAMPLE_DAY_LINK}
         </a>
-        {current === 'about' ? (
-          <Link
-            href="/"
-            data-testid="open-app"
-            className="text-orb-text underline decoration-1 underline-offset-4 hover:text-white"
-          >
-            {OPEN_APP_LABEL}
-          </Link>
-        ) : null}
+        <Link
+          href="/"
+          data-testid="open-app"
+          className="text-orb-text underline decoration-1 underline-offset-4 hover:text-white"
+        >
+          {OPEN_APP_LABEL}
+        </Link>
       </div>
     </LegalChrome>
   );
