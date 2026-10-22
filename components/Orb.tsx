@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useCalendar } from '@/lib/useCalendar';
 import { useManualFocus } from '@/lib/useManualFocus';
@@ -85,10 +85,22 @@ import { StatusLine } from './StatusLine';
 import { Timeline } from './Timeline';
 import { Satellites } from './Satellites';
 import { Welcome } from './Welcome';
+import { FocusIntro } from './FocusIntro';
 import { MiniOrbView } from './MiniOrbView';
 import { KeyHint } from './KeyHint';
 import { ShortcutsCard } from './ShortcutsCard';
 import { isFirstOpen, isGoogleConfigured } from '@/lib/onboarding';
+import {
+  isStoredFocusRunning,
+  loadIntroPlayed,
+  loadIntroSound,
+  loadPlayIntro,
+  markIntroPlayed,
+  parseIntroFreeze,
+  saveIntroSound,
+  savePlayIntro,
+  shouldPlayIntro,
+} from '@/lib/intro';
 import { SAMPLE_DAY_LABEL } from '@/lib/fixtures';
 import { signInWithGoogle } from '@/app/actions';
 
@@ -131,6 +143,8 @@ export function Orb() {
   const taskParam = searchParams.get('task');
   const doneParam = searchParams.get('done');
   const plannedParam = searchParams.get('planned');
+  const introParam = searchParams.get('intro');
+  const introFreeze = parseIntroFreeze(searchParams.get('t'));
   const pipSupported = useSyncExternalStore(
     () => () => {},
     () => canUseDocumentPip() && !forceUnsupported,
@@ -158,6 +172,9 @@ export function Orb() {
   const [leaveHint, setLeaveHint] = useState(false);
   const [showShortcutsCard, setShowShortcutsCard] = useState(false);
   const [showAgenda, setShowAgenda] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
+  const [playIntro, setPlayIntro] = useState(true);
+  const [introSound, setIntroSound] = useState(false);
   const [viewSize, setViewSize] = useState({ w: 1280, h: 800 });
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const cursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -166,6 +183,7 @@ export function Orb() {
   const firstOpenRef = useRef(false);
   const settingsOpenRef = useRef(false);
   const logOpenRef = useRef(false);
+  const introOpenRef = useRef(false);
   const surfaceRef = useRef<PromptSurface | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
@@ -355,6 +373,20 @@ export function Orb() {
       window.visualViewport?.removeEventListener('resize', updateLayout);
     };
   }, [updateLayout, surface, miniOnly, firstOpen]);
+
+  useLayoutEffect(() => {
+    const play = shouldPlayIntro({
+      introParam,
+      sessionPlayed: loadIntroPlayed(),
+      playIntro: loadPlayIntro(),
+      focusing: isStoredFocusRunning(),
+      miniOnly: miniOnlyParam,
+    });
+    if (play) markIntroPlayed();
+    setShowIntro(play);
+    setPlayIntro(loadPlayIntro());
+    setIntroSound(loadIntroSound());
+  }, [introParam, miniOnlyParam]);
 
   useEffect(() => {
     setPopOutOnLeave(loadPopOutOnLeave());
@@ -755,6 +787,7 @@ export function Orb() {
 
   useEffect(() => {
     if (
+      showIntro ||
       !shouldShowShortcutsCard({
         firstOpen,
         miniOnly,
@@ -766,7 +799,7 @@ export function Orb() {
       return;
     }
     setShowShortcutsCard(true);
-  }, [firstOpen, miniOnly, surface]);
+  }, [firstOpen, miniOnly, showIntro, surface]);
 
   const toggleFullscreen = () => {
     markHintSeen('fullscreen');
@@ -783,6 +816,7 @@ export function Orb() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (introOpenRef.current) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -936,6 +970,7 @@ export function Orb() {
   firstOpenRef.current = firstOpen;
   settingsOpenRef.current = showSettings;
   logOpenRef.current = showLog;
+  introOpenRef.current = showIntro;
   surfaceRef.current = surface;
   miniOnlyRef.current = miniOnly;
 
@@ -1266,8 +1301,27 @@ export function Orb() {
             saveShowAgenda(value);
           }}
           onClearLog={() => setFocusLog(clearFocusLog(logKey))}
+          playIntro={playIntro}
+          setPlayIntro={(value) => {
+            setPlayIntro(value);
+            savePlayIntro(value);
+          }}
+          introSound={introSound}
+          setIntroSound={(value) => {
+            setIntroSound(value);
+            saveIntroSound(value);
+          }}
         />
       )}
+
+      {showIntro ? (
+        <FocusIntro
+          soundEnabled={introSound}
+          reducedMotion={reducedMotion}
+          freezeAt={introFreeze}
+          onDone={() => setShowIntro(false)}
+        />
+      ) : null}
 
       {showLog ? (
         <FocusLog

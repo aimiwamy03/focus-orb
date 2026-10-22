@@ -55,6 +55,41 @@ describe('Settings sheet', () => {
     expect(screen.getByTestId('clear-log').textContent).toBe('Clear log');
   });
 
+  it('toggles Play intro and Intro sound', () => {
+    const setPlayIntro = vi.fn();
+    const setIntroSound = vi.fn();
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod="google"
+        selectAuthMethod={() => {}}
+        isGoogleConnected
+        disconnectGoogle={async () => {}}
+        calendars={MOCK_GOOGLE_CALENDARS}
+        selectedCalendarIds={['primary']}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        playIntro
+        setPlayIntro={setPlayIntro}
+        introSound={false}
+        setIntroSound={setIntroSound}
+      />
+    );
+    expect(screen.getByTestId('play-intro')).toBeTruthy();
+    expect(screen.getByTestId('intro-sound')).toBeTruthy();
+    expect(screen.getByText('Play intro')).toBeTruthy();
+    expect(screen.getByText('Intro sound')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('play-intro'));
+    expect(setPlayIntro).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByTestId('intro-sound'));
+    expect(setIntroSound).toHaveBeenCalledWith(true);
+  });
+
   it('asks before clearing the log', () => {
     const onClearLog = vi.fn();
     render(

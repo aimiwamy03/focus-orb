@@ -18,6 +18,7 @@ import {
   CLEAR_LOG_PROMPT,
   KEEP_LOG_LABEL,
 } from '@/lib/focusLog';
+import { INTRO_SOUND_LABEL, PLAY_INTRO_LABEL } from '@/lib/intro';
 
 type AuthMethod = 'google' | 'ical' | null;
 
@@ -43,6 +44,10 @@ interface SettingsProps {
   showAgenda?: boolean;
   setShowAgenda?: (value: boolean) => void;
   onClearLog?: () => void;
+  playIntro?: boolean;
+  setPlayIntro?: (value: boolean) => void;
+  introSound?: boolean;
+  setIntroSound?: (value: boolean) => void;
 }
 
 export function Settings({
@@ -66,6 +71,10 @@ export function Settings({
   showAgenda = true,
   setShowAgenda,
   onClearLog,
+  playIntro = true,
+  setPlayIntro,
+  introSound = false,
+  setIntroSound,
 }: SettingsProps) {
   const [tempUrl, setTempUrl] = useState(calendarUrl);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -276,6 +285,35 @@ export function Settings({
               />
               Pop out when I leave this tab
             </label>
+          </div>
+        ) : null}
+
+        {setPlayIntro || setIntroSound ? (
+          <div className="space-y-2">
+            {setPlayIntro ? (
+              <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
+                <input
+                  type="checkbox"
+                  data-testid="play-intro"
+                  checked={playIntro}
+                  onChange={(event) => setPlayIntro(event.target.checked)}
+                  className="rounded border-orb-quiet bg-black/30"
+                />
+                {PLAY_INTRO_LABEL}
+              </label>
+            ) : null}
+            {setIntroSound ? (
+              <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
+                <input
+                  type="checkbox"
+                  data-testid="intro-sound"
+                  checked={introSound}
+                  onChange={(event) => setIntroSound(event.target.checked)}
+                  className="rounded border-orb-quiet bg-black/30"
+                />
+                {INTRO_SOUND_LABEL}
+              </label>
+            ) : null}
           </div>
         ) : null}
 

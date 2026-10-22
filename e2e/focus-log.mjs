@@ -132,6 +132,7 @@ async function seedPage(page, extra = {}) {
   await page.addInitScript(
     (payload) => {
       localStorage.clear();
+      sessionStorage.setItem('focusOrb:introPlayed', '1');
       localStorage.setItem('focusOrb:shortcutsCard', '1');
       localStorage.setItem('focusOrb:hints', payload.hints);
       localStorage.setItem('focusOrb:recentTasks', payload.recents);
