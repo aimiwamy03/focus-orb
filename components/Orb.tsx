@@ -76,7 +76,6 @@ import {
 import { drawMiniOrbOnCanvas, ensureMiniCanvasSize } from '@/lib/drawMiniOrb';
 import { sizeOrbCanvas } from '@/lib/orbCanvas';
 import { useMiniWindow } from '@/components/useMiniWindow';
-import { StackBoundary } from '@/components/StackBoundary';
 import { Settings } from './Settings';
 import { Hints, markHintSeen } from './Hints';
 import { Agenda } from './Agenda';
@@ -1104,7 +1103,9 @@ export function Orb() {
               completedMinutes={completed?.minutes}
               completedPlanned={completed?.planned}
               joinUrl={extractJoinUrl(day.nextEvent)}
-              onStart={(taskName) => beginFocus(taskName ?? taskDraft, durationChoice)}
+              onStart={(taskName, choice) =>
+                beginFocus(taskName ?? taskDraft, choice ?? durationChoice)
+              }
               onKeepGoing={() => setStopConfirm(false)}
               onEnd={() => {
                 setStopConfirm(false);
@@ -1136,15 +1137,11 @@ export function Orb() {
           {calendar.mockScenario ? (
             <div
               data-testid="sample-day-label"
+              data-text-clear
               className="text-[11px] tracking-wide text-orb-quiet"
             >
               {SAMPLE_DAY_LABEL}
             </div>
-          ) : null}
-          {showShortcutsCard ? (
-            <StackBoundary>
-              <ShortcutsCard onDismiss={dismissShortcutsCard} />
-            </StackBoundary>
           ) : null}
           <Timeline
             events={day.events}
@@ -1242,8 +1239,10 @@ export function Orb() {
         </div>
       ) : null}
 
+      {showShortcutsCard ? <ShortcutsCard onDismiss={dismissShortcutsCard} /> : null}
+
       <Hints
-        active={!firstOpen && !miniOnly}
+        active={!firstOpen && !miniOnly && !showShortcutsCard}
         chromeVisible={showChrome}
         revision={hintRev}
         teach={surface === 'ask'}

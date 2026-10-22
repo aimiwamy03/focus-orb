@@ -157,6 +157,14 @@ describe('intro timeline', () => {
     expect(reduced.artTransform).toContain('scale(1)');
   });
 
+  it('does not drive a fuse hairline on desktop, mobile timing, or reduced motion', () => {
+    for (const t of [0, 1.2, 1.8, 2.83, 3.2, 6.5]) {
+      expect(introFrame(t, false)).not.toHaveProperty('fuseOpacity');
+      expect(introFrame(t, false)).not.toHaveProperty('fuseScale');
+      expect(introFrame(t, true)).not.toHaveProperty('fuseOpacity');
+    }
+  });
+
   it('skips on Esc, Enter, and Space, and has no em dashes', () => {
     expect(isIntroSkipKey('Escape')).toBe(true);
     expect(isIntroSkipKey('Enter')).toBe(true);

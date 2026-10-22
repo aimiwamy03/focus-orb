@@ -19,6 +19,7 @@ describe('FocusIntro', () => {
     );
     expect(screen.getByTestId('focus-intro-hint').textContent).toBe(INTRO_SKIP_HINT);
     expect(INTRO_LINES[1].toLowerCase()).toContain('brain');
+    expect(document.querySelector('.focus-intro-fuse')).toBeNull();
   });
 
   it.each(['Escape', 'Enter', ' '])('skips on %s', (key) => {

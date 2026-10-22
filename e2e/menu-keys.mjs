@@ -218,6 +218,39 @@ if ((await breakPage.getByTestId('focus-break').count()) !== 0) {
 await breakPage.screenshot({ path: path.join(OUT, 'after_break_idle.png') });
 
 await breakPage.close();
+
+const clickPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await open(clickPage, '/?mock=empty');
+if ((await highlighted(clickPage, 'duration-50m')) !== 'true') {
+  fail('Click-pick reload should start on 50m');
+}
+await clickPage.keyboard.press('ArrowRight');
+await clickPage.waitForTimeout(150);
+if ((await highlighted(clickPage, 'duration-90m')) !== 'true') {
+  fail('ArrowRight should highlight 90m before the click-pick test');
+}
+await clickPage.getByTestId('duration-50m').hover();
+await clickPage.waitForTimeout(150);
+if ((await highlighted(clickPage, 'duration-50m')) !== 'true') {
+  fail('Hover should move the highlight to 50m');
+}
+await publish(clickPage, 'duration_hover_50m.png');
+const chipHit = await clickPage.getByTestId('duration-50m').evaluate((el) => {
+  const box = el.getBoundingClientRect();
+  const style = getComputedStyle(el);
+  return { height: box.height, cursor: style.cursor };
+});
+if (chipHit.height < 44) fail(`Duration hit area should be at least 44px tall, got ${chipHit.height}`);
+if (chipHit.cursor !== 'pointer') fail(`Duration chip cursor should be pointer, got ${chipHit.cursor}`);
+await clickPage.getByTestId('duration-50m').click();
+await clickPage.waitForTimeout(400);
+const started = await clickPage.getByTestId('focus-countdown').textContent();
+if (!started || !started.includes('50m')) {
+  fail(`Clicking 50m while 90m was highlighted should start a 50m block, got ${started}`);
+}
+await publish(clickPage, 'duration_click_50m_started.png');
+await clickPage.close();
+
 await browser.close();
 
 if (process.exitCode) {

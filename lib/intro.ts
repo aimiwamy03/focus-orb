@@ -199,8 +199,6 @@ export interface IntroFrame {
   restOpacity: number;
   restScale: number;
   restGlow: number;
-  fuseOpacity: number;
-  fuseScale: number;
   hintOpacity: number;
   overlayOpacity: number;
   done: boolean;
@@ -258,19 +256,6 @@ export function introFrame(
     }
   }
 
-  let fuseO = 0;
-  let fill = 0;
-  if (turned >= 1 && turned <= 3 && inTurn < 0) {
-    fuseO = 1;
-    fill = ramp(t, timeline.turns[turned - 1] + timeline.turn, timeline.turns[turned - 1] + timeline.turn + timeline.hold);
-  } else if (inTurn >= 1 && inTurn <= 3) {
-    fuseO = 1 - clamp(turnP * 3);
-    fill = 1;
-  } else if (inTurn === 0) {
-    fuseO = clamp((turnP - 0.6) / 0.4);
-    fill = 0;
-  }
-
   const restText = restIndex > 0 && restIndex < INTRO_LINES.length ? INTRO_LINES[restIndex] : '';
 
   return {
@@ -285,8 +270,6 @@ export function introFrame(
     restOpacity,
     restScale,
     restGlow,
-    fuseOpacity: fuseO * (1 - out),
-    fuseScale: fill,
     hintOpacity: ramp(t, timeline.hintAt, timeline.hintAt + timeline.hintFade) * (1 - out),
     overlayOpacity: 1 - fin,
     done: fin >= 1,

@@ -45,7 +45,7 @@ interface FocusPromptProps {
   completedMinutes?: number;
   completedPlanned?: number;
   joinUrl?: string | null;
-  onStart: (task?: string) => void;
+  onStart: (task?: string, choice?: DurationChoice) => void;
   onKeepGoing: () => void;
   onEnd: () => void;
   onBreak: () => void;
@@ -264,8 +264,9 @@ export function FocusPrompt({
     if (!item || item.disabled) return;
     const { surface: kind } = handlersRef.current;
     if (item.action === 'duration') {
-      handlersRef.current.onChoiceChange(item.value as DurationChoice);
-      handlersRef.current.onStart();
+      const duration = item.value as DurationChoice;
+      handlersRef.current.onChoiceChange(duration);
+      handlersRef.current.onStart(undefined, duration);
       return;
     }
     if (item.action === 'start') {
@@ -416,19 +417,34 @@ export function FocusPrompt({
           >
             {ASK_PROMPT}
           </label>
-          <input
-            ref={inputRef}
-            data-testid="focus-task"
-            value={task}
-            autoFocus
-            onChange={(event) => onTaskChange(event.target.value)}
-            onFocus={() => setMenu((current) => ({ ...current, focus: 'input' }))}
-            onBlur={() => setMenu((current) => ({ ...current, focus: 'row' }))}
-            placeholder={FALLBACK_TASK}
-            autoComplete="off"
-            className="w-full bg-transparent text-center text-[length:var(--type-input)] text-orb-text outline-none placeholder:text-orb-placeholder"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.18)', paddingBottom: 8 }}
-          />
+          <div className="ask-task-wrap">
+            <div className="ask-task-field">
+              <span className="ask-task-sizer" aria-hidden>
+                {task || FALLBACK_TASK}
+              </span>
+              {task ? null : (
+                <span
+                  data-testid="focus-task-placeholder"
+                  className="ask-task-placeholder"
+                  aria-hidden
+                >
+                  {FALLBACK_TASK}
+                </span>
+              )}
+              <input
+                ref={inputRef}
+                data-testid="focus-task"
+                value={task}
+                autoFocus
+                onChange={(event) => onTaskChange(event.target.value)}
+                onFocus={() => setMenu((current) => ({ ...current, focus: 'input' }))}
+                onBlur={() => setMenu((current) => ({ ...current, focus: 'row' }))}
+                placeholder={FALLBACK_TASK}
+                autoComplete="off"
+                className="ask-task"
+              />
+            </div>
+          </div>
           {mounted && suggestions.length > 0 ? (
             <div data-testid="recent-tasks" className="ask-suggestions">
               {suggestions.map((item, index) => {
@@ -459,7 +475,6 @@ export function FocusPrompt({
           <ChoiceRow
             testId="duration-chips"
             tone="chip"
-            confirmOnClick={false}
             items={durations}
             highlighted={durationHighlight}
             onHighlight={(index) => highlightIndex(durationOffset + index)}
@@ -486,13 +501,17 @@ export function FocusPrompt({
             data-highlighted={menu.index === startIndex ? 'true' : 'false'}
             onMouseDown={(event) => event.preventDefault()}
             onMouseEnter={() => highlightIndex(startIndex)}
-            className={
-              menu.index === startIndex
-                ? choiceClass('button', true, false)
-                : 'rounded-full border border-white/20 bg-white/15 px-[length:var(--btn-px)] py-[length:var(--btn-py)] text-[length:var(--type-button)] font-medium tracking-wide text-orb-text hover:bg-white/25 outline-none focus:outline-none'
-            }
+            className="inline-flex min-h-[44px] cursor-pointer items-center justify-center bg-transparent"
           >
-            {START_LABEL}
+            <span
+              className={
+                menu.index === startIndex
+                  ? choiceClass('button', true, false)
+                  : 'rounded-full border border-white/20 bg-white/15 px-[length:var(--btn-px)] py-[length:var(--btn-py)] text-[length:var(--type-button)] font-medium tracking-wide text-orb-text hover:bg-white/25 outline-none focus:outline-none'
+              }
+            >
+              {START_LABEL}
+            </span>
           </button>
         </form>
       ) : null}
