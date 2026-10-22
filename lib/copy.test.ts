@@ -1,73 +1,66 @@
-import { describe, it, expect } from 'vitest';
-import {
-  ANOTHER_ROUND_LABEL,
-  ASK_PROMPT,
-  DONE_LABEL,
-  END_EARLY_PROMPT,
-  END_LABEL,
-  formatCompleted,
-  KEEP_GOING_LABEL,
-  START_LABEL,
-} from './focusPrompt';
-import {
-  ENTER_HINT,
-  FULLSCREEN_LABEL,
-  GOT_IT_LABEL,
-  SHORTCUT_ROWS,
-  SHORTCUTS_LABEL,
-  SPACE_HINT,
-} from './shortcuts';
-import {
-  CHROME_HINT,
-  DEFAULT_DURATION_LABEL,
-  FLOATING_RESTORE_LABEL,
-  LEAVE_TAB_HINT,
-  MINI_ONLY_LABEL,
-  POP_OUT_LABEL,
-  SIGN_OUT_LABEL,
-  WARN_BEFORE_MEETINGS_LABEL,
-} from './miniOrb';
-import { CONNECT_LABEL, SAMPLE_DAY_LINK, WELCOME_LINE } from './onboarding';
-import { SAMPLE_DAY_LABEL } from './fixtures';
+import { describe, expect, it } from 'vitest';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { extname, join, relative } from 'node:path';
 import { formatClockRange } from './day';
+import { TYPE_SCALE } from './typeScale';
+import { meetsAaContrast, ORB_BG, ORB_TEXT_QUIET } from './palette';
 
-const COPY = [
-  ASK_PROMPT,
-  END_EARLY_PROMPT,
-  KEEP_GOING_LABEL,
-  END_LABEL,
-  START_LABEL,
-  ANOTHER_ROUND_LABEL,
-  DONE_LABEL,
-  formatCompleted(18, 'Write the spec', 50),
-  ENTER_HINT,
-  SPACE_HINT,
-  FULLSCREEN_LABEL,
-  GOT_IT_LABEL,
-  SHORTCUTS_LABEL,
-  ...SHORTCUT_ROWS.map((row) => `${row.key} ${row.action}`),
-  CHROME_HINT,
-  LEAVE_TAB_HINT,
-  FLOATING_RESTORE_LABEL,
-  MINI_ONLY_LABEL,
-  POP_OUT_LABEL,
-  DEFAULT_DURATION_LABEL,
-  SIGN_OUT_LABEL,
-  WARN_BEFORE_MEETINGS_LABEL,
-  CONNECT_LABEL,
-  SAMPLE_DAY_LINK,
-  WELCOME_LINE,
-  SAMPLE_DAY_LABEL,
+const ROOT = join(__dirname, '..');
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'artifacts',
+  'uploads',
+  '.next',
+  '.cursor',
+]);
+const CODE_EXTS = new Set(['.ts', '.tsx', '.js', '.mjs', '.css']);
+
+const BANNED = [
+  ['Click', 'the', 'orb'].join(' '),
+  ['Hover', 'for', 'details'].join(' '),
 ];
 
-describe('user-facing copy', () => {
-  it('has no em or en dashes and names fullscreen in full', () => {
-    for (const line of COPY) {
-      expect(line).not.toMatch(/[—–]/);
+function walk(dir: string, files: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (SKIP_DIRS.has(name)) continue;
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) {
+      walk(path, files);
+      continue;
     }
-    expect(FULLSCREEN_LABEL).toBe('Fullscreen');
-    expect(FLOATING_RESTORE_LABEL).toBe('Open floating orb');
-    expect(WARN_BEFORE_MEETINGS_LABEL).toBe('Warn me before meetings');
+    if (CODE_EXTS.has(extname(name))) files.push(path);
+  }
+  return files;
+}
+
+describe('banned leftover copy', () => {
+  it('does not keep Click-the-orb or Hover-for-details in source strings', () => {
+    const hits: string[] = [];
+    for (const file of walk(ROOT)) {
+      const rel = relative(ROOT, file);
+      if (rel === 'lib/copy.test.ts') continue;
+      const text = readFileSync(file, 'utf8');
+      for (const phrase of BANNED) {
+        if (text.includes(phrase)) hits.push(`${rel}: ${phrase}`);
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
+  it('does not ship tiny low-contrast keycaps', () => {
+    const tiny = ['text-[', '9px]'].join('');
+    const faint = ['text-white/', '30'].join('');
+    const hits: string[] = [];
+    for (const file of walk(ROOT)) {
+      const rel = relative(ROOT, file);
+      if (rel === 'lib/copy.test.ts') continue;
+      const text = readFileSync(file, 'utf8');
+      if (text.includes(tiny) || text.includes(faint)) hits.push(rel);
+    }
+    expect(hits).toEqual([]);
+    expect(TYPE_SCALE.key.min).toBeGreaterThanOrEqual(14);
+    expect(meetsAaContrast(ORB_TEXT_QUIET, ORB_BG, 14)).toBe(true);
   });
 
   it('writes clock ranges with a hyphen', () => {

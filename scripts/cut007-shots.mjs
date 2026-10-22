@@ -120,6 +120,22 @@ if (phase === 'after') {
   await open(narrow, '/?mock=open-afternoon&now=11:30');
   await shot(narrow, 'agenda_hidden_686x386');
   await narrow.close();
+
+  const afterMeet = await browser.newPage({
+    viewport: { width: 1280, height: 800 },
+  });
+  await open(afterMeet, '/?mock=back-to-back&now=15:00');
+  await shot(afterMeet, 'after_meeting_1280x800');
+  await afterMeet.close();
+
+  const keys = await browser.newPage({
+    viewport: { width: 1280, height: 800 },
+  });
+  await open(keys, '/?mock=empty&hover=1');
+  await keys.mouse.move(640, 400);
+  await keys.waitForTimeout(300);
+  await shot(keys, 'keycaps_1280x800');
+  await keys.close();
 }
 
 await browser.close();

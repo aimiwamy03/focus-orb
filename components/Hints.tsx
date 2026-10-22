@@ -7,16 +7,7 @@ import { KeyHint } from './KeyHint';
 const HINTS_KEY = 'focusOrb:hints';
 const HINT_MS = 8000;
 
-export const HINTS = [
-  { id: 'hover', text: 'Hover for details' },
-] as const;
-
-export type HintId =
-  | (typeof HINTS)[number]['id']
-  | 'chrome'
-  | 'leave-tab'
-  | 'fullscreen'
-  | 'click';
+export type HintId = 'chrome' | 'leave-tab' | 'fullscreen' | 'click' | 'hover';
 
 function loadSeen(): Record<string, boolean> {
   if (typeof localStorage === 'undefined') return {};
@@ -56,9 +47,7 @@ export function Hints({
     setReady(true);
   }, [revision]);
 
-  const bannerNext =
-    teach && banner && !seen[banner.id] ? banner : null;
-  const next = teach ? bannerNext ?? HINTS.find((hint) => !seen[hint.id]) : null;
+  const next = teach && banner && !seen[banner.id] ? banner : null;
 
   useEffect(() => {
     if (!active || !ready || !next || helpOpen) return;
@@ -118,7 +107,7 @@ export function Hints({
             </div>
           ))}
         </div>
-      ) : next && ready && (chromeVisible || Boolean(bannerNext)) ? (
+      ) : next && ready && (chromeVisible || Boolean(next)) ? (
         <div
           data-testid="hint"
           data-text-clear
