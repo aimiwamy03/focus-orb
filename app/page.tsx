@@ -14,7 +14,7 @@ function OrbShell() {
   );
 }
 
-export default async function Home({
+async function HomeBody({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -33,4 +33,16 @@ export default async function Home({
   }
 
   return <PublicHome current="home" />;
+}
+
+export default function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <Suspense fallback={<div className="h-screen w-screen bg-black" />}>
+      <HomeBody searchParams={searchParams} />
+    </Suspense>
+  );
 }
