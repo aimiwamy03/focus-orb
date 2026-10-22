@@ -120,6 +120,7 @@ export function Orb() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [orbHovered, setOrbHovered] = useState(false);
   const [stopConfirm, setStopConfirm] = useState(false);
+  const [skipHeadsUp, setSkipHeadsUp] = useState(false);
   const [taskDraft, setTaskDraft] = useState('');
   const [recentTasks, setRecentTasks] = useState<string[]>([]);
   const [durationChoice, setDurationChoice] = useState<DurationChoice>(50);
@@ -199,6 +200,7 @@ export function Orb() {
     stopConfirm,
     completed: Boolean(completed),
     headsUp: isHeadsUp(day, now),
+    skipHeadsUp,
     dayState: day.state,
   });
   const untilMinutes = untilMeetingDuration(day);
@@ -792,6 +794,10 @@ export function Orb() {
   }, [untilMinutes, durationChoice]);
 
   useEffect(() => {
+    if (!isHeadsUp(day, now)) setSkipHeadsUp(false);
+  }, [day, now]);
+
+  useEffect(() => {
     if (settingsParam) setShowSettings(true);
   }, [settingsParam]);
 
@@ -888,7 +894,7 @@ export function Orb() {
             showSettings ? 'invisible pointer-events-none' : ''
           }`}
         >
-          {surface === 'meeting-soon' || surface === 'in-meeting' || !surface ? (
+          {surface === 'in-meeting' || !surface ? (
             <StatusLine
               text={line}
               detail={hoverDetailText(day, now)}
@@ -898,7 +904,11 @@ export function Orb() {
           ) : (
             <FocusPrompt
               surface={surface}
-              contextLine={statusLineText(day, now)}
+              contextLine={
+                surface === 'meeting-soon' && day.nextEvent
+                  ? formatMeetingSoonCopy(minutesBetween(now, day.nextEvent.start))
+                  : statusLineText(day, now)
+              }
               task={surface === 'focusing' || surface === 'stop-confirm' ? activeTask : taskDraft}
               onTaskChange={setTaskDraft}
               recentTasks={recentTasks}
@@ -911,7 +921,7 @@ export function Orb() {
               focusMinutes={manualTimeRemaining}
               completedTask={completed?.task}
               completedMinutes={completed?.minutes}
-              completedPlanned={completed?.planned}
+              joinUrl={extractJoinUrl(day.nextEvent)}
               onStart={() => beginFocus(taskDraft, durationChoice)}
               onKeepGoing={() => setStopConfirm(false)}
               onEnd={() => {
@@ -920,8 +930,13 @@ export function Orb() {
               }}
               onBreak={startBreak}
               onAnotherRound={() => beginFocus(completed?.task || taskDraft, durationChoice)}
-              onDone={dismissCompleted}
+              onJoin={() => {
+                const url = extractJoinUrl(day.nextEvent);
+                if (url) window.open(url, '_blank', 'noreferrer');
+              }}
+              onSkip={() => setSkipHeadsUp(true)}
               chromeVisible={showChrome}
+              keyboardActive={!showSettings}
             />
           )}
           {calendar.mockScenario ? (

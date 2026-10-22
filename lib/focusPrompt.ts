@@ -10,6 +10,9 @@ export const TAKE_BREAK_LABEL = 'Take a break';
 export const ANOTHER_ROUND_LABEL = 'Start another';
 export const DONE_LABEL = 'Done';
 export const UNTIL_MEETING_LABEL = 'Until next meeting';
+export const JOIN_LABEL = 'Join';
+export const SKIP_LABEL = 'Skip';
+export const MENU_ASK_HINT = '← → to choose, Enter to start';
 export const FALLBACK_TASK = 'Focus';
 export const BREAK_MINUTES = 5;
 export const DURATION_CHIPS = [25, 50, 90] as const;
@@ -209,6 +212,7 @@ export function promptSurface(input: {
   stopConfirm: boolean;
   completed: boolean;
   headsUp: boolean;
+  skipHeadsUp?: boolean;
   dayState: DayModel['state'];
 }): PromptSurface | null {
   if (input.firstOpen || input.miniOnly) return null;
@@ -219,7 +223,7 @@ export function promptSurface(input: {
   if (input.dayState === 'in-meeting' || input.dayState === 'in-run') {
     return 'in-meeting';
   }
-  if (input.headsUp) return 'meeting-soon';
+  if (input.headsUp && !input.skipHeadsUp) return 'meeting-soon';
   return 'ask';
 }
 

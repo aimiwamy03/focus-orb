@@ -7,6 +7,7 @@ import {
   capDuration,
   END_EARLY_PROMPT,
   FALLBACK_TASK,
+  MENU_ASK_HINT,
   formatBreakCopy,
   formatCompleted,
   formatFocusingCopy,
@@ -140,6 +141,8 @@ describe('copy', () => {
     expect(formatMeetingSoonCopy(4.2)).toBe('Meeting in 5m');
     expect(ASK_PROMPT).not.toMatch(/[—–]/);
     expect(END_EARLY_PROMPT).not.toMatch(/[—–]/);
+    expect(MENU_ASK_HINT).toBe('← → to choose, Enter to start');
+    expect(MENU_ASK_HINT).not.toMatch(/[—–]/);
     expect(KEEP_GOING_LABEL).not.toMatch(/[—–]/);
     expect(formatCompleted(50, 'Deep work')).not.toMatch(/[—–]/);
   });
@@ -180,6 +183,17 @@ describe('promptSurface', () => {
         dayState: 'free',
       })
     ).toBe('meeting-soon');
+    expect(
+      promptSurface({
+        isFocusing: false,
+        isBreak: false,
+        stopConfirm: false,
+        completed: false,
+        headsUp: true,
+        skipHeadsUp: true,
+        dayState: 'free',
+      })
+    ).toBe('ask');
     expect(
       promptSurface({
         isFocusing: false,

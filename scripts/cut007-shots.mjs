@@ -79,6 +79,14 @@ if (phase === 'after') {
 
   await open(page, '/?mock=empty');
   await shot(page, 'ask_empty_suggestions_1280x800');
+
+  await open(
+    page,
+    '/?mock=empty&prompt=stop&focus=50&task=Write%20the%20spec'
+  );
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(250);
+  await shot(page, 'end_highlighted_1280x800');
   await page.close();
 }
 
