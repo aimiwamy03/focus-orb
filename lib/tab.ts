@@ -1,40 +1,11 @@
-import { DayModel, DayState, formatClock, formatCompactDuration, isHeadsUp } from './day';
+import { DayState, formatCompactDuration } from './day';
 
 export type FaviconState = 'dense' | 'focusing' | 'scattered' | 'dim';
 
 export { formatCompactDuration };
 
-export function formatLiveTabTitle(
-  model: DayModel,
-  now: Date,
-  options: { isManualFocus?: boolean; focusMinutes?: number | null } = {}
-): string {
-  if (options.isManualFocus && options.focusMinutes != null) {
-    return `Focus ${formatCompactDuration(options.focusMinutes)}`;
-  }
-
-  if (isHeadsUp(model, now) && model.nextEvent) {
-    return `Join ${model.nextEvent.summary}`;
-  }
-
-  if (model.state === 'in-run' && model.currentRun) {
-    return `B2B until ${formatClock(model.currentRun.end)}`;
-  }
-
-  if (model.state === 'in-meeting' && model.currentEvent) {
-    return `In ${model.currentEvent.summary}`;
-  }
-
-  if (model.nextBusy && model.nextBusy.events.length >= 2) {
-    return `B2B until ${formatClock(model.nextBusy.end)}`;
-  }
-
-  if (model.nextEvent && model.gapMinutes != null) {
-    return `Free ${formatCompactDuration(model.gapMinutes)}`;
-  }
-
-  return 'Clear';
-}
+/** Browser tab and window title. Never a status string. */
+export const APP_TITLE = 'Focus Orb';
 
 export function faviconStateFor(input: {
   scatter: number;

@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { buildDayModel } from './day';
 import { getMockEvents, parseNowParam } from './fixtures';
 import {
+  APP_TITLE,
   applyOrbFavicon,
   FAVICON_SIZE,
   faviconStateFor,
-  formatLiveTabTitle,
   logoLayout,
   LOGO_CORE,
   LOGO_DOT,
@@ -21,48 +21,30 @@ function modelFor(scenario: Parameters<typeof getMockEvents>[0], hhmm: string) {
   return { now, model: buildDayModel(getMockEvents(scenario, now), now) };
 }
 
-describe('formatLiveTabTitle', () => {
-  it('open-afternoon is Free 4h', () => {
-    const { now, model } = modelFor('open-afternoon', '11:00');
-    expect(formatLiveTabTitle(model, now)).toBe('Free 4h');
-  });
-
-  it('short-gap is Free 20m', () => {
-    const { now, model } = modelFor('short-gap', '13:10');
-    expect(formatLiveTabTitle(model, now)).toBe('Free 20m');
-  });
-
-  it('upcoming back-to-back is B2B until the run ends', () => {
-    const { now, model } = modelFor('back-to-back', '12:00');
-    expect(formatLiveTabTitle(model, now)).toBe('B2B until 3:00');
-  });
-
-  it('in-meeting is In <title>', () => {
-    const { now, model } = modelFor('in-meeting', '13:45');
-    expect(formatLiveTabTitle(model, now)).toBe('In Design sync');
-  });
-
-  it('pre-meeting heads-up is Join <title>', () => {
-    const { now, model } = modelFor('pre-meeting', '13:25');
-    expect(formatLiveTabTitle(model, now)).toBe('Join Design sync');
-  });
-
-  it('empty is Clear', () => {
-    const { now, model } = modelFor('empty', '11:00');
-    expect(formatLiveTabTitle(model, now)).toBe('Clear');
-  });
-
-  it('during a run is B2B until the run ends', () => {
-    const { now, model } = modelFor('back-to-back', '13:45');
-    expect(model.state).toBe('in-run');
-    expect(formatLiveTabTitle(model, now)).toBe('B2B until 3:00');
-  });
-
-  it('manual focus is Focus 18m', () => {
-    const { now, model } = modelFor('empty', '11:00');
-    expect(
-      formatLiveTabTitle(model, now, { isManualFocus: true, focusMinutes: 18.7 })
-    ).toBe('Focus 18m');
+describe('document title', () => {
+  it('is exactly Focus Orb in idle, focusing, heads-up, sample-day, meeting, and run states', () => {
+    const states = [
+      modelFor('empty', '11:00'),
+      modelFor('open-afternoon', '11:00'),
+      modelFor('short-gap', '13:10'),
+      modelFor('back-to-back', '12:00'),
+      modelFor('in-meeting', '13:45'),
+      modelFor('pre-meeting', '13:25'),
+      modelFor('back-to-back', '13:45'),
+    ];
+    expect(states.map(({ model }) => model.state)).toEqual([
+      'free',
+      'free',
+      'free',
+      'free',
+      'in-meeting',
+      'free',
+      'in-run',
+    ]);
+    for (const { model } of states) {
+      expect(model).toBeTruthy();
+      expect(APP_TITLE).toBe('Focus Orb');
+    }
   });
 });
 

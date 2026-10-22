@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateScatter, calculateManualScatter, formatTimeRemaining, formatTabTitle } from './scatter';
+import { calculateScatter, calculateManualScatter, formatTimeRemaining } from './scatter';
 
 describe('calculateScatter', () => {
   it('returns 0 when far from event (>= scatter window)', () => {
@@ -122,17 +122,3 @@ describe('formatTimeRemaining', () => {
   });
 });
 
-describe('formatTabTitle', () => {
-  it('formats with bullet prefix', () => {
-    expect(formatTabTitle(5)).toBe('● 5m');
-    expect(formatTabTitle(90)).toBe('● 1h30m');
-  });
-
-  it('formats negative as now', () => {
-    expect(formatTabTitle(-1)).toBe('● now');
-  });
-
-  it('formats < 1 minute', () => {
-    expect(formatTabTitle(0.5)).toBe('● <1m');
-  });
-});
