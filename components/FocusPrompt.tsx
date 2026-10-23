@@ -75,6 +75,9 @@ interface FocusPromptProps {
   chromeVisible?: boolean;
   keyboardActive?: boolean;
   focusedToday?: string | null;
+  returnLine?: string | null;
+  yesterdayTask?: string | null;
+  yesterdayNote?: string | null;
   blooming?: boolean;
   nextStep?: string;
   onNextStepChange?: (value: string) => void;
@@ -264,6 +267,9 @@ export function FocusPrompt({
   chromeVisible = false,
   keyboardActive = true,
   focusedToday = null,
+  returnLine = null,
+  yesterdayTask = null,
+  yesterdayNote = null,
   blooming = false,
   nextStep = '',
   onNextStepChange,
@@ -282,7 +288,10 @@ export function FocusPrompt({
     }
   }, [choice]);
 
-  const suggestions = useMemo(() => visibleAskSuggestions(recentTasks, task), [recentTasks, task]);
+  const suggestions = useMemo(() => {
+    if (!task.trim() && (yesterdayTask || yesterdayNote)) return [];
+    return visibleAskSuggestions(recentTasks, task);
+  }, [recentTasks, task, yesterdayNote, yesterdayTask]);
   const items = useMemo(
     () =>
       itemsFor(
@@ -627,6 +636,32 @@ export function FocusPrompt({
               />
             </div>
           </div>
+          {!task.trim() && (yesterdayTask || yesterdayNote) ? (
+            <div data-testid="ask-yesterday" className="ask-yesterday">
+              {yesterdayTask ? (
+                <button
+                  type="button"
+                  data-testid="ask-yesterday-task"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => onTaskChange(yesterdayTask)}
+                  className="ask-yesterday-chip"
+                >
+                  {yesterdayTask}
+                </button>
+              ) : null}
+              {yesterdayNote ? (
+                <button
+                  type="button"
+                  data-testid="ask-yesterday-note"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => onTaskChange(yesterdayNote)}
+                  className="ask-yesterday-chip"
+                >
+                  {yesterdayNote}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {mounted && suggestions.length > 0 ? (
             <div data-testid="recent-tasks" className="ask-suggestions">
               {suggestions.map((item, index) => {
@@ -753,6 +788,15 @@ export function FocusPrompt({
               {START_LABEL}
             </span>
           </button>
+          {returnLine ? (
+            <p
+              data-testid="return-line"
+              data-text-clear
+              className="m-0 text-[length:var(--type-whoop)] leading-snug text-orb-quiet"
+            >
+              {returnLine}
+            </p>
+          ) : null}
         </form>
       ) : null}
 

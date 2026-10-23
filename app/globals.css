@@ -520,6 +520,39 @@ body {
   border-bottom-color: oklch(0.78 0.08 230);
 }
 
+.ask-yesterday {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 24px;
+  width: 100%;
+}
+
+.ask-yesterday-chip {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 0 4px;
+  font: inherit;
+  font-size: var(--type-whoop);
+  line-height: 1.4;
+  color: var(--color-orb-quiet);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.ask-yesterday-chip:hover {
+  color: var(--color-orb-text);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
 .whoop-offer {
   background: none;
   border: 0;

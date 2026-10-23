@@ -28,6 +28,7 @@ import {
   loadLastTask,
   loadRecentTasks,
   promptSurface,
+  yesterdayAskSuggestions,
   rememberTask,
   resolveDuration,
   resolveStartTask,
@@ -51,8 +52,10 @@ import {
   ORB_BLOOM_PREVIEW_SESSION,
   ORB_SETTLE_MS,
   attachGrowthFields,
+  countedDayStreak,
   countedMinutesToday,
   formatFocusedToday,
+  formatReturnLine,
   sessionCounts,
   visibleFocusedTodayMinutes,
   growthPointScale,
@@ -122,6 +125,8 @@ import {
   loadIntroSound,
   markIntroPlayed,
   parseIntroFreeze,
+  playEndResolve,
+  shouldPlayEndResolve,
   REPLAY_INTRO_LABEL,
   saveIntroSound,
   shouldPlayIntro,
@@ -191,6 +196,7 @@ export function Orb() {
       ? orbFromMock
       : null;
   const settleParam = searchParams.get('settle');
+  const endParam = searchParams.get('end');
   const orbFreeze = parseOrbFreeze(searchParams.get('orbT'));
   const orbMinutesParam = searchParams.get('orbMinutes');
   const whoop = useWhoop();
@@ -216,7 +222,10 @@ export function Orb() {
   const [hintRev, setHintRev] = useState(0);
   const [miniOnly, setMiniOnly] = useState(miniOnlyParam);
   const [popOutOnLeave, setPopOutOnLeave] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  });
   const [leaveHint, setLeaveHint] = useState(false);
   const [showShortcutsCard, setShowShortcutsCard] = useState(false);
   const [showAgenda, setShowAgenda] = useState(true);
@@ -246,6 +255,8 @@ export function Orb() {
   const sessionFromRef = useRef<OrbStage | null>(null);
   const bloomFromRef = useRef<OrbStage | null>(null);
   const bloomToRef = useRef<OrbStage | null>(null);
+  const reducedMotionRef = useRef(false);
+  const introSoundRef = useRef(true);
   const growthClockRef = useRef({ moment: 'still' as OrbMoment, startedAt: 0 });
   const growthRef = useRef({
     moment: 'still' as OrbMoment,
@@ -322,7 +333,13 @@ export function Orb() {
       lastLogIdRef.current = next[0]?.id ?? null;
       bloomFromRef.current = stageById(enriched.stageBefore ?? 0);
       bloomToRef.current = stageById(enriched.stageAfter ?? 0);
-      setBloomDone(false);
+      const finished = draft.ended === 'completed';
+      const skipBloom = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      reducedMotionRef.current = skipBloom;
+      setBloomDone(!finished || skipBloom);
+      if (finished && shouldPlayEndResolve({ introSound: loadIntroSound(), reducedMotion: skipBloom })) {
+        playEndResolve();
+      }
       setNextStep('');
       setFocusRating(null);
       setFocusLog(next);
@@ -419,6 +436,8 @@ export function Orb() {
     viewSize.h
   );
   const logMinutes = countedMinutesToday(focusLog, now);
+  const dayStreak = countedDayStreak(focusLog, now);
+  const yesterdayAsk = yesterdayAskSuggestions(focusLog, now);
   const displayMinutes = resolveDisplayMinutes({
     logMinutes,
     preview: orbPreview,
@@ -868,6 +887,7 @@ export function Orb() {
           moment: OrbMoment;
           scale: number;
           glow: number;
+          brightness: number;
         };
       };
       debugGrowth.__orbGrowth = {
@@ -876,7 +896,12 @@ export function Orb() {
         moment: visual.moment,
         scale: look.scale * breath,
         glow,
+        brightness: look.brightness,
       };
+      canvas.closest('[data-testid="orb-root"]')?.setAttribute(
+        'data-orb-brightness',
+        look.brightness.toFixed(3)
+      );
       
       if (showBackdropRef.current) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1315,6 +1340,22 @@ export function Orb() {
   handleOrbClickRef.current = handleOrbClick;
 
   useEffect(() => {
+    if (endParam === '1') {
+      const minutes = Number(doneParam) || 50;
+      const planned = Number(plannedParam) || minutes;
+      seedCompleted(taskParam || 'Deep work', minutes, planned);
+      if (taskParam) setTaskDraft(taskParam);
+      const before = countedMinutesToday(loadFocusLog(logKeyRef.current), nowRef.current);
+      bloomFromRef.current = stageForMinutes(before);
+      bloomToRef.current = stageForMinutes(before + minutes);
+      const skipBloom = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      reducedMotionRef.current = skipBloom;
+      setBloomDone(skipBloom);
+      if (shouldPlayEndResolve({ introSound: loadIntroSound(), reducedMotion: skipBloom })) {
+        playEndResolve();
+      }
+      return;
+    }
     if (promptParam === 'done') {
       seedCompleted(
         taskParam || 'Deep work',
@@ -1337,7 +1378,7 @@ export function Orb() {
       if (promptParam === 'stop') setStopConfirm(true);
       if (taskParam) setTaskDraft(taskParam);
     }
-  }, [doneParam, focusParam, plannedParam, promptParam, seedCompleted, startBreak, startFocus, taskParam]);
+  }, [doneParam, endParam, focusParam, plannedParam, promptParam, seedCompleted, startBreak, startFocus, taskParam]);
 
   useEffect(() => {
     if (untilMinutes != null && isPresetDuration(durationChoice) && durationChoice > untilMinutes) {
@@ -1379,6 +1420,8 @@ export function Orb() {
   }, []);
 
   firstOpenRef.current = firstOpen;
+  reducedMotionRef.current = reducedMotion;
+  introSoundRef.current = introSound;
   askOpenRef.current = surface === 'ask';
   settingsOpenRef.current = showSettings;
   logOpenRef.current = showLog;
@@ -1424,6 +1467,7 @@ export function Orb() {
       data-orb-stage={previewVisual.stage.key}
       data-orb-moment={growthMoment}
       data-orb-minutes={String(Math.round(displayMinutes))}
+      data-orb-brightness={previewVisual.look.brightness.toFixed(3)}
       data-log-open={showLog ? 'true' : 'false'}
       data-backdrop={showBackdrop ? 'true' : 'false'}
       data-cursor-hidden={hideCursor ? 'true' : 'false'}
@@ -1554,10 +1598,14 @@ export function Orb() {
                                 Math.round(focusLog[0].minutes) === Math.round(completed.minutes) &&
                                 sessionCounts(focusLog[0]).counted
                             )
-                          )
+                          ),
+                      dayStreak
                     )
                   : null
               }
+              returnLine={surface === 'ask' ? formatReturnLine(logMinutes, dayStreak) : null}
+              yesterdayTask={yesterdayAsk.task ?? null}
+              yesterdayNote={yesterdayAsk.note ?? null}
               blooming={blooming}
               nextStep={nextStep}
               onNextStepChange={(value) => {
