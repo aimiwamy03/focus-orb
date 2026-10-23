@@ -29,12 +29,9 @@ import {
 import { createMenuState, reduceMenu, type MenuState } from '@/lib/menuKey';
 import { SPACE_HINT } from '@/lib/shortcuts';
 import {
-  DISTRACTED_PROMPT,
   NEXT_STEP_LABEL,
   NEXT_STEP_PLACEHOLDER,
-  NO_LABEL,
   RATING_PROMPT,
-  YES_LABEL,
 } from '@/lib/orbGrowth';
 import { WHOOP_APP_URL, whoopOfferLabel } from '@/lib/whoop';
 import { ChoiceItem, ChoiceRow, choiceClass } from './ChoiceRow';
@@ -77,8 +74,6 @@ interface FocusPromptProps {
   blooming?: boolean;
   nextStep?: string;
   onNextStepChange?: (value: string) => void;
-  distracted?: boolean | null;
-  onDistracted?: (value: boolean) => void;
   focusRating?: number | null;
   onFocusRating?: (value: number) => void;
 }
@@ -183,6 +178,35 @@ function itemsFor(
   return [];
 }
 
+function NextStepNote({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange?: (value: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const field = ref.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = `${field.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      data-testid="next-step"
+      data-text-clear
+      value={value}
+      rows={1}
+      onChange={(event) => onChange?.(event.target.value)}
+      placeholder={NEXT_STEP_PLACEHOLDER}
+      className="next-step"
+    />
+  );
+}
+
 function defaultIndex(surface: PromptSurface, items: MenuItem[], choice: DurationChoice): number {
   if (surface === 'ask') {
     const match = items.findIndex((item) => item.action === 'duration' && item.value === choice);
@@ -229,8 +253,6 @@ export function FocusPrompt({
   blooming = false,
   nextStep = '',
   onNextStepChange,
-  distracted = null,
-  onDistracted,
   focusRating = null,
   onFocusRating,
 }: FocusPromptProps) {
@@ -714,7 +736,7 @@ export function FocusPrompt({
       ) : null}
 
       {surface === 'completed' && completedTask != null && completedMinutes != null ? (
-        <div className="flex w-full flex-col items-center gap-3">
+        <div className="flex w-full flex-col items-center gap-[length:var(--stack-gap)]">
           {focusedToday ? (
             <p
               data-testid="focused-today"
@@ -735,52 +757,15 @@ export function FocusPrompt({
               >
                 {formatCompleted(completedMinutes, completedTask, completedPlanned)}
               </button>
-              <label className="flex w-full max-w-[min(32rem,92vw)] flex-col items-center gap-2">
+              <label className="flex w-full max-w-[min(32rem,92vw)] flex-col items-center gap-1">
                 <span
                   data-testid="next-step-label"
                   className="text-[length:var(--type-whoop)] leading-snug text-orb-text"
                 >
                   {NEXT_STEP_LABEL}
                 </span>
-                <textarea
-                  data-testid="next-step"
-                  data-text-clear
-                  value={nextStep}
-                  onChange={(event) => onNextStepChange?.(event.target.value)}
-                  placeholder={NEXT_STEP_PLACEHOLDER}
-                  rows={2}
-                  className="w-full resize-none border-0 border-b border-orb-quiet bg-transparent px-0 py-1 text-center text-[length:var(--type-input)] leading-snug text-orb-text outline-none placeholder:text-orb-quiet"
-                />
+                <NextStepNote value={nextStep} onChange={onNextStepChange} />
               </label>
-              <div className="flex flex-col items-center gap-2">
-                <p
-                  data-testid="distracted-prompt"
-                  className="m-0 text-[length:var(--type-whoop)] leading-snug text-orb-text"
-                >
-                  {DISTRACTED_PROMPT}
-                </p>
-                <div className="flex items-center gap-6" data-testid="distracted-row">
-                  {[
-                    { id: 'distract-yes', label: YES_LABEL, value: true },
-                    { id: 'distract-no', label: NO_LABEL, value: false },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      data-testid={item.id}
-                      data-selected={distracted === item.value ? 'true' : 'false'}
-                      onClick={() => onDistracted?.(item.value)}
-                      className={`min-h-[44px] bg-transparent text-[length:var(--type-button)] leading-snug ${
-                        distracted === item.value
-                          ? 'text-orb-text underline decoration-1 underline-offset-[6px]'
-                          : 'text-orb-quiet hover:text-orb-text'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
               <div className="flex flex-col items-center gap-2">
                 <p
                   data-testid="rating-prompt"

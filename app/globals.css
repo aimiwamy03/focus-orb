@@ -540,6 +540,36 @@ body {
   text-underline-offset: 6px;
 }
 
+.next-step {
+  display: block;
+  width: 100%;
+  min-height: 1.3em;
+  margin: 0;
+  padding: 0 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--color-orb-quiet);
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: var(--type-whoop);
+  line-height: 1.3;
+  color: var(--color-orb-text);
+  text-align: center;
+  outline: none;
+  field-sizing: content;
+}
+
+.next-step::placeholder {
+  color: var(--color-orb-quiet);
+}
+
+.duration-chip {
+  border-radius: 0;
+  box-shadow: none;
+}
+
 @font-face {
   font-family: 'Intro Cormorant';
   font-style: normal;

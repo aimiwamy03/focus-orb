@@ -146,23 +146,28 @@ describe('game-menu rows', () => {
 
   it('shows the focused-today line, next-step note, and ratings after bloom', () => {
     const onNextStepChange = vi.fn();
-    const onDistracted = vi.fn();
     const onFocusRating = vi.fn();
     renderPrompt('completed', {
       focusedToday: '1h 45m focused today.',
       nextStep: '',
       onNextStepChange,
-      onDistracted,
       onFocusRating,
     });
     expect(screen.getByTestId('focused-today').textContent).toBe('1h 45m focused today.');
     expect(screen.getByTestId('focused-today').textContent).not.toMatch(/[—–]/);
     fireEvent.change(screen.getByTestId('next-step'), { target: { value: 'Write the recap' } });
     expect(onNextStepChange).toHaveBeenCalledWith('Write the recap');
-    fireEvent.click(screen.getByTestId('distract-no'));
-    expect(onDistracted).toHaveBeenCalledWith(false);
+    expect(screen.queryByTestId('distracted-prompt')).toBeNull();
+    expect(screen.queryByTestId('distract-yes')).toBeNull();
+    expect(screen.queryByTestId('distract-no')).toBeNull();
+    expect(screen.queryByText('Did the orb distract you?')).toBeNull();
     fireEvent.click(screen.getByTestId('rating-4'));
     expect(onFocusRating).toHaveBeenCalledWith(4);
+    const note = screen.getByTestId('next-step');
+    expect(note.tagName).toBe('TEXTAREA');
+    expect(note.getAttribute('rows')).toBe('1');
+    expect(note.className).toBe('next-step');
+    expect(note.className).not.toMatch(/rounded-full|py-1/);
   });
 
   it('hides the note form while the bloom is playing', () => {
@@ -216,6 +221,10 @@ describe('game-menu rows', () => {
     const chip = screen.getByTestId('duration-50m');
     expect(chip.className).toMatch(/min-h-\[44px\]/);
     expect(chip.className).toMatch(/cursor-pointer/);
+    const selected = chip.querySelector('span');
+    expect(selected?.className).toMatch(/underline/);
+    expect(selected?.className).not.toMatch(/rounded-full|bg-orb-highlight|ring-2/);
+    expect(selected?.className).toMatch(/type-whoop/);
   });
 
   it('confirms a non-highlighted stop-confirm option on click', () => {

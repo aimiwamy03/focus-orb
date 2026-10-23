@@ -109,6 +109,45 @@ const gathering = await open(`/?mock=empty&intro=0&settle=0`, counted);
 if ((await gathering.getByTestId('orb-root').getAttribute('data-orb-stage')) !== 'gathering') {
   fail('50 counted minutes should be Gathering');
 }
+
+async function readPulse(page) {
+  return page.evaluate(() => window.__orbGrowth ?? null);
+}
+
+async function pulseRange(page, ms, step) {
+  const samples = [];
+  const started = Date.now();
+  while (Date.now() - started < ms) {
+    const pulse = await readPulse(page);
+    if (pulse?.scale != null) samples.push(pulse);
+    await page.waitForTimeout(step);
+  }
+  const scales = samples.map((item) => item.scale);
+  return {
+    samples,
+    min: Math.min(...scales),
+    max: Math.max(...scales),
+    range: Math.max(...scales) - Math.min(...scales),
+  };
+}
+
+const idlePulse = await pulseRange(gathering, 3200, 400);
+if (!idlePulse.samples.length) fail('Idle pulse debug hook missing');
+if (idlePulse.range < 0.006) {
+  fail(`Idle orb should pulse, scale range ${idlePulse.range}`);
+}
+await gathering.getByTestId('focus-start').click();
+await gathering.getByTestId('focus-countdown').waitFor({ timeout: 4000 });
+const focusPulse = await pulseRange(gathering, 2800, 350);
+if (!focusPulse.samples.some((item) => item.moment === 'focusing')) {
+  fail('Focus pulse should run during a block');
+}
+if (focusPulse.range < 0.02) {
+  fail(`Focus orb should pulse, scale range ${focusPulse.range}`);
+}
+if (Math.max(...focusPulse.samples.map((item) => item.glow ?? 0)) < 0.2) {
+  fail('Focus pulse should glow');
+}
 await gathering.close();
 
 const settle = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -156,11 +195,20 @@ await afterBloom.waitForTimeout(2800);
 if ((await afterBloom.getByTestId('next-step').count()) !== 1) {
   fail('After bloom, the where-I-stopped note should appear');
 }
-if ((await afterBloom.getByTestId('distracted-prompt').textContent()).includes('—')) {
-  fail('Completed copy should not use an em dash');
+if ((await afterBloom.getByTestId('distracted-prompt').count()) !== 0) {
+  fail('The distraction question should be gone');
+}
+if ((await afterBloom.getByText('Did the orb distract you?').count()) !== 0) {
+  fail('Did the orb distract you? should not render');
+}
+const noteBox = await afterBloom.getByTestId('next-step').boundingBox();
+const ratingBox = await afterBloom.getByTestId('rating-prompt').boundingBox();
+if (!noteBox || !ratingBox) fail('Note field and rating prompt should both render after bloom');
+if (noteBox.height > 40) fail(`Note field should be one line tall, got ${noteBox.height}`);
+if (ratingBox.y - (noteBox.y + noteBox.height) > 28) {
+  fail(`Gap under the note field should be tight, got ${ratingBox.y - (noteBox.y + noteBox.height)}`);
 }
 await afterBloom.getByTestId('next-step').fill('Send the recap');
-await afterBloom.getByTestId('distract-no').click();
 await afterBloom.getByTestId('rating-4').click();
 await publish(afterBloom, 'orb_bloom_note.png');
 await afterBloom.getByTestId('help-toggle').click();

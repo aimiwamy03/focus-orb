@@ -1,4 +1,5 @@
 import { formatDayFocused, type FocusLogEnded, type FocusLogEntry } from './focusLog';
+import { breathGlow, breathPhase, breathScale } from './miniOrb';
 
 export const ORB_GROWTH_MIN_COUNTED = 15;
 
@@ -21,10 +22,12 @@ export const SETTLE_SKIP_HINT = 'Esc to skip';
 export const ONE_THING_PROMPT = "What's the one thing?";
 export const NEXT_STEP_LABEL = 'Where did you stop, and what is next?';
 export const NEXT_STEP_PLACEHOLDER = 'A note for later';
-export const DISTRACTED_PROMPT = 'Did the orb distract you?';
 export const RATING_PROMPT = 'How was your focus?';
-export const YES_LABEL = 'Yes';
-export const NO_LABEL = 'No';
+export const IDLE_BREATH_STEP = 0.008;
+export const IDLE_BREATH_FREQ = 0.45;
+export const IDLE_BREATH_AMP_GATHERED = 0.05;
+export const IDLE_BREATH_AMP_SCATTERED = 0.03;
+export const IDLE_BREATH_SCATTER_TIGHT = 0.05;
 
 export const ORB_STAGE_KEYS = [
   'cluster',
@@ -210,6 +213,46 @@ export function bloomLook(
 export function focusDriftScale(elapsedMs: number, reducedMotion = false): number {
   if (reducedMotion) return 1;
   return 1 + Math.sin(elapsedMs / 18_000) * ORB_FOCUS_DRIFT;
+}
+
+/** Idle pulse from before #30: `time += 0.008` each frame, then `1 + sin(time * 0.45) * amp`. */
+export function idleBreathScale(
+  time: number,
+  scatter: number,
+  reducedMotion = false
+): number {
+  if (reducedMotion) return 1;
+  const amp =
+    scatter < IDLE_BREATH_SCATTER_TIGHT
+      ? IDLE_BREATH_AMP_GATHERED
+      : IDLE_BREATH_AMP_SCATTERED;
+  return 1 + Math.sin(time * IDLE_BREATH_FREQ) * amp;
+}
+
+/** Original idle/focus pulse, stacked on #30 settle/bloom breath and stage scale. */
+export function liveOrbPulse(input: {
+  moment: OrbMoment;
+  settleOrBloomBreath: number;
+  pulseTime: number;
+  scatter: number;
+  nowMs: number;
+  reducedMotion?: boolean;
+}): { breath: number; glowBoost: number } {
+  const reduced = Boolean(input.reducedMotion);
+  if (input.moment === 'settle' || input.moment === 'bloom') {
+    return { breath: input.settleOrBloomBreath, glowBoost: 0 };
+  }
+  if (input.moment === 'focusing') {
+    const phase = breathPhase(input.nowMs);
+    return {
+      breath: breathScale(phase, reduced),
+      glowBoost: breathGlow(phase, true),
+    };
+  }
+  return {
+    breath: idleBreathScale(input.pulseTime, input.scatter, reduced),
+    glowBoost: 0,
+  };
 }
 
 export function sessionActiveMinutes(input: {

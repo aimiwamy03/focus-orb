@@ -19,6 +19,12 @@ import {
   dayFinalStage,
   focusDriftScale,
   formatFocusedToday,
+  idleBreathScale,
+  IDLE_BREATH_AMP_GATHERED,
+  IDLE_BREATH_AMP_SCATTERED,
+  IDLE_BREATH_FREQ,
+  IDLE_BREATH_STEP,
+  liveOrbPulse,
   growthPointScale,
   isOrbPreviewKey,
   loadSettlePlayed,
@@ -164,19 +170,46 @@ describe('settle and bloom motion', () => {
     expect(bloomLook(from, from, 1_200, false, false).glow).toBeGreaterThan(from.glow);
   });
 
-  it('holds size still on open and barely drifts while focusing', () => {
+  it('holds growth size still, then layers the original idle and focus pulse', () => {
     const still = orbVisualState({ minutes: 50, moment: 'still' });
     expect(still.breath).toBe(1);
     expect(still.look.scale).toBe(stageForMinutes(50).look.scale);
-    const focusing = orbVisualState({
-      minutes: 50,
-      moment: 'focusing',
-      elapsedMs: 9_000,
-      fromStage: stageForMinutes(50),
+    expect(IDLE_BREATH_STEP).toBe(0.008);
+    expect(IDLE_BREATH_FREQ).toBe(0.45);
+    expect(IDLE_BREATH_AMP_GATHERED).toBe(0.05);
+    expect(IDLE_BREATH_AMP_SCATTERED).toBe(0.03);
+    expect(idleBreathScale(Math.PI / (2 * IDLE_BREATH_FREQ), 0)).toBeCloseTo(1.05);
+    expect(idleBreathScale(1, 0, true)).toBe(1);
+    const idle = liveOrbPulse({
+      moment: 'still',
+      settleOrBloomBreath: 1,
+      pulseTime: Math.PI / (2 * IDLE_BREATH_FREQ),
+      scatter: 0,
+      nowMs: 0,
     });
-    expect(Math.abs(focusing.breath - 1)).toBeLessThan(0.004);
+    expect(idle.breath).toBeCloseTo(1.05);
+    expect(idle.glowBoost).toBe(0);
+    const focusing = liveOrbPulse({
+      moment: 'focusing',
+      settleOrBloomBreath: 1,
+      pulseTime: 0,
+      scatter: 0,
+      nowMs: 2_500,
+    });
+    expect(focusing.breath).toBeGreaterThan(1.07);
+    expect(focusing.glowBoost).toBeGreaterThan(0.9);
+    expect(
+      liveOrbPulse({
+        moment: 'focusing',
+        settleOrBloomBreath: 1,
+        pulseTime: 0,
+        scatter: 0,
+        nowMs: 2_500,
+        reducedMotion: true,
+      }).breath
+    ).toBe(1);
     expect(focusDriftScale(1_000, true)).toBe(1);
-    expect(growthPointScale(still.look, 1, 1)).toBeGreaterThan(still.look.scale);
+    expect(growthPointScale(still.look, idle.breath, 1)).toBeGreaterThan(still.look.scale);
   });
 
   it('mixes looks without shrinking the cap', () => {

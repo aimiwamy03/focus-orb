@@ -53,6 +53,8 @@ import {
   countedMinutesToday,
   formatFocusedToday,
   growthPointScale,
+  IDLE_BREATH_STEP,
+  liveOrbPulse,
   isOrbPreviewKey,
   loadSettlePlayed,
   markSettlePlayed,
@@ -216,7 +218,6 @@ export function Orb() {
   const [showSettle, setShowSettle] = useState(false);
   const [bloomDone, setBloomDone] = useState(true);
   const [nextStep, setNextStep] = useState('');
-  const [distracted, setDistracted] = useState<boolean | null>(null);
   const [focusRating, setFocusRating] = useState<number | null>(null);
   const [playIntro, setPlayIntro] = useState(true);
   const [introSound, setIntroSound] = useState(true);
@@ -314,7 +315,6 @@ export function Orb() {
       bloomToRef.current = stageById(enriched.stageAfter ?? 0);
       setBloomDone(false);
       setNextStep('');
-      setDistracted(null);
       setFocusRating(null);
       setFocusLog(next);
       if (draft.ended === 'ended-session') return;
@@ -780,15 +780,16 @@ export function Orb() {
     window.visualViewport?.addEventListener('resize', resize);
     
     let lastTs = 0;
+    let pulseTime = 0;
 
-    const paintMini = (visualScatter: number, look: OrbLook, breath: number) => {
+    const paintMini = (visualScatter: number, look: OrbLook, breath: number, glow: number) => {
       const frame = miniDrawRef.current;
       const payload = {
         scatter: visualScatter,
         density: frame.density,
         dim: frame.dim,
         scale: look.scale * breath,
-        glow: look.glow,
+        glow,
         halo: look.halo,
         brightness: look.brightness,
         warmth: look.warmth,
@@ -810,6 +811,7 @@ export function Orb() {
         dt
       );
       const visualScatter = visualScatterRef.current;
+      pulseTime += IDLE_BREATH_STEP;
       const debug = window as Window & {
         __orbScatter?: { target: number; visual: number };
       };
@@ -840,19 +842,31 @@ export function Orb() {
         toStage: growth.toStage,
       });
       const look = visual.look;
+      const pulse = liveOrbPulse({
+        moment: visual.moment,
+        settleOrBloomBreath: visual.breath,
+        pulseTime,
+        scatter: visualScatter,
+        nowMs: performance.now(),
+        reducedMotion: growth.reducedMotion,
+      });
+      const breath = pulse.breath;
+      const glow = Math.max(look.glow, pulse.glowBoost);
       const debugGrowth = window as Window & {
         __orbGrowth?: {
           stage: string;
           minutes: number;
           moment: OrbMoment;
           scale: number;
+          glow: number;
         };
       };
       debugGrowth.__orbGrowth = {
         stage: visual.stage.key,
         minutes: visual.minutes,
         moment: visual.moment,
-        scale: look.scale * visual.breath,
+        scale: look.scale * breath,
+        glow,
       };
       
       if (showBackdropRef.current) {
@@ -863,21 +877,20 @@ export function Orb() {
       }
 
       if (miniOnlyRef.current) {
-        paintMini(visualScatter, look, visual.breath);
+        paintMini(visualScatter, look, breath, glow);
         animationRef.current = requestAnimationFrame(render);
         return;
       }
 
       const glowColor = `${255}, ${Math.round(255 - 12 * look.warmth)}, ${Math.round(255 - 28 * look.warmth)}`;
-      if (look.glow > 0) {
-        const glow = look.glow;
+      if (glow > 0) {
         const gradient = ctx.createRadialGradient(
           centerX,
           centerY,
-          radius * 0.18 * look.scale,
+          radius * 0.18 * look.scale * breath,
           centerX,
           centerY,
-          radius * (1.15 + 0.35 * glow) * look.scale
+          radius * (1.15 + 0.35 * glow) * look.scale * breath
         );
         gradient.addColorStop(0, `rgba(${glowColor},${0.16 * glow})`);
         gradient.addColorStop(1, `rgba(${glowColor},0)`);
@@ -888,10 +901,10 @@ export function Orb() {
         const ring = ctx.createRadialGradient(
           centerX,
           centerY,
-          radius * 0.95 * look.scale,
+          radius * 0.95 * look.scale * breath,
           centerX,
           centerY,
-          radius * (1.55 + 0.2 * look.halo) * look.scale
+          radius * (1.55 + 0.2 * look.halo) * look.scale * breath
         );
         ring.addColorStop(0, `rgba(${glowColor},0)`);
         ring.addColorStop(0.55, `rgba(${glowColor},${0.14 * look.halo})`);
@@ -910,7 +923,7 @@ export function Orb() {
       const clearRects = textClearRectsOnDisk(collectTextClearRects(), {
         centerX: layout.centerX,
         centerY: layout.centerY,
-        radius: textClearCloudRadius(layout.radius * look.scale, visualScatter),
+        radius: textClearCloudRadius(layout.radius * look.scale * breath, visualScatter),
       });
       ctx.fillStyle = '#ffffff';
       
@@ -936,7 +949,7 @@ export function Orb() {
         if (point.threshold >= keepProb) continue;
         
         const pointRadius = Math.hypot(point.x, point.y) / Math.max(radius, 1);
-        const pointScale = growthPointScale(look, visual.breath, pointRadius);
+        const pointScale = growthPointScale(look, breath, pointRadius);
         let x = point.x * pointScale;
         let y = point.y * pointScale;
         
@@ -1006,7 +1019,7 @@ export function Orb() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      paintMini(visualScatter, look, visual.breath);
+      paintMini(visualScatter, look, breath, glow);
       
       animationRef.current = requestAnimationFrame(render);
     };
@@ -1384,7 +1397,7 @@ export function Orb() {
       <canvas
         ref={canvasRef}
         data-testid="orb-canvas"
-        className={`absolute inset-0 z-[1] ${miniOnly ? 'opacity-0' : ''}`}
+        className={`pointer-events-none absolute inset-0 z-[1] ${miniOnly ? 'opacity-0' : ''}`}
       />
 
       {mountAgenda ? <Agenda sections={agendaSections} faded={agendaFaded} /> : null}
@@ -1461,11 +1474,6 @@ export function Orb() {
               onNextStepChange={(value) => {
                 setNextStep(value);
                 patchLastLog({ nextStep: value });
-              }}
-              distracted={distracted}
-              onDistracted={(value) => {
-                setDistracted(value);
-                patchLastLog({ distracted: value });
               }}
               focusRating={focusRating}
               onFocusRating={(value) => {

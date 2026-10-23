@@ -41,8 +41,8 @@ export function ChoiceRow({
     <div
       role="group"
       data-testid={testId}
-      className={`flex flex-wrap items-center justify-center ${
-        tone === 'chip' || tone === 'quiet' ? 'gap-1' : 'gap-4'
+      className={`relative z-30 flex flex-wrap items-center justify-center pointer-events-auto ${
+        tone === 'chip' || tone === 'quiet' ? 'gap-3' : 'gap-4'
       }`}
     >
       {items.map((item, index) => {
@@ -57,7 +57,16 @@ export function ChoiceRow({
             data-whoop-adapt={underlined === index ? 'true' : 'false'}
             disabled={item.disabled}
             aria-pressed={active}
-            onMouseDown={keepButtonUnfocused}
+            onMouseDown={(event) => {
+              if (tone !== 'chip') keepButtonUnfocused(event);
+            }}
+            onPointerDown={(event) => {
+              if (item.disabled) return;
+              if (tone === 'chip') {
+                event.stopPropagation();
+                onHighlight(index);
+              }
+            }}
             onMouseEnter={() => {
               if (!item.disabled) onHighlight(index);
             }}
@@ -66,7 +75,7 @@ export function ChoiceRow({
               onHighlight(index);
               if (confirmOnClick) onConfirm(index);
             }}
-            className={hitClass(Boolean(item.disabled))}
+            className={`${hitClass(Boolean(item.disabled))} pointer-events-auto`}
           >
             <span
               className={`${choiceClass(tone, active, Boolean(item.disabled))} ${
@@ -90,6 +99,15 @@ export function choiceClass(
   disabled: boolean
 ): string {
   const ring = 'outline-none focus:outline-none focus-visible:outline-none';
+  if (tone === 'chip') {
+    if (disabled) {
+      return `${ring} rounded-none bg-transparent px-1 pb-1 text-[length:var(--type-whoop)] leading-snug tracking-wide text-orb-placeholder`;
+    }
+    if (highlighted) {
+      return `${ring} duration-chip rounded-none bg-transparent px-1 pb-1 text-[length:var(--type-whoop)] leading-snug tracking-wide text-orb-text underline decoration-1 underline-offset-[6px]`;
+    }
+    return `${ring} duration-chip rounded-none bg-transparent px-1 pb-1 text-[length:var(--type-whoop)] leading-snug tracking-wide text-orb-quiet hover:text-orb-text`;
+  }
   if (disabled) {
     return `${ring} rounded-full px-3.5 py-1.5 text-[length:var(--type-chip)] tracking-wide text-orb-placeholder`;
   }
@@ -98,9 +116,6 @@ export function choiceClass(
   }
   if (tone === 'quiet') {
     return `${ring} rounded-full px-3.5 py-1.5 text-[length:var(--type-button)] tracking-wide text-orb-quiet hover:text-orb-text`;
-  }
-  if (tone === 'chip') {
-    return `${ring} rounded-full px-3.5 py-1.5 text-[length:var(--type-chip)] tracking-wide text-orb-dim hover:text-orb-text`;
   }
   return `${ring} rounded-full px-[length:var(--btn-px)] py-[length:var(--btn-py)] text-[length:var(--type-button)] text-orb-quiet hover:text-orb-dim`;
 }
