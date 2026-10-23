@@ -24,6 +24,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 await page.addInitScript(() => {
   localStorage.clear();
   sessionStorage.setItem('focusOrb:introPlayed', '1');
+  sessionStorage.setItem('focusOrb:settlePlayed', '1');
   localStorage.setItem('focusOrb:shortcutsCard', '1');
   localStorage.setItem(
     'focusOrb:hints',

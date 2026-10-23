@@ -11,6 +11,9 @@ describe('Welcome', () => {
     screen.getByTestId('connect-calendar').click();
     expect(onConnect).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('sample-day').textContent).toBe(SAMPLE_DAY_LINK);
+    expect(screen.getByTestId('welcome-about').getAttribute('href')).toBe('/about');
+    expect(screen.getByTestId('welcome-privacy').getAttribute('href')).toBe('/privacy');
+    expect(screen.getByTestId('welcome-terms').getAttribute('href')).toBe('/terms');
   });
 
   it('falls back to plain copy and a sample day when Google is not configured', () => {
@@ -18,7 +21,7 @@ describe('Welcome', () => {
     expect(screen.getByTestId('welcome-line').textContent).toBe(WELCOME_LINE);
     expect(screen.queryByTestId('connect-calendar')).toBeNull();
     expect(screen.getByTestId('sample-day').textContent).toBe(SAMPLE_DAY_LINK);
-    expect(screen.getByTestId('welcome-legal').textContent).toMatch(/Health data/);
-    expect(screen.getByTestId('legal-privacy').textContent).toBe('Privacy');
+    expect(screen.getByTestId('welcome-about').getAttribute('href')).toBe('/about');
+    expect(screen.getByTestId('welcome-privacy').getAttribute('href')).toBe('/privacy');
   });
 });

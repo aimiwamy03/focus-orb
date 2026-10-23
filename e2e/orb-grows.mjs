@@ -151,7 +151,7 @@ if ((await bloom.getByTestId('next-step').count()) !== 0) {
 await publish(bloom, 'orb_bloom.png');
 await bloom.close();
 
-const afterBloom = await open(`/?mock=empty&orb=bloom&intro=0&settle=0`);
+const afterBloom = await open(`/?mock=empty&orb=bloom&intro=0&settle=0&hover=1`);
 await afterBloom.waitForTimeout(2800);
 if ((await afterBloom.getByTestId('next-step').count()) !== 1) {
   fail('After bloom, the where-I-stopped note should appear');

@@ -346,7 +346,7 @@ if ((await page.getByTestId('legal-health-data').count()) !== 1) {
 }
 
 await open(page, '/about');
-if (!(await page.getByTestId('about-heading').textContent())?.includes('About')) {
+if (!(await page.getByTestId('about-heading').textContent())?.includes('Focus Orb')) {
   fail('About page missing');
 }
 if ((await page.getByTestId('legal-health-data').count()) !== 1) {

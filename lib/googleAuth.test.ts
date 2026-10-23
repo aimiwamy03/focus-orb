@@ -66,6 +66,8 @@ describe('Google auth env aliases', () => {
     expect(GOOGLE_CALENDAR_SCOPES).toContain(
       'https://www.googleapis.com/auth/calendar.events.readonly'
     );
+    expect(GOOGLE_CALENDAR_SCOPES).not.toContain('calendar.write');
+    expect(GOOGLE_CALENDAR_SCOPES).not.toMatch(/vercel\.app/);
     expect(GOOGLE_CALENDAR_AUTH.include_granted_scopes).toBe('true');
     expect(GOOGLE_CALENDAR_AUTH.scope).toBe(GOOGLE_CALENDAR_SCOPES);
   });
