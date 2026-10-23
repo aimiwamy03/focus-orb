@@ -28,6 +28,14 @@ import {
 } from '@/lib/focusPrompt';
 import { createMenuState, reduceMenu, type MenuState } from '@/lib/menuKey';
 import { SPACE_HINT } from '@/lib/shortcuts';
+import {
+  DISTRACTED_PROMPT,
+  NEXT_STEP_LABEL,
+  NEXT_STEP_PLACEHOLDER,
+  NO_LABEL,
+  RATING_PROMPT,
+  YES_LABEL,
+} from '@/lib/orbGrowth';
 import { WHOOP_APP_URL, whoopOfferLabel } from '@/lib/whoop';
 import { ChoiceItem, ChoiceRow, choiceClass } from './ChoiceRow';
 import { KeyHint } from './KeyHint';
@@ -65,6 +73,14 @@ interface FocusPromptProps {
   sessionKeepLabel?: string;
   chromeVisible?: boolean;
   keyboardActive?: boolean;
+  focusedToday?: string | null;
+  blooming?: boolean;
+  nextStep?: string;
+  onNextStepChange?: (value: string) => void;
+  distracted?: boolean | null;
+  onDistracted?: (value: boolean) => void;
+  focusRating?: number | null;
+  onFocusRating?: (value: number) => void;
 }
 
 type MenuItem = ChoiceItem & {
@@ -209,6 +225,14 @@ export function FocusPrompt({
   sessionKeepLabel = KEEP_RESTING_LABEL,
   chromeVisible = false,
   keyboardActive = true,
+  focusedToday = null,
+  blooming = false,
+  nextStep = '',
+  onNextStepChange,
+  distracted = null,
+  onDistracted,
+  focusRating = null,
+  onFocusRating,
 }: FocusPromptProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -690,23 +714,108 @@ export function FocusPrompt({
       ) : null}
 
       {surface === 'completed' && completedTask != null && completedMinutes != null ? (
-        <div className="space-y-3">
-          <button
-            type="button"
-            data-text-clear
-            data-testid="focus-completed"
-            onClick={() => onOpenLog?.()}
-            className="text-[length:var(--type-heading)] leading-tight text-orb-text underline-offset-4 hover:underline"
-          >
-            {formatCompleted(completedMinutes, completedTask, completedPlanned)}
-          </button>
-          <ChoiceRow
-            testId="completed-row"
-            items={items}
-            highlighted={menu.index}
-            onHighlight={highlightIndex}
-            onConfirm={confirmIndex}
-          />
+        <div className="flex w-full flex-col items-center gap-3">
+          {focusedToday ? (
+            <p
+              data-testid="focused-today"
+              data-text-clear
+              className="m-0 text-[length:var(--type-heading)] leading-tight text-orb-text"
+            >
+              {focusedToday}
+            </p>
+          ) : null}
+          {blooming ? null : (
+            <>
+              <button
+                type="button"
+                data-text-clear
+                data-testid="focus-completed"
+                onClick={() => onOpenLog?.()}
+                className="text-[length:var(--type-whoop)] leading-snug text-orb-text underline-offset-4 hover:underline"
+              >
+                {formatCompleted(completedMinutes, completedTask, completedPlanned)}
+              </button>
+              <label className="flex w-full max-w-[min(32rem,92vw)] flex-col items-center gap-2">
+                <span
+                  data-testid="next-step-label"
+                  className="text-[length:var(--type-whoop)] leading-snug text-orb-text"
+                >
+                  {NEXT_STEP_LABEL}
+                </span>
+                <textarea
+                  data-testid="next-step"
+                  data-text-clear
+                  value={nextStep}
+                  onChange={(event) => onNextStepChange?.(event.target.value)}
+                  placeholder={NEXT_STEP_PLACEHOLDER}
+                  rows={2}
+                  className="w-full resize-none border-0 border-b border-orb-quiet bg-transparent px-0 py-1 text-center text-[length:var(--type-input)] leading-snug text-orb-text outline-none placeholder:text-orb-quiet"
+                />
+              </label>
+              <div className="flex flex-col items-center gap-2">
+                <p
+                  data-testid="distracted-prompt"
+                  className="m-0 text-[length:var(--type-whoop)] leading-snug text-orb-text"
+                >
+                  {DISTRACTED_PROMPT}
+                </p>
+                <div className="flex items-center gap-6" data-testid="distracted-row">
+                  {[
+                    { id: 'distract-yes', label: YES_LABEL, value: true },
+                    { id: 'distract-no', label: NO_LABEL, value: false },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      data-testid={item.id}
+                      data-selected={distracted === item.value ? 'true' : 'false'}
+                      onClick={() => onDistracted?.(item.value)}
+                      className={`min-h-[44px] bg-transparent text-[length:var(--type-button)] leading-snug ${
+                        distracted === item.value
+                          ? 'text-orb-text underline decoration-1 underline-offset-[6px]'
+                          : 'text-orb-quiet hover:text-orb-text'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <p
+                  data-testid="rating-prompt"
+                  className="m-0 text-[length:var(--type-whoop)] leading-snug text-orb-text"
+                >
+                  {RATING_PROMPT}
+                </p>
+                <div className="flex items-center gap-4" data-testid="rating-row">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      data-testid={`rating-${value}`}
+                      data-selected={focusRating === value ? 'true' : 'false'}
+                      onClick={() => onFocusRating?.(value)}
+                      className={`min-h-[44px] min-w-[44px] bg-transparent text-[length:var(--type-button)] leading-snug ${
+                        focusRating === value
+                          ? 'text-orb-text underline decoration-1 underline-offset-[6px]'
+                          : 'text-orb-quiet hover:text-orb-text'
+                      }`}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ChoiceRow
+                testId="completed-row"
+                items={items}
+                highlighted={menu.index}
+                onHighlight={highlightIndex}
+                onConfirm={confirmIndex}
+              />
+            </>
+          )}
         </div>
       ) : null}
 

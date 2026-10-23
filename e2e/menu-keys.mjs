@@ -36,6 +36,7 @@ async function seed(page) {
   await page.addInitScript((seed) => {
     localStorage.clear();
     sessionStorage.setItem('focusOrb:introPlayed', '1');
+    sessionStorage.setItem('focusOrb:settlePlayed', '1');
     for (const [key, value] of Object.entries(seed)) localStorage.setItem(key, value);
   }, SEED);
 }

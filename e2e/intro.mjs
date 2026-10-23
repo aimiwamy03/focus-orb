@@ -27,7 +27,7 @@ await playPage.addInitScript(() => {
   sessionStorage.clear();
   localStorage.setItem('focusOrb:shortcutsCard', '1');
 });
-await playPage.goto(`${BASE}/?mock=empty&intro=1`, { waitUntil: 'networkidle' });
+await playPage.goto(`${BASE}/?mock=empty&intro=1&settle=0`, { waitUntil: 'networkidle' });
 await playPage.waitForTimeout(400);
 if ((await playPage.getByTestId('focus-intro').count()) !== 1) {
   fail('?intro=1 should play the opening intro');
@@ -39,10 +39,10 @@ await playPage.getByTestId('focus-intro').waitFor({ state: 'detached', timeout: 
 if ((await playPage.getByTestId('focus-prompt').count()) !== 1) {
   fail('Intro should land on the home ask screen');
 }
-const heading = await playPage.locator('text=What do you want to focus on?').count();
+const heading = await playPage.locator("text=What's the one thing?").count();
 if (!heading) fail('Home heading missing after intro');
 
-await playPage.goto(`${BASE}/?mock=empty`, { waitUntil: 'networkidle' });
+await playPage.goto(`${BASE}/?mock=empty&settle=0`, { waitUntil: 'networkidle' });
 await playPage.waitForTimeout(500);
 if ((await playPage.getByTestId('focus-intro').count()) !== 0) {
   fail('Second load in the same session should not replay the intro');
@@ -55,7 +55,7 @@ await skipPage.addInitScript(() => {
   sessionStorage.clear();
   localStorage.setItem('focusOrb:shortcutsCard', '1');
 });
-await skipPage.goto(`${BASE}/?mock=empty&intro=1`, { waitUntil: 'networkidle' });
+await skipPage.goto(`${BASE}/?mock=empty&intro=1&settle=0`, { waitUntil: 'networkidle' });
 await skipPage.waitForSelector('[data-testid="focus-intro"]');
 await skipPage.keyboard.press('Escape');
 await skipPage.getByTestId('focus-intro').waitFor({ state: 'detached', timeout: 2000 });
@@ -173,6 +173,7 @@ const settings = await browser.newPage({ viewport: { width: 1280, height: 800 } 
 await settings.addInitScript(() => {
   localStorage.clear();
   sessionStorage.setItem('focusOrb:introPlayed', '1');
+  sessionStorage.setItem('focusOrb:settlePlayed', '1');
   localStorage.setItem('focusOrb:shortcutsCard', '1');
 });
 await settings.goto(`${BASE}/?mock=empty&intro=0&settings=1`, { waitUntil: 'networkidle' });

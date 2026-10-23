@@ -145,6 +145,7 @@ describe('copy', () => {
     expect(formatBreakCopy(4.2)).toBe('Break 5m');
     expect(formatBreakCopy(5)).toBe('Break 5m');
     expect(formatMeetingSoonCopy(4.2)).toBe('Meeting in 5m');
+    expect(ASK_PROMPT).toBe("What's the one thing?");
     expect(ASK_PROMPT).not.toMatch(/[—–]/);
     expect(END_EARLY_PROMPT).not.toMatch(/[—–]/);
     expect(END_SESSION_PROMPT).toBe('End session?');
