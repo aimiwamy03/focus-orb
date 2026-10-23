@@ -163,6 +163,7 @@ await afterBloom.getByTestId('next-step').fill('Send the recap');
 await afterBloom.getByTestId('distract-no').click();
 await afterBloom.getByTestId('rating-4').click();
 await publish(afterBloom, 'orb_bloom_note.png');
+await afterBloom.getByTestId('help-toggle').click();
 await afterBloom.getByTestId('focus-log-open').click();
 await afterBloom.waitForSelector('[data-testid="focus-log"]');
 const todayStage = await afterBloom.getByTestId('focus-log-day-stage-Today').count();
