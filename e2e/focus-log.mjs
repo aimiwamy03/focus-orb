@@ -133,6 +133,7 @@ async function seedPage(page, extra = {}) {
     (payload) => {
       localStorage.clear();
       sessionStorage.setItem('focusOrb:introPlayed', '1');
+      sessionStorage.setItem('focusOrb:settlePlayed', '1');
       localStorage.setItem('focusOrb:shortcutsCard', '1');
       localStorage.setItem('focusOrb:hints', payload.hints);
       localStorage.setItem('focusOrb:recentTasks', payload.recents);
@@ -151,13 +152,10 @@ async function openLog({ log, width, height }) {
   await seedPage(page, { log });
   await page.goto(`${BASE}/?mock=empty&hover=1`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
-  const logButton = page.getByTestId('focus-log-open');
-  if ((await logButton.count()) === 1) {
-    await logButton.click();
-  } else {
-    await page.keyboard.press('Escape');
-    await page.keyboard.press('l');
-  }
+  const task = page.getByTestId('focus-task');
+  if ((await task.count()) === 1) await task.blur();
+  await page.getByTestId('help-toggle').click();
+  await page.getByTestId('focus-log-open').click();
   await page.waitForTimeout(300);
   return page;
 }
@@ -166,10 +164,15 @@ let page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 await seedPage(page);
 await page.goto(`${BASE}/?mock=empty&hover=1`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(700);
-if ((await page.getByTestId('focus-log-open').count()) !== 1) {
-  fail('Log chrome control is missing');
+if ((await page.getByTestId('help-toggle').count()) !== 1) {
+  fail('Shortcuts ? control is missing');
 }
-if ((await page.getByTestId('keycap-L').count()) < 1) {
+await page.getByTestId('help-toggle').click();
+await page.waitForSelector('[data-testid="short-help"]');
+if ((await page.getByTestId('focus-log-open').count()) !== 1) {
+  fail('Log chrome control is missing from the ? menu');
+}
+if ((await page.getByTestId('short-help').getByTestId('keycap-L').count()) < 1) {
   fail('Log keycap L should match the P keycap style');
 }
 await shot(page, 'chrome_1280x800');
@@ -464,6 +467,8 @@ await page.close();
 page = await openLog({ log: rows, width: 1280, height: 800 });
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
+if ((await page.getByTestId('focus-task').count()) === 1) await page.getByTestId('focus-task').blur();
+await page.getByTestId('help-toggle').click();
 await page.getByTestId('settings-gear').click();
 await page.waitForTimeout(200);
 await page.getByTestId('clear-log').click();
@@ -474,6 +479,7 @@ await page.getByTestId('clear-log-yes').click();
 await page.waitForTimeout(200);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(150);
+if ((await page.getByTestId('focus-task').count()) === 1) await page.getByTestId('focus-task').blur();
 await page.keyboard.press('l');
 await page.waitForTimeout(250);
 if ((await page.getByTestId('focus-log-empty').count()) !== 1) {

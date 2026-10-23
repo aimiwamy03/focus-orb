@@ -29,6 +29,7 @@ import {
   loadFocusLog,
   recordFocusLog,
   saveFocusLog,
+  updateFocusLogEntry,
   sessionBarPercent,
   summarizeChart,
   taskTotals,
@@ -77,6 +78,46 @@ describe('focus log storage', () => {
     });
     expect(clearFocusLog(key)).toEqual([]);
     expect(loadFocusLog(key)).toEqual([]);
+  });
+
+  it('patches next-step and rating on an existing entry', () => {
+    const recorded = recordFocusLog(key, {
+      task: 'write the spec',
+      startMs: now.getTime() - 25 * 60_000,
+      endMs: now.getTime(),
+      minutes: 25,
+      planned: 25,
+      ended: 'completed',
+    });
+    const updated = updateFocusLogEntry(key, recorded[0].id, {
+      nextStep: 'Send the recap',
+      focusRating: 4,
+      distracted: false,
+    });
+    expect(updated[0].nextStep).toBe('Send the recap');
+    expect(updated[0].focusRating).toBe(4);
+    expect(updated[0].distracted).toBe(false);
+  });
+
+  it('still loads old sessions that stored a distracted answer', () => {
+    localStorage.setItem(
+      key,
+      JSON.stringify([
+        {
+          id: 'old-1',
+          task: 'write the spec',
+          startMs: now.getTime() - 25 * 60_000,
+          endMs: now.getTime(),
+          minutes: 25,
+          planned: 25,
+          ended: 'completed',
+          distracted: true,
+        },
+      ])
+    );
+    const loaded = loadFocusLog(key);
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].distracted).toBe(true);
   });
 
   it('ignores broken stored JSON', () => {

@@ -15,11 +15,20 @@ import {
   whoopLineKey,
   whoopOfferLabel,
   whoopQuietLine,
+  whoopWhyLine,
+  formatSleepDuration,
+  formatWhoopWindow,
+  whoopBestWindow,
   whoopSettingsStatus,
   WHOOP_MODE_HINTS,
   WHOOP_LEARNING_LABEL,
   WHOOP_NO_DATA_LABEL,
   WHOOP_DISCONNECTED_LABEL,
+  WHOOP_RECONNECT_LABEL,
+  WHOOP_SUMMARY_KEY,
+  clearCachedWhoopSummary,
+  loadCachedWhoopSummary,
+  saveCachedWhoopSummary,
   WHOOP_USUAL,
   type WhoopFacts,
   type WhoopState,
@@ -32,6 +41,7 @@ function facts(partial: Partial<WhoopFacts> = {}): WhoopFacts {
     recovery: 82,
     recoveryState: 'scored',
     sleepPerformance: 90,
+    sleepMinutes: 7 * 60 + 20,
     sleepDebtMinutes: 0,
     yesterdayStrain: 8,
     lastWorkoutEndedAt: null,
@@ -257,20 +267,82 @@ describe('quiet line', () => {
     const suggestion = suggestWhoop(
       facts({
         recovery: 28,
+        sleepMinutes: 5 * 60 + 50,
+        sleepPerformance: 72,
         lastWorkoutEndedAt: noon - 5 * 60_000,
       }),
       true
     );
     expect(suggestion.lineKey).toBe('workout');
-    expect(suggestion.line).toContain('workout');
+    expect(suggestion.line).toBe('Recovery 28%, slept 5h 50m (72%), so 20m blocks today.');
     expect(suggestion.rhythm.firstBlockMinutes).toBe(20);
     expect(suggestion.rhythm.blocks).toBe(3);
+  });
+});
+
+describe('WHOOP why line and best window', () => {
+  it('uses recovery, sleep, and the block length, and never invents missing numbers', () => {
+    expect(
+      whoopWhyLine(
+        facts({ recovery: 42, sleepMinutes: 5 * 60 + 50, sleepPerformance: 72 }),
+        25,
+        true
+      )
+    ).toBe('Recovery 42%, slept 5h 50m (72%), so 25m blocks today.');
+    expect(whoopWhyLine(facts({ recovery: 42, sleepMinutes: null, sleepPerformance: null }), 25, true)).toBe(
+      'Recovery 42%, so 25m blocks today.'
+    );
+    expect(whoopWhyLine(facts({ recovery: null, sleepMinutes: 5 * 60 + 50, sleepPerformance: 72 }), 25, true)).toBe(
+      'slept 5h 50m (72%), so 25m blocks today.'
+    );
+    expect(whoopWhyLine(null, 25, true)).toBeNull();
+    expect(formatSleepDuration(350)).toBe('5h 50m');
+    expect(formatSleepDuration(360)).toBe('6h');
+  });
+
+  it('keeps the reason wording without numbers when the toggle is off', () => {
+    expect(
+      whoopWhyLine(
+        facts({ recovery: 28, sleepMinutes: 5 * 60 + 50, sleepPerformance: 72 }),
+        25,
+        false
+      )
+    ).toBe('Recovery is low, sleep was short, so shorter blocks today.');
+    expect(
+      whoopWhyLine(facts({ recovery: 82, sleepMinutes: 7 * 60 + 20 }), 50, false)
+    ).toBe('Recovery is strong, sleep was solid, so full blocks today.');
+  });
+
+  it('picks a peak window that overlaps a free gap and skips thin or missing gaps', () => {
+    const wake = new Date(noon);
+    wake.setHours(8, 0, 0, 0);
+    const now = new Date(noon);
+    now.setHours(12, 0, 0, 0);
+    const window = whoopBestWindow(
+      facts({ wakeAt: wake.getTime(), now: now.getTime() }),
+      [{ start: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0), end: null }],
+      now
+    );
+    expect(window).not.toBeNull();
+    expect(formatWhoopWindow(window!.start, window!.end)).toMatch(/Best focus window /);
+    expect(formatWhoopWindow(window!.start, window!.end)).not.toMatch(/[—–]/);
+    expect(
+      whoopBestWindow(facts({ wakeAt: wake.getTime(), now: now.getTime() }), [], now)
+    ).toBeNull();
+    expect(
+      whoopBestWindow(
+        facts({ wakeAt: null, now: now.getTime() }),
+        [{ start: now, end: null }],
+        now
+      )
+    ).toBeNull();
   });
 });
 
 describe('settings copy and mode', () => {
   it('labels disconnected, empty, and calibrating days', () => {
     expect(whoopSettingsStatus('disconnected')).toBe(WHOOP_DISCONNECTED_LABEL);
+    expect(whoopSettingsStatus('reconnect')).toBe(WHOOP_RECONNECT_LABEL);
     expect(whoopSettingsStatus('no-data')).toBe(WHOOP_NO_DATA_LABEL);
     expect(whoopSettingsStatus('calibrating')).toBe(WHOOP_LEARNING_LABEL);
     expect(whoopSettingsStatus('ok')).toBeNull();
@@ -284,7 +356,7 @@ describe('settings copy and mode', () => {
   });
 
   it('labels the offer and explains each mode', () => {
-    expect(whoopOfferLabel(25)).toBe('WHOOP suggests 25m');
+    expect(whoopOfferLabel(25)).toBe('25m today');
     expect(WHOOP_MODE_HINTS.suggest).toMatch(/quiet length/i);
     expect(WHOOP_MODE_HINTS.suggest).toMatch(/still start/i);
     expect(WHOOP_MODE_HINTS.adapt).toMatch(/pre-fills/i);
@@ -307,5 +379,22 @@ describe('hide line and nudge limit', () => {
     recordWhoopNudge('red', 90, 25, noon);
     expect(shouldStopWhoopNudge('red', noon)).toBe(true);
     expect(shouldStopWhoopNudge('green', noon)).toBe(false);
+  });
+});
+
+describe('WHOOP summary cache', () => {
+  it('clears the leftover local summary', () => {
+    saveCachedWhoopSummary({
+      connected: true,
+      email: 'amy@example.com',
+      status: 'ok',
+      facts: null,
+      fetchedAt: noon,
+    });
+    expect(localStorage.getItem(WHOOP_SUMMARY_KEY)).toBeTruthy();
+    expect(loadCachedWhoopSummary()?.email).toBe('amy@example.com');
+    clearCachedWhoopSummary();
+    expect(localStorage.getItem(WHOOP_SUMMARY_KEY)).toBeNull();
+    expect(loadCachedWhoopSummary()).toBeNull();
   });
 });

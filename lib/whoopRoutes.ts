@@ -1,12 +1,14 @@
 import { authSecret, authUrl } from './googleAuth';
 import {
+  WHOOP_INVITE_ONLY_MESSAGE,
   WHOOP_STATE_COOKIE,
   WHOOP_TOKEN_COOKIE,
   createWhoopState,
   decryptWhoopPayload,
   encryptWhoopPayload,
+  isWhoopEmailInvited,
   isWhoopSecure,
-  sessionEmailMatches,
+  sessionWhoopMatches,
   stateIsValid,
   whoopCookieOptions,
   whoopRedirectUri,
@@ -14,17 +16,19 @@ import {
 } from './whoopAuth';
 import {
   exchangeWhoopCode,
-  revokeWhoopToken,
+  revokeWhoopSession,
   summarizeWhoopToday,
   whoopAuthorizeUrl,
   type FetchLike,
   type WhoopClientOptions,
 } from './whoopClient';
+import { WHOOP_REVOKE_APP_LABEL } from './whoop';
 import { isWhoopConfigured as whoopReady, whoopClientId } from './whoopEndpoints';
 import type { WhoopEndpoints } from './whoopEndpoints';
 
 export interface WhoopSession {
   email?: string | null;
+  userId?: string | null;
 }
 
 export interface CookieJar {
@@ -62,6 +66,29 @@ function cookieOpts(env: NodeJS.Dict<string | undefined>, maxAge: number) {
   return whoopCookieOptions(maxAge, isWhoopSecure(env));
 }
 
+function sessionOf(session: WhoopSession | null | undefined) {
+  return {
+    email: session?.email ?? null,
+    userId: session?.userId ?? null,
+  };
+}
+
+export function whoopSessionFromAuth(session: {
+  user?: { email?: string | null; id?: string | null } | null;
+} | null): WhoopSession {
+  return {
+    email: session?.user?.email ?? null,
+    userId: session?.user?.id ?? null,
+  };
+}
+
+export function clearWhoopSessionCookies(): WhoopRouteResult {
+  return {
+    status: 200,
+    cookies: [{ name: WHOOP_TOKEN_COOKIE, value: '', clear: true }],
+  };
+}
+
 export function applyWhoopCookies(jar: CookieJar, result: WhoopRouteResult, env = process.env) {
   for (const cookie of result.cookies ?? []) {
     if (cookie.clear) {
@@ -72,20 +99,38 @@ export function applyWhoopCookies(jar: CookieJar, result: WhoopRouteResult, env 
   }
 }
 
+function settingsHome(
+  requestUrl: string,
+  env: NodeJS.Dict<string | undefined>,
+  extra: Record<string, string> = {}
+): string {
+  const base = (authUrl(env) || new URL(requestUrl).origin).replace(/\/$/, '');
+  const url = new URL(`${base}/`);
+  url.searchParams.set('settings', '1');
+  for (const [key, value] of Object.entries(extra)) {
+    url.searchParams.set(key, value);
+  }
+  return url.toString();
+}
+
 export function handleWhoopConnect(input: {
   session: WhoopSession | null;
   requestUrl: string;
   env?: NodeJS.Dict<string | undefined>;
 }): WhoopRouteResult {
   const env = input.env ?? process.env;
-  const email = input.session?.email;
-  if (!email) {
+  const session = sessionOf(input.session);
+  if (!session.email || !session.userId) {
     return { status: 401, body: { error: 'Sign in with Google first.' } };
   }
-  if (!whoopReady(env) || !whoopClientId(env)) {
+  if (!isWhoopEmailInvited(session.email, env)) {
+    return { status: 403, body: { error: WHOOP_INVITE_ONLY_MESSAGE } };
+  }
+  const secret = authSecret(env);
+  if (!whoopReady(env) || !whoopClientId(env) || !secret) {
     return { status: 503, body: { error: 'WHOOP is not configured.' } };
   }
-  const state = createWhoopState();
+  const state = createWhoopState(session.userId, secret);
   const redirectUri = whoopRedirectUri(input.requestUrl, env);
   const location = whoopAuthorizeUrl({
     clientId: whoopClientId(env)!,
@@ -95,6 +140,7 @@ export function handleWhoopConnect(input: {
   return {
     status: 302,
     redirect: location,
+    body: { redirect: location },
     cookies: [{ name: WHOOP_STATE_COOKIE, value: state, maxAge: 10 * 60 }],
   };
 }
@@ -109,20 +155,26 @@ export async function handleWhoopCallback(input: {
 }): Promise<WhoopRouteResult> {
   const env = input.env ?? process.env;
   const secret = authSecret(env);
-  const email = input.session?.email;
-  const home = (authUrl(env) || new URL(input.requestUrl).origin).replace(/\/$/, '') + '/?settings=1';
+  const session = sessionOf(input.session);
+  const home = settingsHome(input.requestUrl, env);
   const url = new URL(input.requestUrl);
   const state = url.searchParams.get('state');
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
 
-  const fail = (): WhoopRouteResult => ({
+  const fail = (whoopError?: string): WhoopRouteResult => ({
     status: 302,
-    redirect: home,
+    redirect: whoopError ? settingsHome(input.requestUrl, env, { whoopError }) : home,
     cookies: [{ name: WHOOP_STATE_COOKIE, value: '', clear: true }],
   });
 
-  if (!email || !secret || error || !code || !stateIsValid(input.stateCookie, state)) {
+  if (!session.email || !session.userId || !secret || error || !code) {
+    return fail();
+  }
+  if (!isWhoopEmailInvited(session.email, env)) {
+    return fail('invite');
+  }
+  if (!stateIsValid(input.stateCookie, state, session.userId, secret)) {
     return fail();
   }
 
@@ -133,7 +185,8 @@ export async function handleWhoopCallback(input: {
       clientOptions(env, input.fetchImpl, input.endpoints)
     );
     const payload: WhoopTokenSet = {
-      email,
+      userId: session.userId,
+      email: session.email,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       expiresAt: tokens.expiresAt,
@@ -166,20 +219,29 @@ export async function handleWhoopToday(input: {
 }): Promise<WhoopRouteResult> {
   const env = input.env ?? process.env;
   const secret = authSecret(env);
-  const email = input.session?.email ?? null;
+  const session = sessionOf(input.session);
+  const clearSession = [{ name: WHOOP_TOKEN_COOKIE, value: '', clear: true }];
   if (!secret) {
-    return { status: 200, body: { connected: false, status: 'disconnected', facts: null } };
+    return {
+      status: 200,
+      body: { connected: false, status: 'disconnected', facts: null },
+      cookies: clearSession,
+    };
   }
   const tokens = decryptWhoopPayload(input.cookie, secret);
-  if (!tokens || !sessionEmailMatches(tokens, email)) {
-    return { status: 200, body: { connected: false, status: 'disconnected', email, facts: null } };
+  if (!tokens || !sessionWhoopMatches(tokens, session)) {
+    return {
+      status: 200,
+      body: { connected: false, status: 'disconnected', email: session.email, facts: null },
+      cookies: clearSession,
+    };
   }
   if (input.light) {
     return {
       status: 200,
       body: {
         connected: true,
-        status: tokens.summary?.status ?? 'ok',
+        status: 'ok',
         email: tokens.email,
         facts: null,
       },
@@ -221,18 +283,25 @@ export async function handleWhoopDisconnect(input: {
 }): Promise<WhoopRouteResult> {
   const env = input.env ?? process.env;
   const secret = authSecret(env);
+  const session = sessionOf(input.session);
   const tokens = secret ? decryptWhoopPayload(input.cookie, secret) : null;
-  if (tokens && sessionEmailMatches(tokens, input.session?.email)) {
-    await revokeWhoopToken(tokens.refreshToken, clientOptions(env, input.fetchImpl, input.endpoints));
-    await revokeWhoopToken(tokens.accessToken, clientOptions(env, input.fetchImpl, input.endpoints));
+  let revoked = true;
+  if (tokens && sessionWhoopMatches(tokens, session)) {
+    revoked = await revokeWhoopSession(
+      tokens,
+      clientOptions(env, input.fetchImpl, input.endpoints)
+    );
   }
   return {
     status: 200,
-    body: { connected: false, status: 'disconnected' },
+    body: {
+      connected: false,
+      status: 'disconnected',
+      ...(revoked ? {} : { message: WHOOP_REVOKE_APP_LABEL }),
+    },
     cookies: [
       { name: WHOOP_TOKEN_COOKIE, value: '', clear: true },
       { name: WHOOP_STATE_COOKIE, value: '', clear: true },
     ],
   };
 }
-

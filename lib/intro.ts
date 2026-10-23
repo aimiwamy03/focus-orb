@@ -4,11 +4,13 @@ export const INTRO_SESSION_KEY = 'focusOrb:introPlayed';
 export const PLAY_INTRO_KEY = 'focusOrb:playIntro';
 export const INTRO_SOUND_KEY = 'focusOrb:introSound';
 export const PLAY_INTRO_LABEL = 'Play intro';
+export const REPLAY_INTRO_LABEL = 'Replay intro';
 export const INTRO_SOUND_LABEL = 'Intro sound';
-export const INTRO_SKIP_HINT = 'Esc to skip';
+export const INTRO_SKIP_HINT = 'Skip (Esc)';
 export const INTRO_HINT_COLOR = '#a1a1a6';
 export const INTRO_HINT_SIZE_PX = 16;
 export const INTRO_MIN_CAPTION_PX = 24;
+export const INTRO_TITLE_TRACKING = '0.04em';
 export const INTRO_NARROW_PX = 520;
 export const INTRO_NARROW_ART_ZOOM = 1.45;
 export const INTRO_ART_SRC = '/intro/intro-brain.webp';
@@ -187,6 +189,34 @@ export function introSoundEvents(timeline: IntroTimeline = INTRO_TIMELINE): Intr
   return events;
 }
 
+export interface IntroSoundCue {
+  name: IntroAudioName;
+  volume: number;
+  when: number;
+  offset: number;
+}
+
+export function introSoundCuesAt(
+  elapsed: number,
+  events: IntroSoundEvent[] = introSoundEvents()
+): IntroSoundCue[] {
+  const t = Math.max(0, elapsed);
+  const cues: IntroSoundCue[] = [];
+  for (const event of events) {
+    if (t <= event.at) {
+      cues.push({ name: event.name, volume: event.volume, when: event.at - t, offset: 0 });
+      continue;
+    }
+    if (event.name !== 'bed') continue;
+    cues.push({ name: event.name, volume: event.volume, when: 0, offset: t - event.at });
+  }
+  return cues;
+}
+
+export function introPointerUnlocksSound(waitingForGesture: boolean): boolean {
+  return waitingForGesture;
+}
+
 export interface IntroFrame {
   artOpacity: number;
   artTransform: string;
@@ -300,14 +330,38 @@ export function savePlayIntro(value: boolean): void {
   localStorage.setItem(PLAY_INTRO_KEY, value ? '1' : '0');
 }
 
+export const DEFAULT_INTRO_SOUND = true;
+
+export function introSoundPref(stored: string | null | undefined): boolean {
+  return stored !== '0';
+}
+
 export function loadIntroSound(): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  return localStorage.getItem(INTRO_SOUND_KEY) === '1';
+  if (typeof localStorage === 'undefined') return DEFAULT_INTRO_SOUND;
+  return introSoundPref(localStorage.getItem(INTRO_SOUND_KEY));
 }
 
 export function saveIntroSound(value: boolean): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(INTRO_SOUND_KEY, value ? '1' : '0');
+}
+
+export function shouldPlayEndResolve(input: {
+  introSound: boolean;
+  reducedMotion: boolean;
+}): boolean {
+  return input.introSound && !input.reducedMotion;
+}
+
+export function playEndResolve(): void {
+  if (typeof Audio === 'undefined') return;
+  try {
+    const audio = new Audio(INTRO_AUDIO.resolve);
+    audio.volume = INTRO_MIX.resolve;
+    void audio.play().catch(() => {});
+  } catch {
+    // browsers may block autoplay
+  }
 }
 
 export function isStoredFocusRunning(now = Date.now()): boolean {

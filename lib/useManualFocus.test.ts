@@ -18,6 +18,7 @@ describe('draftFocusEnd', () => {
       minutes: 25,
       planned: 25,
       ended: 'completed',
+      pausedMinutes: 0,
     });
     expect(draftFocusEnd(session, 'ended-early', session.startTime + 18 * 60_000)).toMatchObject({
       minutes: 18,

@@ -7,6 +7,7 @@ export const MOCK_SCENARIOS = [
   'in-meeting',
   'pre-meeting',
   'empty',
+  'amy-thursday',
 ] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];
@@ -109,5 +110,22 @@ export function getMockEvents(scenario: MockScenario, now: Date): CalendarEvent[
       ];
     case 'empty':
       return [];
+    case 'amy-thursday':
+      return [
+        ev(now, 'Mindspace Open House', 9, 0, 17, 0, {
+          transparency: 'transparent',
+          eventType: 'fromGmail',
+          backgroundColor: '#4285f4',
+        }),
+        ev(now, 'Production Agent Lab - Workshop', 10, 0, 20, 0, {
+          backgroundColor: '#8e24aa',
+        }),
+        ev(now, 'Sleep', 22, 0, 22, 30, { backgroundColor: '#8e24aa' }),
+        evOnDay(now, 1, 'Zoom', 10, 0, 11, 0, { backgroundColor: '#4285f4' }),
+        evOnDay(now, 1, 'Catch-up', 10, 0, 11, 0, { backgroundColor: '#4285f4' }),
+        evOnDay(now, 1, 'Interview', 10, 0, 11, 0, { backgroundColor: '#4285f4' }),
+        evOnDay(now, 1, 'recap with myself', 20, 0, 20, 30, { backgroundColor: '#8e24aa' }),
+        evOnDay(now, 1, 'Sleep', 22, 0, 22, 30, { backgroundColor: '#8e24aa' }),
+      ];
   }
 }

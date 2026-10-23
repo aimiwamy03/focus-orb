@@ -27,7 +27,7 @@ await playPage.addInitScript(() => {
   sessionStorage.clear();
   localStorage.setItem('focusOrb:shortcutsCard', '1');
 });
-await playPage.goto(`${BASE}/?mock=empty&intro=1`, { waitUntil: 'networkidle' });
+await playPage.goto(`${BASE}/?mock=empty&intro=1&settle=0`, { waitUntil: 'networkidle' });
 await playPage.waitForTimeout(400);
 if ((await playPage.getByTestId('focus-intro').count()) !== 1) {
   fail('?intro=1 should play the opening intro');
@@ -39,10 +39,10 @@ await playPage.getByTestId('focus-intro').waitFor({ state: 'detached', timeout: 
 if ((await playPage.getByTestId('focus-prompt').count()) !== 1) {
   fail('Intro should land on the home ask screen');
 }
-const heading = await playPage.locator('text=What do you want to focus on?').count();
+const heading = await playPage.locator("text=What's the one thing?").count();
 if (!heading) fail('Home heading missing after intro');
 
-await playPage.goto(`${BASE}/?mock=empty`, { waitUntil: 'networkidle' });
+await playPage.goto(`${BASE}/?mock=empty&intro=0&settle=0`, { waitUntil: 'networkidle' });
 await playPage.waitForTimeout(500);
 if ((await playPage.getByTestId('focus-intro').count()) !== 0) {
   fail('Second load in the same session should not replay the intro');
@@ -55,7 +55,7 @@ await skipPage.addInitScript(() => {
   sessionStorage.clear();
   localStorage.setItem('focusOrb:shortcutsCard', '1');
 });
-await skipPage.goto(`${BASE}/?mock=empty&intro=1`, { waitUntil: 'networkidle' });
+await skipPage.goto(`${BASE}/?mock=empty&intro=1&settle=0`, { waitUntil: 'networkidle' });
 await skipPage.waitForSelector('[data-testid="focus-intro"]');
 await skipPage.keyboard.press('Escape');
 await skipPage.getByTestId('focus-intro').waitFor({ state: 'detached', timeout: 2000 });
@@ -79,9 +79,9 @@ const hintStyle = await stills.getByTestId('focus-intro-hint').evaluate((el) => 
   const style = getComputedStyle(el);
   return { color: style.color, size: parseFloat(style.fontSize) };
 });
-if (hintStyle.size < 15) fail(`Skip hint should be at least 15px, got ${hintStyle.size}`);
-if (hintStyle.color !== 'rgb(161, 161, 166)') {
-  fail(`Skip hint should be #a1a1a6, got ${hintStyle.color}`);
+if (hintStyle.size < 17) fail(`Skip hint should be at least 17px, got ${hintStyle.size}`);
+if (hintStyle.color !== 'rgb(208, 208, 212)') {
+  fail(`Skip hint should be #d0d0d4, got ${hintStyle.color}`);
 }
 if ((await stills.locator('.focus-intro-fuse').count()) !== 0) {
   fail('Desktop rest caption should not show a fuse hairline');
@@ -173,17 +173,24 @@ const settings = await browser.newPage({ viewport: { width: 1280, height: 800 } 
 await settings.addInitScript(() => {
   localStorage.clear();
   sessionStorage.setItem('focusOrb:introPlayed', '1');
+  sessionStorage.setItem('focusOrb:settlePlayed', '1');
   localStorage.setItem('focusOrb:shortcutsCard', '1');
 });
 await settings.goto(`${BASE}/?mock=empty&intro=0&settings=1`, { waitUntil: 'networkidle' });
 await settings.waitForTimeout(500);
-if ((await settings.getByTestId('play-intro').count()) !== 1) {
-  fail('Settings should include Play intro');
+if ((await settings.getByTestId('play-intro').count()) !== 0) {
+  fail('Settings should not include Play intro');
 }
 if ((await settings.getByTestId('intro-sound').count()) !== 1) {
   fail('Settings should include Intro sound');
 }
-await settings.getByTestId('play-intro').scrollIntoViewIfNeeded();
+if ((await settings.getByTestId('intro-sound').getAttribute('aria-checked')) !== 'true') {
+  fail('Intro sound should be on by default');
+}
+await settings.getByTestId('settings-body').evaluate((el) => {
+  el.scrollTop = el.scrollHeight;
+});
+await settings.getByTestId('intro-sound').waitFor();
 await publish(settings, 'intro_settings_toggles.png');
 await settings.close();
 

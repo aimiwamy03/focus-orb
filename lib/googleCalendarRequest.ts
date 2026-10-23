@@ -7,6 +7,7 @@ import type { CalendarEvent } from './calendar';
 
 export interface CalendarSession {
   accessToken?: string | null;
+  hasCalendar?: boolean;
 }
 
 export interface GoogleCalendarResult {
@@ -48,6 +49,9 @@ export async function handleGoogleCalendarGet(options: {
   const accessToken = options.session?.accessToken;
   if (!accessToken) {
     return { status: 401, body: { error: 'Not authenticated' } };
+  }
+  if (options.session?.hasCalendar === false) {
+    return { status: 403, body: { error: 'Calendar is off. Turn it on in Settings.' } };
   }
 
   const fetchList = options.fetchList ?? fetchGoogleCalendarList;

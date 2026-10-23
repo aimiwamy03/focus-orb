@@ -1,7 +1,9 @@
 import { DayModel, DEFAULT_FOCUS_MINUTES } from './day';
+import type { FocusLogEntry } from './focusLog';
+import { addLocalDays, startOfLocalDay } from './orbGrowth';
 import { formatCompactDuration } from './tab';
 
-export const ASK_PROMPT = 'What do you want to focus on?';
+export const ASK_PROMPT = "What's the one thing?";
 export const END_EARLY_PROMPT = 'End focus early?';
 export const END_SESSION_PROMPT = 'End session?';
 export const END_SESSION_LABEL = 'End session';
@@ -20,13 +22,18 @@ export const MENU_ASK_HINT = '← → to choose, Enter to start';
 export const FALLBACK_TASK = 'Focus';
 export const BREAK_MINUTES = 5;
 export const DURATION_CHIPS = [25, 50, 90] as const;
+export const CUSTOM_DURATION_LABEL = 'Custom';
+export const CUSTOM_MIN_MINUTES = 1;
+export const CUSTOM_MAX_MINUTES = 180;
+export const CUSTOM_RANGE_ERROR = 'Enter a whole number from 1 to 180.';
+export const CUSTOM_UNTIL_ERROR = 'That is longer than the time until your next meeting.';
 export const RECENT_TASKS_KEY = 'focusOrb:recentTasks';
 export const LAST_DURATION_KEY = 'focusOrb:lastDuration';
 export const LAST_TASK_KEY = 'focusOrb:lastTask';
 export const MAX_RECENT_TASKS = 5;
 export const MAX_ASK_SUGGESTIONS = 3;
 
-export type DurationChoice = number | 'until';
+export type DurationChoice = number | 'until' | 'custom';
 export type PromptSurface =
   | 'ask'
   | 'focusing'
@@ -102,6 +109,34 @@ export function suggestionMatchesInput(name: string, typed: string): boolean {
   return Boolean(current) && name.trim().toLowerCase() === current;
 }
 
+export interface YesterdayAskSuggestion {
+  task?: string;
+  note?: string;
+}
+
+export function yesterdayAskSuggestions(
+  entries: FocusLogEntry[],
+  now: Date = new Date()
+): YesterdayAskSuggestion {
+  const start = addLocalDays(startOfLocalDay(now), -1).getTime();
+  const end = start + 86_400_000;
+  const last = [...entries]
+    .filter((entry) => entry.startMs >= start && entry.startMs < end)
+    .sort((a, b) => b.endMs - a.endMs)[0];
+  if (!last) return {};
+  const task = last.task.trim();
+  const note = last.nextStep?.trim() ?? '';
+  const taskOk = Boolean(task) && task !== FALLBACK_TASK;
+  const noteOk = Boolean(note);
+  if (taskOk && noteOk && task.toLowerCase() === note.toLowerCase()) {
+    return { task };
+  }
+  return {
+    ...(taskOk ? { task } : {}),
+    ...(noteOk ? { note } : {}),
+  };
+}
+
 export function resolveStartTask(
   typed: string,
   lastTask: string,
@@ -116,18 +151,71 @@ export function resolveStartTask(
   return FALLBACK_TASK;
 }
 
+export function isPresetDuration(choice: DurationChoice | null | undefined): choice is number {
+  return typeof choice === 'number' && (DURATION_CHIPS as readonly number[]).includes(choice);
+}
+
+export function isCustomDuration(choice: DurationChoice | null | undefined): boolean {
+  if (choice === 'custom') return true;
+  return typeof choice === 'number' && !(DURATION_CHIPS as readonly number[]).includes(choice);
+}
+
+export function parseCustomMinutes(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (!/^\d+$/.test(trimmed)) return null;
+  const minutes = Number(trimmed);
+  if (!Number.isInteger(minutes)) return null;
+  if (minutes < CUSTOM_MIN_MINUTES || minutes > CUSTOM_MAX_MINUTES) return null;
+  return minutes;
+}
+
+export function customDurationError(
+  raw: string,
+  untilMinutes: number | null = null
+): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (!/^\d+$/.test(trimmed)) return CUSTOM_RANGE_ERROR;
+  const minutes = Number(trimmed);
+  if (!Number.isInteger(minutes) || minutes < CUSTOM_MIN_MINUTES || minutes > CUSTOM_MAX_MINUTES) {
+    return CUSTOM_RANGE_ERROR;
+  }
+  if (untilMinutes != null && minutes > untilMinutes) return CUSTOM_UNTIL_ERROR;
+  return null;
+}
+
+export function canStartCustom(
+  raw: string,
+  untilMinutes: number | null = null
+): { ok: true; minutes: number } | { ok: false; error: string | null } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: false, error: null };
+  const error = customDurationError(raw, untilMinutes);
+  if (error) return { ok: false, error };
+  const minutes = parseCustomMinutes(raw);
+  if (minutes == null) return { ok: false, error: CUSTOM_RANGE_ERROR };
+  return { ok: true, minutes };
+}
+
 export function loadLastDuration(): DurationChoice | null {
   if (typeof localStorage === 'undefined') return null;
   const raw = localStorage.getItem(LAST_DURATION_KEY);
   if (raw === 'until') return 'until';
+  if (raw === 'custom') return 'custom';
   if (!raw) return null;
   const minutes = Number(raw);
   if (!Number.isFinite(minutes) || minutes <= 0) return null;
+  if (minutes < CUSTOM_MIN_MINUTES || minutes > CUSTOM_MAX_MINUTES) return null;
   return minutes;
 }
 
 export function saveLastDuration(choice: DurationChoice): void {
   if (typeof localStorage === 'undefined') return;
+  if (choice === 'custom') return;
+  if (typeof choice === 'number' && (choice < CUSTOM_MIN_MINUTES || choice > CUSTOM_MAX_MINUTES)) {
+    return;
+  }
   localStorage.setItem(LAST_DURATION_KEY, String(choice));
 }
 
@@ -151,10 +239,18 @@ export function resolveDuration(
   if (choice === 'until') {
     return untilMinutes ?? DEFAULT_FOCUS_MINUTES;
   }
+  if (choice === 'custom') {
+    return capDuration(DEFAULT_FOCUS_MINUTES, untilMinutes);
+  }
   if (typeof choice === 'number') {
     return capDuration(choice, untilMinutes);
   }
   return capDuration(DEFAULT_FOCUS_MINUTES, untilMinutes);
+}
+
+export function sessionDisplayMinutes(minutes: number): number {
+  if (!(minutes > 0)) return 0;
+  return Math.max(1, Math.round(minutes));
 }
 
 export function formatCompleted(
@@ -163,7 +259,7 @@ export function formatCompleted(
   planned: number = minutes
 ): string {
   const label = task.trim() || FALLBACK_TASK;
-  const spent = Math.max(1, Math.round(minutes));
+  const spent = sessionDisplayMinutes(minutes);
   const total = Math.max(spent, Math.round(planned));
   return `Focused ${spent} of ${total} min on ${label}`;
 }
@@ -225,7 +321,7 @@ export function promptSurface(input: {
   skipHeadsUp?: boolean;
   dayState: DayModel['state'];
 }): PromptSurface | null {
-  if (input.firstOpen || input.miniOnly) return null;
+  if (input.miniOnly) return null;
   if (input.isFocusing && input.stopConfirm) return 'stop-confirm';
   if ((input.isFocusing || input.isBreak) && input.sessionConfirm) return 'session-confirm';
   if (input.isFocusing) return 'focusing';

@@ -1,17 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { signInWithGoogle } from '@/app/actions';
+import { signInWithGoogleCalendar } from '@/app/actions';
+import { LegalLinks } from './LegalLinks';
 import { SHOW_AGENDA_LABEL } from '@/lib/agenda';
 import { CalendarInfo, calendarLabelTags } from '@/lib/calendars';
-import { DURATION_CHIPS, DurationChoice, saveLastDuration } from '@/lib/focusPrompt';
+import {
+  CUSTOM_DURATION_LABEL,
+  DURATION_CHIPS,
+  DurationChoice,
+  canStartCustom,
+  customDurationError,
+  isCustomDuration,
+  isPresetDuration,
+  saveLastDuration,
+} from '@/lib/focusPrompt';
 import {
   DEFAULT_DURATION_LABEL,
   SIGN_OUT_LABEL,
   WARN_BEFORE_MEETINGS_LABEL,
 } from '@/lib/miniOrb';
 import { isGoogleConfigured } from '@/lib/onboarding';
-import { SETTINGS_BG } from '@/lib/palette';
 import {
   CLEAR_LABEL,
   CLEAR_LOG_LABEL,
@@ -19,7 +28,7 @@ import {
   KEEP_LOG_LABEL,
 } from '@/lib/focusLog';
 import { SHOW_BACKDROP_LABEL } from '@/lib/backdrop';
-import { INTRO_SOUND_LABEL, PLAY_INTRO_LABEL } from '@/lib/intro';
+import { INTRO_SOUND_LABEL } from '@/lib/intro';
 import type { WhoopConnectionStatus, WhoopMode } from '@/lib/whoop';
 import { WhoopSettings } from './WhoopSettings';
 
@@ -47,8 +56,6 @@ interface SettingsProps {
   showAgenda?: boolean;
   setShowAgenda?: (value: boolean) => void;
   onClearLog?: () => void;
-  playIntro?: boolean;
-  setPlayIntro?: (value: boolean) => void;
   introSound?: boolean;
   setIntroSound?: (value: boolean) => void;
   showBackdrop?: boolean;
@@ -61,6 +68,33 @@ interface SettingsProps {
   setWhoopShowNumbers?: (value: boolean) => void;
   onWhoopConnect?: () => void;
   onWhoopDisconnect?: () => void;
+  whoopMessage?: string | null;
+}
+
+function TextSwitch({
+  testId,
+  label,
+  checked,
+  onChange,
+}: {
+  testId: string;
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      data-testid={testId}
+      data-selected={checked ? 'true' : 'false'}
+      onClick={() => onChange(!checked)}
+      className="settings-toggle"
+    >
+      {label}
+    </button>
+  );
 }
 
 export function Settings({
@@ -84,9 +118,7 @@ export function Settings({
   showAgenda = true,
   setShowAgenda,
   onClearLog,
-  playIntro = true,
-  setPlayIntro,
-  introSound = false,
+  introSound = true,
   setIntroSound,
   showBackdrop = true,
   setShowBackdrop,
@@ -98,12 +130,20 @@ export function Settings({
   setWhoopShowNumbers,
   onWhoopConnect,
   onWhoopDisconnect,
+  whoopMessage,
 }: SettingsProps) {
   const [tempUrl, setTempUrl] = useState(calendarUrl);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [clearLogConfirm, setClearLogConfirm] = useState(false);
+  const [customDraft, setCustomDraft] = useState(
+    isCustomDuration(defaultDuration) && typeof defaultDuration === 'number'
+      ? String(defaultDuration)
+      : ''
+  );
   const configured = isGoogleConfigured();
+  const customSelected = isCustomDuration(defaultDuration);
+  const customError = customSelected ? customDurationError(customDraft) : null;
 
   useEffect(() => {
     const active = document.activeElement;
@@ -127,7 +167,7 @@ export function Settings({
     setIsConnecting(true);
     try {
       selectAuthMethod('google');
-      await signInWithGoogle();
+      await signInWithGoogleCalendar();
     } catch (error) {
       console.error('Failed to connect:', error);
       setIsConnecting(false);
@@ -138,20 +178,22 @@ export function Settings({
     await disconnectGoogle();
   };
 
+  const pickDuration = (choice: DurationChoice) => {
+    setDefaultDuration(choice);
+    if (choice !== 'custom') saveLastDuration(choice);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
       <div
         data-testid="settings-sheet"
-        className="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 w-full max-w-md cursor-auto flex-col rounded-lg"
-        style={{ backgroundColor: SETTINGS_BG }}
+        className="settings-sheet flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 w-full max-w-md cursor-auto flex-col"
       >
         <div className="flex shrink-0 items-center justify-between px-6 pb-4 pt-6">
-          <h2 className="text-[length:var(--type-heading)] font-semibold text-orb-text">
-            Settings
-          </h2>
+          <h2 className="settings-heading">Settings</h2>
           <button
             onClick={onClose}
-            className="text-[length:var(--type-chrome)] text-orb-quiet transition-colors hover:text-orb-text"
+            className="settings-link text-orb-quiet hover:text-orb-text"
             aria-label="Close"
           >
             ✕
@@ -160,44 +202,42 @@ export function Settings({
 
         <div
           data-testid="settings-body"
-          className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6"
+          className="settings-body min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6"
         >
         <div className="space-y-2">
-          <label className="text-[length:var(--type-status)] font-medium text-orb-dim">
-            Calendars
-          </label>
+          <label className="settings-label">Calendars</label>
           {isGoogleConnected ? (
             <div className="space-y-3">
-              <div className="rounded bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text">
-                {userEmail || 'Connected'}
-              </div>
+              <div className="settings-copy">{userEmail || 'Connected'}</div>
               {calendars.length > 0 ? (
                 <div data-testid="calendar-picker" className="space-y-2">
-                  {calendars.map((calendar) => (
-                    <label
-                      key={calendar.id}
-                      className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedCalendarIds.includes(calendar.id)}
-                        onChange={() => toggleCalendar(calendar.id)}
-                        className="rounded border-orb-quiet bg-black/30"
-                      />
-                      <span>
-                        {calendar.summary}
-                        {calendarLabelTags(calendar).map((tag) => (
-                          <span
-                            key={tag}
-                            data-testid={`calendar-tag-${tag}`}
-                            className="text-orb-muted"
-                          >
-                            {' '}({tag})
-                          </span>
-                        ))}
-                      </span>
-                    </label>
-                  ))}
+                  {calendars.map((calendar) => {
+                    const selected = selectedCalendarIds.includes(calendar.id);
+                    return (
+                      <button
+                        key={calendar.id}
+                        type="button"
+                        role="switch"
+                        aria-checked={selected}
+                        onClick={() => toggleCalendar(calendar.id)}
+                        data-selected={selected ? 'true' : 'false'}
+                        className="settings-toggle flex w-full items-center justify-between text-left"
+                      >
+                        <span>
+                          {calendar.summary}
+                          {calendarLabelTags(calendar).map((tag) => (
+                            <span
+                              key={tag}
+                              data-testid={`calendar-tag-${tag}`}
+                              className="text-orb-muted"
+                            >
+                              {' '}({tag})
+                            </span>
+                          ))}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
@@ -205,12 +245,15 @@ export function Settings({
             <button
               onClick={handleGoogleConnect}
               disabled={isConnecting}
-              className="w-full rounded bg-white px-4 py-2 text-[length:var(--type-button)] font-medium text-black transition-colors hover:bg-orb-dim disabled:cursor-not-allowed disabled:opacity-50"
+              className="settings-action underline decoration-1 underline-offset-4"
             >
               {isConnecting ? 'Connecting...' : 'Connect Google Calendar'}
             </button>
           ) : (
-            <p className="text-[length:var(--type-hint)] text-orb-quiet">
+            <p
+              data-testid="calendar-unconfigured"
+              className="settings-copy text-[18px] leading-snug text-orb-text"
+            >
               Google Calendar is not configured. Try a sample day from the first screen.
             </p>
           )}
@@ -219,7 +262,8 @@ export function Settings({
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-[length:var(--type-hint)] text-orb-quiet transition-colors hover:text-orb-dim"
+                data-testid="ical-toggle"
+                className="settings-link text-[18px] leading-snug text-orb-text underline decoration-1 underline-offset-4"
               >
                 {showAdvanced ? 'Hide iCal URL' : 'Add iCal URL'}
               </button>
@@ -230,12 +274,12 @@ export function Settings({
                     value={tempUrl}
                     onChange={(e) => setTempUrl(e.target.value)}
                     placeholder="Paste secret iCal URL here"
-                    className="w-full rounded border border-white/10 bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text placeholder:text-orb-placeholder focus:outline-none focus:ring-2 focus:ring-white/20"
+                    className="w-full border-0 border-b border-white/30 bg-transparent px-0 py-2 text-[length:var(--type-log-body)] text-orb-text placeholder:text-orb-placeholder focus:border-white focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={handleSave}
-                    className="w-full rounded bg-black/40 px-4 py-2 text-[length:var(--type-status)] text-orb-text transition-colors hover:bg-black/20"
+                    className="settings-action underline decoration-1 underline-offset-4"
                   >
                     Save iCal URL
                   </button>
@@ -255,49 +299,74 @@ export function Settings({
             setShowNumbers={setWhoopShowNumbers}
             onConnect={onWhoopConnect}
             onDisconnect={onWhoopDisconnect}
+            message={whoopMessage}
           />
         ) : null}
 
         <div className="space-y-2">
-          <label className="text-[length:var(--type-status)] font-medium text-orb-dim">
-            {DEFAULT_DURATION_LABEL}
-          </label>
-          <div className="flex gap-2">
+          <label className="settings-label">{DEFAULT_DURATION_LABEL}</label>
+          <div className="flex flex-wrap items-center gap-3">
             {DURATION_CHIPS.map((minutes) => (
               <button
                 key={minutes}
                 type="button"
                 data-testid={`default-duration-${minutes}`}
-                onClick={() => {
-                  setDefaultDuration(minutes);
-                  saveLastDuration(minutes);
-                }}
-                className={`flex-1 rounded px-3 py-2 text-[length:var(--type-chip)] transition-colors ${
-                  defaultDuration === minutes
-                    ? 'bg-white text-black'
-                    : 'bg-black/30 text-orb-text hover:bg-black/20'
-                }`}
+                data-selected={isPresetDuration(defaultDuration) && defaultDuration === minutes ? 'true' : 'false'}
+                onClick={() => pickDuration(minutes)}
+                className="settings-chip"
               >
                 {minutes}m
               </button>
             ))}
+            <button
+              type="button"
+              data-testid="default-duration-custom"
+              data-selected={customSelected ? 'true' : 'false'}
+              onClick={() => pickDuration(customDraft ? Number(customDraft) || 'custom' : 'custom')}
+              className="settings-chip"
+            >
+              {CUSTOM_DURATION_LABEL}
+            </button>
           </div>
+          {customSelected ? (
+            <div className="flex flex-col items-start gap-2">
+              <input
+                data-testid="default-custom-minutes"
+                className="custom-minutes"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={customDraft}
+                onChange={(event) => {
+                  const next = event.target.value.replace(/\D/g, '');
+                  setCustomDraft(next);
+                  const parsed = canStartCustom(next);
+                  if (parsed.ok) {
+                    setDefaultDuration(parsed.minutes);
+                    saveLastDuration(parsed.minutes);
+                  } else {
+                    setDefaultDuration('custom');
+                  }
+                }}
+              />
+              {customError ? (
+                <p data-testid="default-custom-error" className="custom-minutes-error">
+                  {customError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-2">
-          <label className="text-[length:var(--type-status)] font-medium text-orb-dim">
-            {WARN_BEFORE_MEETINGS_LABEL}
-          </label>
-          <div className="flex gap-2">
+          <label className="settings-label">{WARN_BEFORE_MEETINGS_LABEL}</label>
+          <div className="flex flex-wrap items-center gap-3">
             {[15, 30, 60, 90].map((minutes) => (
               <button
                 key={minutes}
+                type="button"
+                data-selected={scatterWindow === minutes ? 'true' : 'false'}
                 onClick={() => setScatterWindow(minutes)}
-                className={`flex-1 rounded px-3 py-2 text-[length:var(--type-chip)] transition-colors ${
-                  scatterWindow === minutes
-                    ? 'bg-white text-black'
-                    : 'bg-black/30 text-orb-text hover:bg-black/20'
-                }`}
+                className="settings-chip"
               >
                 {minutes}m
               </button>
@@ -306,90 +375,58 @@ export function Settings({
         </div>
 
         {setShowAgenda || setShowBackdrop ? (
-          <div className="space-y-2">
+          <div className="flex flex-col items-start gap-3">
             {setShowAgenda ? (
-              <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
-                <input
-                  type="checkbox"
-                  data-testid="show-agenda"
-                  checked={showAgenda}
-                  onChange={(event) => setShowAgenda(event.target.checked)}
-                  className="rounded border-orb-quiet bg-black/30"
-                />
-                {SHOW_AGENDA_LABEL}
-              </label>
+              <TextSwitch
+                testId="show-agenda"
+                label={SHOW_AGENDA_LABEL}
+                checked={showAgenda}
+                onChange={setShowAgenda}
+              />
             ) : null}
             {setShowBackdrop ? (
-              <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
-                <input
-                  type="checkbox"
-                  data-testid="show-backdrop"
-                  checked={showBackdrop}
-                  onChange={(event) => setShowBackdrop(event.target.checked)}
-                  className="rounded border-orb-quiet bg-black/30"
-                />
-                {SHOW_BACKDROP_LABEL}
-              </label>
+              <TextSwitch
+                testId="show-backdrop"
+                label={SHOW_BACKDROP_LABEL}
+                checked={showBackdrop}
+                onChange={setShowBackdrop}
+              />
             ) : null}
           </div>
         ) : null}
 
         {pipSupported && setPopOutOnLeave ? (
           <div className="space-y-2">
-            <p className="text-[length:var(--type-status)] font-medium text-orb-dim">Mini orb</p>
-            <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
-              <input
-                type="checkbox"
-                data-testid="pop-out-on-leave"
-                checked={popOutOnLeave}
-                onChange={(event) => setPopOutOnLeave(event.target.checked)}
-                className="rounded border-orb-quiet bg-black/30"
-              />
-              Pop out when I leave this tab
-            </label>
+            <p className="settings-label">Mini orb</p>
+            <TextSwitch
+              testId="pop-out-on-leave"
+              label="Pop out when I leave this tab"
+              checked={popOutOnLeave}
+              onChange={setPopOutOnLeave}
+            />
           </div>
         ) : null}
 
-        {setPlayIntro || setIntroSound ? (
-          <div className="space-y-2">
-            {setPlayIntro ? (
-              <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
-                <input
-                  type="checkbox"
-                  data-testid="play-intro"
-                  checked={playIntro}
-                  onChange={(event) => setPlayIntro(event.target.checked)}
-                  className="rounded border-orb-quiet bg-black/30"
-                />
-                {PLAY_INTRO_LABEL}
-              </label>
-            ) : null}
-            {setIntroSound ? (
-              <label className="flex items-center gap-2 text-[length:var(--type-status)] text-orb-dim">
-                <input
-                  type="checkbox"
-                  data-testid="intro-sound"
-                  checked={introSound}
-                  onChange={(event) => setIntroSound(event.target.checked)}
-                  className="rounded border-orb-quiet bg-black/30"
-                />
-                {INTRO_SOUND_LABEL}
-              </label>
-            ) : null}
-          </div>
+        {setIntroSound ? (
+          <TextSwitch
+            testId="intro-sound"
+            label={INTRO_SOUND_LABEL}
+            checked={introSound}
+            onChange={setIntroSound}
+          />
         ) : null}
 
         {onClearLog ? (
           <div className="space-y-2">
             {clearLogConfirm ? (
               <div data-testid="clear-log-confirm" className="space-y-2">
-                <p className="text-[length:var(--type-status)] text-orb-dim">{CLEAR_LOG_PROMPT}</p>
-                <div className="flex gap-2">
+                <p className="settings-copy">{CLEAR_LOG_PROMPT}</p>
+                <div className="flex gap-4">
                   <button
                     type="button"
                     data-testid="clear-log-keep"
                     onClick={() => setClearLogConfirm(false)}
-                    className="flex-1 rounded bg-white px-3 py-2 text-[length:var(--type-status)] text-black"
+                    className="settings-action underline decoration-1 underline-offset-4"
                   >
                     {KEEP_LOG_LABEL}
                   </button>
@@ -400,7 +437,7 @@ export function Settings({
                       onClearLog();
                       setClearLogConfirm(false);
                     }}
-                    className="flex-1 rounded bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text"
+                    className="settings-action underline decoration-1 underline-offset-4"
                   >
                     {CLEAR_LABEL}
                   </button>
@@ -411,7 +448,7 @@ export function Settings({
                 type="button"
                 data-testid="clear-log"
                 onClick={() => setClearLogConfirm(true)}
-                className="w-full rounded bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text transition-colors hover:bg-black/20"
+                className="settings-action underline decoration-1 underline-offset-4"
               >
                 {CLEAR_LOG_LABEL}
               </button>
@@ -419,10 +456,10 @@ export function Settings({
           </div>
         ) : null}
 
-        {isGoogleConnected ? (
+        {userEmail || isGoogleConnected ? (
           <div className="space-y-2 border-t border-white/10 pt-4">
             {userEmail ? (
-              <p data-testid="signed-in-email" className="text-[length:var(--type-status)] text-orb-dim">
+              <p data-testid="signed-in-email" className="settings-copy">
                 {userEmail}
               </p>
             ) : null}
@@ -430,12 +467,15 @@ export function Settings({
               type="button"
               data-testid="sign-out"
               onClick={handleDisconnect}
-              className="w-full rounded bg-black/30 px-3 py-2 text-[length:var(--type-status)] text-orb-text transition-colors hover:bg-black/20"
+              className="settings-action underline decoration-1 underline-offset-4"
             >
               {SIGN_OUT_LABEL}
             </button>
           </div>
         ) : null}
+        <div className="border-t border-white/10 pt-4">
+          <LegalLinks testId="settings-legal" />
+        </div>
         </div>
       </div>
     </div>

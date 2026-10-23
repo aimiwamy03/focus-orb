@@ -15,6 +15,7 @@ export const WHOOP_MOCK_KEYS = [
   'late',
   'pending',
   'calibrating',
+  'nodata',
   'disconnected',
 ] as const;
 
@@ -39,6 +40,7 @@ function scored(
     recovery,
     recoveryState: 'scored',
     sleepPerformance: 90,
+    sleepMinutes: 7 * 60 + 20,
     sleepDebtMinutes: 0,
     yesterdayStrain: 8,
     lastWorkoutEndedAt: null,
@@ -51,17 +53,18 @@ function scored(
 export function mockWhoopFacts(key: WhoopMockKey, nowMs: number = MOCK_NOW): WhoopFacts | null {
   switch (key) {
     case 'disconnected':
+    case 'nodata':
       return null;
     case 'green':
-      return scored(82, {}, nowMs);
+      return scored(82, { sleepMinutes: 7 * 60 + 20, sleepPerformance: 90 }, nowMs);
     case 'yellow':
-      return scored(51, {}, nowMs);
+      return scored(51, { sleepMinutes: 6 * 60 + 10, sleepPerformance: 80 }, nowMs);
     case 'red':
-      return scored(28, {}, nowMs);
+      return scored(28, { sleepMinutes: 5 * 60 + 50, sleepPerformance: 72 }, nowMs);
     case 'sleep':
-      return scored(75, { sleepPerformance: 62 }, nowMs);
+      return scored(75, { sleepPerformance: 62, sleepMinutes: 6 * 60 }, nowMs);
     case 'debt':
-      return scored(78, { sleepDebtMinutes: 60 }, nowMs);
+      return scored(78, { sleepDebtMinutes: 60, sleepMinutes: 5 * 60 }, nowMs);
     case 'strain':
       return scored(80, { yesterdayStrain: 16 }, nowMs);
     case 'workout':
@@ -84,6 +87,7 @@ export function mockWhoopFacts(key: WhoopMockKey, nowMs: number = MOCK_NOW): Who
 
 export function mockWhoopStatus(key: WhoopMockKey): WhoopConnectionStatus {
   if (key === 'disconnected') return 'disconnected';
+  if (key === 'nodata') return 'no-data';
   if (key === 'pending') return 'pending';
   if (key === 'calibrating') return 'calibrating';
   return 'ok';
@@ -93,12 +97,11 @@ export function mockWhoopSummary(
   key: WhoopMockKey,
   nowMs: number = Date.now()
 ): WhoopCachedSummary {
-  const factsNow = key === 'late' || key === 'workout' ? nowMs : MOCK_NOW;
   return {
     connected: key !== 'disconnected',
-    email: key === 'disconnected' ? null : 'mock@whoop.test',
+    email: key === 'disconnected' || key === 'nodata' ? null : 'mock@whoop.test',
     status: mockWhoopStatus(key),
-    facts: mockWhoopFacts(key, factsNow),
+    facts: mockWhoopFacts(key, nowMs),
     fetchedAt: nowMs,
   };
 }

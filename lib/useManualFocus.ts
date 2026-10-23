@@ -39,6 +39,7 @@ export function draftFocusEnd(
     minutes,
     planned: session.duration,
     ended,
+    pausedMinutes: 0,
   };
 }
 
