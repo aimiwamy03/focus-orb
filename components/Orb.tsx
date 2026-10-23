@@ -331,7 +331,8 @@ export function Orb() {
     surface === 'break' ||
     surface === 'completed' ||
     surface === 'meeting-soon' ||
-    surface === 'session-confirm';
+    surface === 'session-confirm' ||
+    surface === 'in-meeting';
   const mountAgenda =
     showAgenda &&
     !firstOpen &&

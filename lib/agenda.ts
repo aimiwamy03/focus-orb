@@ -1,5 +1,5 @@
 import { CalendarEvent } from './calendar';
-import { isSkippedEvent, startOfDay } from './day';
+import { hidesFromAgenda, startOfDay } from './day';
 import type { OrbLayout } from './layout';
 import type { PromptSurface } from './focusPrompt';
 import { AGENDA_ACCENT } from './palette';
@@ -65,7 +65,9 @@ export function formatAgendaClock(date: Date, withPeriod = false): string {
 }
 
 export function formatAgendaRange(start: Date, end: Date, now: Date): string {
-  if (start.getTime() <= now.getTime() && end.getTime() > now.getTime()) return 'Now';
+  if (start.getTime() <= now.getTime() && end.getTime() > now.getTime()) {
+    return `Now, until ${formatAgendaClock(end, true)}`;
+  }
   const startPeriod = period(start);
   const endPeriod = period(end);
   if (startPeriod === endPeriod) {
@@ -80,7 +82,7 @@ export function eventColor(event: Pick<CalendarEvent, 'backgroundColor'>): strin
 
 function usableEvents(events: CalendarEvent[]): CalendarEvent[] {
   return events
-    .filter((event) => !isSkippedEvent(event))
+    .filter((event) => !hidesFromAgenda(event))
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 }
 
@@ -182,7 +184,8 @@ export function shouldShowAgenda(input: {
     input.surface === 'break' ||
     input.surface === 'completed' ||
     input.surface === 'meeting-soon' ||
-    input.surface === 'session-confirm'
+    input.surface === 'session-confirm' ||
+    input.surface === 'in-meeting'
   ) {
     return true;
   }

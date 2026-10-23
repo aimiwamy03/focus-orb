@@ -48,6 +48,7 @@ export interface GoogleEventItem {
   end: GoogleDateStamp;
   status?: string;
   transparency?: string;
+  eventType?: string;
   hangoutLink?: string;
   location?: string;
   description?: string;
@@ -268,6 +269,7 @@ export function parseGoogleEvents(
           ? status
           : undefined,
       transparency: event.transparency === 'transparent' ? 'transparent' : 'opaque',
+      eventType: event.eventType,
       declined: self?.responseStatus === 'declined' || status === 'cancelled',
       hangoutLink: event.hangoutLink,
       location: event.location,
@@ -354,6 +356,9 @@ export async function fetchGoogleCalendarEvents(
     maxResults: '250',
     conferenceDataVersion: '1',
   });
+  for (const eventType of ['default', 'fromGmail', 'focusTime', 'outOfOffice']) {
+    params.append('eventTypes', eventType);
+  }
 
   const response = await fetchImpl(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
