@@ -6,7 +6,7 @@ Focus Orb helps creatives protect their best hours by sizing deep-work blocks to
 
 ## Features
 
-- **Particle orb visualization** - A glowing sphere of 8,000 particles that stays cohesive during focus blocks and scatters as your next meeting approaches
+- **Particle orb visualization** - A glowing sphere of 135,000 particles that stays cohesive during focus blocks and scatters as your next meeting approaches
 - **Google Calendar integration** - View your agenda and let the orb respond to your schedule in real-time
 - **WHOOP-aware block suggestions** - Duration recommendations based on your recovery score (when WHOOP is connected)
 - **Focus log** - Track your completed focus sessions
@@ -57,7 +57,7 @@ npm run dev
 Try these URLs to see different states without connecting a calendar:
 
 - `?mock=back-to-back&now=12:00` - Dense schedule
-- `?mock=light&now=12:00` - Relaxed schedule
-- `?mock=sample-day` - Full sample day
+- `?mock=open-afternoon&now=13:00` - Open afternoon
+- `?mock=in-meeting` - In a meeting
 
 Click "Try a sample day" on the home page for an interactive demo.
