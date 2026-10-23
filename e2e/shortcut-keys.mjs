@@ -31,6 +31,7 @@ async function seed(page) {
   await page.addInitScript((hints) => {
     localStorage.clear();
     sessionStorage.setItem('focusOrb:introPlayed', '1');
+    sessionStorage.setItem('focusOrb:settlePlayed', '1');
     localStorage.setItem('focusOrb:shortcutsCard', '1');
     localStorage.setItem('focusOrb:hints', hints);
     Object.defineProperty(window, 'documentPictureInPicture', {

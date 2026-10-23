@@ -42,7 +42,7 @@ if ((await playPage.getByTestId('focus-prompt').count()) !== 1) {
 const heading = await playPage.locator("text=What's the one thing?").count();
 if (!heading) fail('Home heading missing after intro');
 
-await playPage.goto(`${BASE}/?mock=empty&settle=0`, { waitUntil: 'networkidle' });
+await playPage.goto(`${BASE}/?mock=empty&intro=0&settle=0`, { waitUntil: 'networkidle' });
 await playPage.waitForTimeout(500);
 if ((await playPage.getByTestId('focus-intro').count()) !== 0) {
   fail('Second load in the same session should not replay the intro');

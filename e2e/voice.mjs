@@ -32,6 +32,7 @@ async function seed(page) {
     (hints) => {
       localStorage.clear();
       sessionStorage.setItem('focusOrb:introPlayed', '1');
+      sessionStorage.setItem('focusOrb:settlePlayed', '1');
       localStorage.setItem('focusOrb:hints', hints);
       localStorage.setItem('focusOrb:shortcutsCard', '1');
       Object.defineProperty(window, 'speechSynthesis', {
