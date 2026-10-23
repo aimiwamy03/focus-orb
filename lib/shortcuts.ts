@@ -10,12 +10,15 @@ export const SHORTCUT_ROWS = [
   { id: 'fullscreen', key: 'F', action: 'fullscreen', testId: 'fullscreen-toggle' },
   { id: 'settings', key: 'S', action: 'settings', testId: 'settings-gear' },
   { id: 'focus', key: 'Space', action: 'start/stop focus', testId: 'chrome-focus' },
+  { id: 'voice', key: 'V', action: 'Voice', testId: 'chrome-voice' },
   { id: 'pop-out', key: 'P', action: 'pop out', testId: 'pop-out' },
   { id: 'mini-only', key: 'M', action: 'mini only', testId: 'mini-only' },
   { id: 'log', key: 'L', action: 'log', testId: 'focus-log-open' },
 ] as const;
 
 export type ShortcutId = (typeof SHORTCUT_ROWS)[number]['id'];
+
+export const SHORTCUT_TIPS_ROWS = SHORTCUT_ROWS.filter((row) => row.key !== 'V');
 
 export function isShortcutKey(key: string): boolean {
   return (
@@ -24,6 +27,8 @@ export function isShortcutKey(key: string): boolean {
     key === 's' ||
     key === 'S' ||
     key === ' ' ||
+    key === 'v' ||
+    key === 'V' ||
     key === 'p' ||
     key === 'P' ||
     key === 'm' ||
