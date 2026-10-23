@@ -1,4 +1,6 @@
 import { DayModel, DEFAULT_FOCUS_MINUTES } from './day';
+import type { FocusLogEntry } from './focusLog';
+import { addLocalDays, startOfLocalDay } from './orbGrowth';
 import { formatCompactDuration } from './tab';
 
 export const ASK_PROMPT = "What's the one thing?";
@@ -105,6 +107,34 @@ export function visibleAskSuggestions(
 export function suggestionMatchesInput(name: string, typed: string): boolean {
   const current = typed.trim().toLowerCase();
   return Boolean(current) && name.trim().toLowerCase() === current;
+}
+
+export interface YesterdayAskSuggestion {
+  task?: string;
+  note?: string;
+}
+
+export function yesterdayAskSuggestions(
+  entries: FocusLogEntry[],
+  now: Date = new Date()
+): YesterdayAskSuggestion {
+  const start = addLocalDays(startOfLocalDay(now), -1).getTime();
+  const end = start + 86_400_000;
+  const last = [...entries]
+    .filter((entry) => entry.startMs >= start && entry.startMs < end)
+    .sort((a, b) => b.endMs - a.endMs)[0];
+  if (!last) return {};
+  const task = last.task.trim();
+  const note = last.nextStep?.trim() ?? '';
+  const taskOk = Boolean(task) && task !== FALLBACK_TASK;
+  const noteOk = Boolean(note);
+  if (taskOk && noteOk && task.toLowerCase() === note.toLowerCase()) {
+    return { task };
+  }
+  return {
+    ...(taskOk ? { task } : {}),
+    ...(noteOk ? { note } : {}),
+  };
 }
 
 export function resolveStartTask(

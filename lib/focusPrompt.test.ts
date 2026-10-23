@@ -33,6 +33,7 @@ import {
   resolveStartTask,
   suggestionMatchesInput,
   visibleAskSuggestions,
+  yesterdayAskSuggestions,
   RECENT_TASKS_KEY,
   saveLastDuration,
   saveRecentTasks,
@@ -62,6 +63,92 @@ describe('rememberTask', () => {
     expect(rememberTask('  Write  ', ['Email', 'Write'])).toEqual(['Write', 'Email']);
     expect(rememberTask('   ', ['Email'])).toEqual(['Email']);
     expect(rememberTask(FALLBACK_TASK, ['Email'])).toEqual(['Email']);
+  });
+});
+
+describe('yesterdayAskSuggestions', () => {
+  it('returns yesterday last task and note, and collapses the same text', () => {
+    const now = new Date(2026, 9, 23, 12, 0, 0, 0);
+    const yday = new Date(2026, 9, 22, 16, 0, 0, 0).getTime();
+    const earlier = new Date(2026, 9, 22, 9, 0, 0, 0).getTime();
+    expect(
+      yesterdayAskSuggestions(
+        [
+          {
+            id: 'last',
+            task: 'finish voice ai post',
+            startMs: yday,
+            endMs: yday + 50 * 60_000,
+            minutes: 50,
+            planned: 50,
+            ended: 'completed',
+            nextStep: 'Send the recap',
+          },
+          {
+            id: 'am',
+            task: 'plan the week',
+            startMs: earlier,
+            endMs: earlier + 25 * 60_000,
+            minutes: 25,
+            planned: 25,
+            ended: 'completed',
+            nextStep: 'Older note',
+          },
+        ],
+        now
+      )
+    ).toEqual({ task: 'finish voice ai post', note: 'Send the recap' });
+    expect(
+      yesterdayAskSuggestions(
+        [
+          {
+            id: 'same',
+            task: 'Write the spec',
+            startMs: yday,
+            endMs: yday + 25 * 60_000,
+            minutes: 25,
+            planned: 25,
+            ended: 'completed',
+            nextStep: 'write the spec',
+          },
+        ],
+        now
+      )
+    ).toEqual({ task: 'Write the spec' });
+    expect(
+      yesterdayAskSuggestions(
+        [
+          {
+            id: 'today',
+            task: 'today only',
+            startMs: now.getTime(),
+            endMs: now.getTime() + 25 * 60_000,
+            minutes: 25,
+            planned: 25,
+            ended: 'completed',
+            nextStep: 'Later',
+          },
+        ],
+        now
+      )
+    ).toEqual({});
+    expect(
+      yesterdayAskSuggestions(
+        [
+          {
+            id: 'fallback',
+            task: FALLBACK_TASK,
+            startMs: yday,
+            endMs: yday + 25 * 60_000,
+            minutes: 25,
+            planned: 25,
+            ended: 'completed',
+            nextStep: 'Pick up the draft',
+          },
+        ],
+        now
+      )
+    ).toEqual({ note: 'Pick up the draft' });
   });
 });
 

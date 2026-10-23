@@ -16,6 +16,7 @@ export const ORB_FOCUS_DRIFT = 0.003;
 export const ORB_BLOOM_MS = 2_500;
 export const ORB_BLOOM_MIN_MS = 2_000;
 export const ORB_BLOOM_MAX_MS = 3_000;
+export const ORB_BLOOM_PEAK_T = 0.35;
 
 export const SETTLE_SESSION_KEY = 'focusOrb:settlePlayed';
 export const SETTLE_SKIP_HINT = 'Esc to skip';
@@ -51,6 +52,15 @@ export interface OrbLook {
   halo: number;
   warmth: number;
 }
+
+export const ORB_BLOOM_PEAK: OrbLook = {
+  scale: 1,
+  tightness: 1,
+  brightness: 1,
+  glow: 0.7,
+  halo: 0.65,
+  warmth: 0.16,
+};
 
 export interface OrbStage {
   id: number;
@@ -210,6 +220,28 @@ export function bloomLook(
   return mixLooks(from, to, bloomProgress(elapsedMs, false));
 }
 
+/** Finish bloom: full brightness at the peak, then settle to the day's stage. */
+export function bloomPayoffLook(
+  from: OrbLook,
+  to: OrbLook,
+  elapsedMs: number,
+  reducedMotion = false
+): OrbLook {
+  if (reducedMotion) {
+    return elapsedMs > 0 ? to : from;
+  }
+  if (elapsedMs <= 0) return from;
+  const t = clamp01(elapsedMs / ORB_BLOOM_MS);
+  if (t <= ORB_BLOOM_PEAK_T) {
+    return mixLooks(from, ORB_BLOOM_PEAK, easeInOut(t / ORB_BLOOM_PEAK_T));
+  }
+  return mixLooks(
+    ORB_BLOOM_PEAK,
+    to,
+    easeInOut((t - ORB_BLOOM_PEAK_T) / (1 - ORB_BLOOM_PEAK_T))
+  );
+}
+
 export function focusDriftScale(elapsedMs: number, reducedMotion = false): number {
   if (reducedMotion) return 1;
   return 1 + Math.sin(elapsedMs / 18_000) * ORB_FOCUS_DRIFT;
@@ -280,12 +312,40 @@ export function startOfLocalDay(date: Date): Date {
   return next;
 }
 
+export function addLocalDays(date: Date, days: number): Date {
+  const next = startOfLocalDay(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 export function isSameLocalDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   );
+}
+
+export function dayHasCounted(entries: FocusLogEntry[], day: Date): boolean {
+  const start = startOfLocalDay(day).getTime();
+  const end = start + 86_400_000;
+  return entries.some(
+    (entry) => entry.startMs >= start && entry.startMs < end && sessionCounts(entry).counted
+  );
+}
+
+/** Consecutive local days with a counted block. An empty today still holds yesterday's streak. */
+export function countedDayStreak(entries: FocusLogEntry[], now: Date = new Date()): number {
+  const today = startOfLocalDay(now);
+  const cursor = dayHasCounted(entries, today) ? today : addLocalDays(today, -1);
+  if (!dayHasCounted(entries, cursor)) return 0;
+  let streak = 0;
+  let day = cursor;
+  while (dayHasCounted(entries, day)) {
+    streak += 1;
+    day = addLocalDays(day, -1);
+  }
+  return streak;
 }
 
 export function countedMinutesOnDay(
@@ -327,8 +387,17 @@ export function dayFinalStage(entries: FocusLogEntry[], day: Date): OrbStage | n
     : null;
 }
 
-export function formatFocusedToday(minutes: number): string {
-  return `${formatDayFocused(Math.max(0, minutes))} focused today.`;
+export function formatFocusedToday(minutes: number, streak = 0): string {
+  const today = `${formatDayFocused(Math.max(0, minutes))} focused today`;
+  if (streak >= 2) return `${today} · ${streak} day streak`;
+  return `${today}.`;
+}
+
+export function formatReturnLine(minutes: number, streak: number): string | null {
+  const today = `${formatDayFocused(Math.max(0, minutes))} today`;
+  if (streak >= 2) return `${today} · ${streak} day streak`;
+  if (minutes > 0) return today;
+  return null;
 }
 
 export function visibleFocusedTodayMinutes(
@@ -462,7 +531,7 @@ export function orbVisualState(input: {
     look = lookForStage(fromStage);
     breath = settleBreathScale(elapsed, reduced);
   } else if (input.moment === 'bloom') {
-    look = bloomLook(lookForStage(fromStage), lookForStage(toStage), elapsed, reduced, crossed);
+    look = bloomPayoffLook(lookForStage(fromStage), lookForStage(toStage), elapsed, reduced);
     breath = 1;
   } else if (input.moment === 'focusing') {
     look = lookForStage(fromStage);

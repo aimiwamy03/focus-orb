@@ -346,6 +346,24 @@ export function saveIntroSound(value: boolean): void {
   localStorage.setItem(INTRO_SOUND_KEY, value ? '1' : '0');
 }
 
+export function shouldPlayEndResolve(input: {
+  introSound: boolean;
+  reducedMotion: boolean;
+}): boolean {
+  return input.introSound && !input.reducedMotion;
+}
+
+export function playEndResolve(): void {
+  if (typeof Audio === 'undefined') return;
+  try {
+    const audio = new Audio(INTRO_AUDIO.resolve);
+    audio.volume = INTRO_MIX.resolve;
+    void audio.play().catch(() => {});
+  } catch {
+    // browsers may block autoplay
+  }
+}
+
 export function isStoredFocusRunning(now = Date.now()): boolean {
   if (typeof localStorage === 'undefined') return false;
   try {

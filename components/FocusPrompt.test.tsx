@@ -116,6 +116,28 @@ describe('Ask task field', () => {
     expect(screen.queryByTestId('focus-task-placeholder')).toBeNull();
     expect((screen.getByTestId('focus-task') as HTMLInputElement).value).toBe('write the spec');
   });
+
+  it('fills the empty task from yesterday chips and keeps the landing calm', () => {
+    const { onTaskChange } = renderPrompt('ask', {
+      task: '',
+      returnLine: '50m today · 3 day streak',
+      yesterdayTask: 'finish voice ai post',
+      yesterdayNote: 'Send the recap',
+    });
+    expect(screen.getByTestId('return-line').textContent).toBe('50m today · 3 day streak');
+    expect(screen.getByTestId('return-line').textContent).not.toMatch(/[—–]/);
+    expect(screen.queryByTestId('recent-tasks')).toBeNull();
+    expect(screen.getByTestId('ask-yesterday-task').className).not.toMatch(/rounded-full|bg-orb-highlight/);
+    screen.getByTestId('ask-yesterday-task').click();
+    expect(onTaskChange).toHaveBeenCalledWith('finish voice ai post');
+    screen.getByTestId('ask-yesterday-note').click();
+    expect(onTaskChange).toHaveBeenCalledWith('Send the recap');
+  });
+
+  it('hides yesterday chips once the task box has text', () => {
+    renderPrompt('ask', { task: 'already filled', yesterdayTask: 'finish voice ai post' });
+    expect(screen.queryByTestId('ask-yesterday')).toBeNull();
+  });
 });
 
 describe('game-menu rows', () => {

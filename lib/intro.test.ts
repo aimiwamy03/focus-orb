@@ -15,6 +15,7 @@ import {
   introSoundCuesAt,
   introSoundEvents,
   introSoundPref,
+  shouldPlayEndResolve,
   introPointerUnlocksSound,
   isIntroSkipKey,
   isStoredFocusRunning,
@@ -124,6 +125,9 @@ describe('intro gating', () => {
     expect(introSoundPref(undefined)).toBe(true);
     expect(introSoundPref('1')).toBe(true);
     expect(introSoundPref('0')).toBe(false);
+    expect(shouldPlayEndResolve({ introSound: true, reducedMotion: false })).toBe(true);
+    expect(shouldPlayEndResolve({ introSound: false, reducedMotion: false })).toBe(false);
+    expect(shouldPlayEndResolve({ introSound: true, reducedMotion: true })).toBe(false);
     expect(loadIntroSound()).toBe(true);
     saveIntroSound(false);
     expect(loadIntroSound()).toBe(false);

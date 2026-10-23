@@ -13,12 +13,15 @@ import {
   SETTLE_SESSION_KEY,
   attachGrowthFields,
   bloomLook,
+  bloomPayoffLook,
   bloomProgress,
+  countedDayStreak,
   countedMinutesToday,
   crossedStage,
   dayFinalStage,
   focusDriftScale,
   formatFocusedToday,
+  formatReturnLine,
   visibleFocusedTodayMinutes,
   idleBreathScale,
   IDLE_BREATH_AMP_GATHERED,
@@ -169,6 +172,69 @@ describe('settle and bloom motion', () => {
     expect(bloomLook(from, to, ORB_BLOOM_MS).scale).toBeCloseTo(to.scale);
     expect(bloomLook(from, to, 10, true).scale).toBeCloseTo(to.scale);
     expect(bloomLook(from, from, 1_200, false, false).glow).toBeGreaterThan(from.glow);
+    expect(bloomPayoffLook(from, to, ORB_BLOOM_MS * 0.35).brightness).toBe(1);
+    expect(bloomPayoffLook(from, to, ORB_BLOOM_MS).brightness).toBeCloseTo(to.brightness);
+    expect(bloomPayoffLook(from, to, 10, true).brightness).toBeCloseTo(to.brightness);
+    const peak = orbVisualState({
+      minutes: 50,
+      moment: 'bloom',
+      elapsedMs: ORB_BLOOM_MS * 0.35,
+      fromStage: stageForMinutes(0),
+      toStage: stageForMinutes(50),
+    });
+    expect(peak.look.brightness).toBe(1);
+    const still = orbVisualState({ minutes: 18, moment: 'still' });
+    expect(still.look.brightness).toBeLessThan(1);
+  });
+
+  it('counts consecutive local days and holds a live streak past midnight', () => {
+    const late = new Date(2026, 9, 22, 23, 59, 0, 0);
+    const early = new Date(2026, 9, 23, 0, 1, 0, 0);
+    const noon = new Date(2026, 9, 23, 12, 0, 0, 0);
+    const three = [
+      entry({ id: 'd1', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 21, 10, 0, 0, 0).getTime() }),
+      entry({ id: 'd2', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 22, 10, 0, 0, 0).getTime() }),
+      entry({ id: 'd3', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 23, 10, 0, 0, 0).getTime() }),
+    ];
+    expect(countedDayStreak(three, noon)).toBe(3);
+    expect(
+      countedDayStreak(
+        [
+          entry({ id: 'late', minutes: 25, ended: 'completed', startMs: late.getTime() }),
+          entry({ id: 'early', minutes: 25, ended: 'completed', startMs: early.getTime() }),
+        ],
+        noon
+      )
+    ).toBe(2);
+    expect(
+      countedDayStreak(
+        [
+          entry({ id: 'yday', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 22, 10, 0, 0, 0).getTime() }),
+        ],
+        noon
+      )
+    ).toBe(1);
+    expect(
+      countedDayStreak(
+        [
+          entry({ id: 'gap', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 21, 10, 0, 0, 0).getTime() }),
+          entry({ id: 'today', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 23, 10, 0, 0, 0).getTime() }),
+        ],
+        noon
+      )
+    ).toBe(1);
+    expect(
+      countedDayStreak(
+        [entry({ id: 'short', minutes: 10, ended: 'ended-early', startMs: new Date(2026, 9, 22, 10, 0, 0, 0).getTime() })],
+        noon
+      )
+    ).toBe(0);
+    expect(formatReturnLine(50, 3)).toBe('50m today · 3 day streak');
+    expect(formatReturnLine(50, 3)).not.toMatch(/[—–]/);
+    expect(formatReturnLine(0, 3)).toBe('0m today · 3 day streak');
+    expect(formatReturnLine(0, 1)).toBeNull();
+    expect(formatFocusedToday(105, 3)).toBe('1h 45m focused today · 3 day streak');
+    expect(formatFocusedToday(105, 1)).toBe('1h 45m focused today.');
   });
 
   it('holds growth size still, then layers the original idle and focus pulse', () => {

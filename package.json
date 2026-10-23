@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:e2e": "node e2e/menu-keys.mjs && node e2e/focus-log.mjs && node e2e/intro.mjs && node e2e/caret.mjs && node e2e/sample-day.mjs && node e2e/backdrop.mjs && node e2e/whoop.mjs && node e2e/tab-title.mjs && node e2e/agenda.mjs && node e2e/shortcut-keys.mjs && node e2e/voice.mjs && node e2e/orb-grows.mjs && node e2e/legal.mjs && node e2e/duration-click.mjs && node e2e/start-focusing.mjs"
+    "test:e2e": "node e2e/menu-keys.mjs && node e2e/focus-log.mjs && node e2e/intro.mjs && node e2e/caret.mjs && node e2e/sample-day.mjs && node e2e/backdrop.mjs && node e2e/whoop.mjs && node e2e/tab-title.mjs && node e2e/agenda.mjs && node e2e/shortcut-keys.mjs && node e2e/voice.mjs && node e2e/orb-grows.mjs && node e2e/legal.mjs && node e2e/duration-click.mjs && node e2e/start-focusing.mjs && node e2e/payoff-return.mjs"
   },
   "dependencies": {
     "next": "16.4.2",
