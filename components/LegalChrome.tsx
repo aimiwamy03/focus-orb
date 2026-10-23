@@ -2,17 +2,22 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import {
   ABOUT_LABEL,
+  HEALTH_DATA_LABEL,
   HOME_LABEL,
   PRIVACY_LABEL,
   TERMS_LABEL,
 } from '@/lib/legal';
 
-export function LegalNav({ current }: { current?: 'about' | 'privacy' | 'terms' | 'home' }) {
-  const links = [
-    { href: '/about', label: ABOUT_LABEL, id: 'about' as const },
-    { href: '/privacy', label: PRIVACY_LABEL, id: 'privacy' as const },
-    { href: '/terms', label: TERMS_LABEL, id: 'terms' as const },
-  ];
+export type LegalCurrent = 'about' | 'privacy' | 'terms' | 'health-data' | 'home';
+
+const LINKS: Array<{ href: string; label: string; id: Exclude<LegalCurrent, 'home'> }> = [
+  { href: '/about', label: ABOUT_LABEL, id: 'about' },
+  { href: '/privacy', label: PRIVACY_LABEL, id: 'privacy' },
+  { href: '/health-data', label: HEALTH_DATA_LABEL, id: 'health-data' },
+  { href: '/terms', label: TERMS_LABEL, id: 'terms' },
+];
+
+export function LegalNav({ current }: { current?: LegalCurrent }) {
   return (
     <nav
       data-testid="legal-nav"
@@ -27,7 +32,7 @@ export function LegalNav({ current }: { current?: 'about' | 'privacy' | 'terms' 
       >
         {HOME_LABEL}
       </Link>
-      {links.map((link) => (
+      {LINKS.map((link) => (
         <Link
           key={link.id}
           href={link.href}
@@ -47,14 +52,14 @@ export function LegalChrome({
   current,
   children,
 }: {
-  current?: 'about' | 'privacy' | 'terms' | 'home';
+  current?: LegalCurrent;
   children: ReactNode;
 }) {
   return (
     <main
       data-testid="legal-page"
       data-legal={current ?? 'home'}
-      className="min-h-screen overflow-y-auto bg-black px-6 py-16 text-orb-text"
+      className="fixed inset-0 overflow-y-auto bg-black px-6 py-16 text-orb-text"
     >
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
         <LegalNav current={current} />

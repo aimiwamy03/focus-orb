@@ -39,7 +39,7 @@ async function open(browser, search, { skipIntro = false } = {}) {
       );
     }
   }, skipIntro);
-  await page.goto(`${BASE}${search}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}${search}`, { waitUntil: 'load' });
   await page.waitForTimeout(400);
   return page;
 }
@@ -96,6 +96,9 @@ if ((await about.getByTestId('legal-privacy').count()) !== 1) {
 if ((await about.getByTestId('legal-terms').count()) !== 1) {
   fail('About should link to Terms');
 }
+if ((await about.getByTestId('legal-health-data').count()) !== 1) {
+  fail('About should link to health data');
+}
 if ((await about.locator('text=1 Issue').count()) !== 0) {
   fail('About should not show the Next issue overlay');
 }
@@ -115,11 +118,21 @@ for (const id of [
   'privacy-revoke',
   'privacy-contact',
   'privacy-limited-use',
+  'privacy-whoop',
 ]) {
   if ((await privacy.getByTestId(id).count()) !== 1) fail(`Privacy missing ${id}`);
 }
 if (!((await privacy.getByTestId('privacy-contact').textContent()) || '').includes('hello@example.com')) {
   fail('Privacy should include the contact placeholder');
+}
+if (!((await privacy.getByTestId('privacy-whoop').textContent()) || '').includes('whoop_session cookie')) {
+  fail('Privacy should cover the WHOOP cookie');
+}
+if ((await privacy.getByTestId('legal-health-data').count()) !== 1) {
+  fail('Privacy should link to health data');
+}
+if (!((await privacy.getByTestId('privacy-intro').textContent()) || '').includes('identify you')) {
+  fail('Privacy should explain identity sign-in and incremental calendar');
 }
 await publish(privacy, 'legal_privacy.png');
 await privacy.close();
@@ -131,6 +144,23 @@ if ((await terms.getByTestId('terms-heading').textContent()) !== 'Terms') {
 }
 await publish(terms, 'legal_terms.png');
 await terms.close();
+
+const health = await open(browser, '/health-data');
+await assertPublic(health, 'health-data');
+if ((await health.getByTestId('health-data-heading').textContent()) !== 'Consumer health data') {
+  fail('Health data heading missing');
+}
+if (!((await health.getByTestId('health-data-store').textContent()) || '').includes('does not keep a database')) {
+  fail('Health data should say there is no database');
+}
+if (!((await health.getByTestId('health-data-invite').textContent()) || '').includes('invite-only')) {
+  fail('Health data should say WHOOP is invite-only');
+}
+if (!((await health.getByTestId('health-data-stop').textContent()) || '').includes('revoke')) {
+  fail('Health data should say Disconnect revokes access');
+}
+await publish(health, 'legal_health_data.png');
+await health.close();
 
 await browser.close();
 if (process.exitCode) {

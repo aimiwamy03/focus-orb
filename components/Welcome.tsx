@@ -22,7 +22,7 @@ export function Welcome({ onConnect, googleConfigured }: WelcomeProps) {
       data-testid="status-line"
       className="pointer-events-none absolute bottom-[5.75rem] left-1/2 z-20 w-fit max-w-[min(40rem,90vw)] -translate-x-1/2 text-center font-normal tracking-wide text-orb-dim"
     >
-      <div className="text-[length:var(--type-status)] leading-snug">
+      <div className="text-[length:var(--type-whoop)] leading-snug">
         {googleConfigured ? (
           <span data-text-clear className="inline-block">
             <button

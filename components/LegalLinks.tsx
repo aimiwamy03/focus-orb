@@ -6,15 +6,17 @@ import {
   HEALTH_DATA_LABEL,
   HOME_LABEL,
   PRIVACY_LABEL,
+  TERMS_LABEL,
 } from '@/lib/legal';
 
-export type LegalCurrent = 'home' | 'about' | 'privacy' | 'health-data';
+export type LegalCurrent = 'home' | 'about' | 'privacy' | 'health-data' | 'terms';
 
 const LINKS: Array<{ href: string; label: string; id: LegalCurrent; testId: string }> = [
   { href: '/', label: HOME_LABEL, id: 'home', testId: 'legal-home' },
   { href: '/about', label: ABOUT_LABEL, id: 'about', testId: 'legal-about' },
   { href: '/privacy', label: PRIVACY_LABEL, id: 'privacy', testId: 'legal-privacy' },
   { href: '/health-data', label: HEALTH_DATA_LABEL, id: 'health-data', testId: 'legal-health-data' },
+  { href: '/terms', label: TERMS_LABEL, id: 'terms', testId: 'legal-terms' },
 ];
 
 export function LegalLinks({

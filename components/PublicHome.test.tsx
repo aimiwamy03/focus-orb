@@ -16,6 +16,7 @@ describe('PublicHome', () => {
     expect(screen.getByTestId('about-lede').textContent).toBe(ABOUT_LEDE);
     expect(screen.getByTestId('legal-privacy').textContent).toBe(PRIVACY_LABEL);
     expect(screen.getByTestId('legal-terms').textContent).toBe(TERMS_LABEL);
+    expect(screen.getByTestId('legal-health-data').textContent).toBe('Health data');
     expect(screen.getByTestId('sample-day').textContent).toBe(SAMPLE_DAY_LINK);
     expect(screen.getByTestId('open-app').getAttribute('href')).toBe('/');
     expect(screen.getByTestId('about-calendar').textContent).not.toMatch(/[—–]/);

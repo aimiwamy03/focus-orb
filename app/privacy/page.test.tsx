@@ -21,6 +21,9 @@ describe('verification pages', () => {
     expect(screen.getByTestId('privacy-revoke').textContent).toMatch(/permissions/i);
     expect(screen.getByTestId('privacy-contact').textContent).toContain(CONTACT_EMAIL);
     expect(screen.getByTestId('privacy-limited-use').textContent).toContain(PRIVACY_LIMITED_USE);
+    expect(screen.getByTestId('privacy-whoop').textContent).toMatch(/whoop_session cookie/);
+    expect(screen.getByTestId('privacy-whoop').textContent).toMatch(/invite-only/);
+    expect(screen.getByTestId('legal-health-data').textContent).toBe('Health data');
     expect(screen.getByTestId('legal-page').textContent).not.toMatch(/[—–]/);
     cleanup();
 
