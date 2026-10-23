@@ -252,6 +252,11 @@ const chipHit = await clickPage.getByTestId('duration-50m').evaluate((el) => {
 });
 if (chipHit.height < 44) fail(`Duration hit area should be at least 44px tall, got ${chipHit.height}`);
 if (chipHit.cursor !== 'pointer') fail(`Duration chip cursor should be pointer, got ${chipHit.cursor}`);
+const chipClass = await clickPage.getByTestId('duration-50m').locator('span').getAttribute('class');
+if (!chipClass || chipClass.includes('rounded-full') || chipClass.includes('bg-orb-highlight')) {
+  fail(`Selected duration should not be a pill, got ${chipClass}`);
+}
+if (!chipClass.includes('underline')) fail('Selected duration should use an underline');
 await clickPage.getByTestId('duration-50m').click();
 await clickPage.waitForTimeout(400);
 if ((await clickPage.getByTestId('focus-task-name').count()) !== 0) {

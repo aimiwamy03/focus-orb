@@ -99,6 +99,27 @@ describe('focus log storage', () => {
     expect(updated[0].distracted).toBe(false);
   });
 
+  it('still loads old sessions that stored a distracted answer', () => {
+    localStorage.setItem(
+      key,
+      JSON.stringify([
+        {
+          id: 'old-1',
+          task: 'write the spec',
+          startMs: now.getTime() - 25 * 60_000,
+          endMs: now.getTime(),
+          minutes: 25,
+          planned: 25,
+          ended: 'completed',
+          distracted: true,
+        },
+      ])
+    );
+    const loaded = loadFocusLog(key);
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].distracted).toBe(true);
+  });
+
   it('ignores broken stored JSON', () => {
     localStorage.setItem(key, '{not json');
     expect(loadFocusLog(key)).toEqual([]);
