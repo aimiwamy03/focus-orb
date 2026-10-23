@@ -258,8 +258,17 @@ await assertNoIssueBadge(page, 'settings disconnected');
 if ((await page.getByTestId('whoop-status').textContent()) !== 'WHOOP disconnected') {
   fail('Disconnected settings status missing');
 }
-if (!(await page.getByTestId('whoop-connect').textContent())?.includes('Reconnect')) {
-  fail('Disconnected settings should offer Reconnect');
+if (!(await page.getByTestId('whoop-connect').textContent())?.includes('Reconnect WHOOP')) {
+  fail('Disconnected settings should offer Reconnect WHOOP');
+}
+if ((await page.getByTestId('whoop-consent').count()) !== 1) {
+  fail('Disconnected settings should show the WHOOP opt-in');
+}
+if (!(await page.getByTestId('whoop-devices').textContent())?.includes('Each device connects separately.')) {
+  fail('Settings should note that each device connects separately');
+}
+if ((await page.getByTestId('settings-legal').getByTestId('legal-health-data').count()) !== 1) {
+  fail('Settings should link to health data');
 }
 
 await open(page, '/?whoop=calibrating&settings=1');
@@ -322,6 +331,31 @@ for (const [search, file, extra] of mobileShots) {
 await open(page, '/privacy');
 if (!(await page.getByRole('heading', { name: 'Privacy' }).count())) {
   fail('Privacy page missing');
+}
+if (!(await page.getByTestId('privacy-whoop').textContent())?.includes('whoop_session cookie')) {
+  fail('Privacy should cover the WHOOP cookie');
+}
+if ((await page.getByTestId('legal-health-data').count()) !== 1) {
+  fail('Privacy should link to health data');
+}
+
+await open(page, '/about');
+if (!(await page.getByTestId('about-heading').textContent())?.includes('About')) {
+  fail('About page missing');
+}
+if ((await page.getByTestId('legal-health-data').count()) !== 1) {
+  fail('About should link to health data');
+}
+
+await open(page, '/health-data');
+if (!(await page.getByTestId('health-data-heading').textContent())?.includes('Consumer health data')) {
+  fail('Health data page missing');
+}
+if (!(await page.getByTestId('health-data-store').textContent())?.includes('does not keep a database')) {
+  fail('Health data should say there is no database');
+}
+if (!(await page.getByTestId('health-data-contact').textContent())?.includes('hello@example.com')) {
+  fail('Health data should use the privacy contact email');
 }
 
 await browser.close();

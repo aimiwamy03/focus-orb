@@ -100,7 +100,8 @@ import {
   saveShowBackdrop,
 } from '@/lib/backdrop';
 import { SAMPLE_DAY_LABEL } from '@/lib/fixtures';
-import { signInWithGoogle } from '@/app/actions';
+import { signInWithGoogleCalendar } from '@/app/actions';
+import { LegalLinks } from './LegalLinks';
 import { formatWhoopWindow, recordWhoopNudge, whoopBestWindow } from '@/lib/whoop';
 import { useWhoop } from '@/lib/useWhoop';
 import { StarDustBackdrop } from './StarDustBackdrop';
@@ -1142,6 +1143,11 @@ export function Orb() {
       }}
     >
       <StarDustBackdrop enabled={showBackdrop} />
+      {!miniOnly && !showSettings && !showLog && !firstOpen ? (
+        <div className="absolute left-4 top-4 z-20">
+          <LegalLinks testId="home-legal" current="home" />
+        </div>
+      ) : null}
       <canvas
         ref={canvasRef}
         data-testid="orb-canvas"
@@ -1165,7 +1171,7 @@ export function Orb() {
           onConnect={() => {
             if (isGoogleConfigured()) {
               calendar.selectAuthMethod('google');
-              void signInWithGoogle();
+              void signInWithGoogleCalendar();
               return;
             }
             setShowSettings(true);
@@ -1381,6 +1387,7 @@ export function Orb() {
           setWhoopShowNumbers={whoop.setShowNumbers}
           onWhoopConnect={whoop.connect}
           onWhoopDisconnect={whoop.disconnect}
+          whoopMessage={whoop.message}
         />
       )}
 

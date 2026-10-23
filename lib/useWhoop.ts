@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { signInWithGoogle } from '@/app/actions';
 import { mockWhoopSummary, parseWhoopQuery } from './whoop.mock';
 import {
   cachedSummaryIsFresh,
   clearCachedWhoopSummary,
   DEFAULT_WHOOP_MODE,
+  WHOOP_INVITE_ONLY_MESSAGE,
   hideWhoopLineForToday,
   isWhoopLineHidden,
   loadCachedWhoopSummary,
@@ -29,15 +31,18 @@ export function useWhoop() {
   const [showNumbers, setShowNumbersState] = useState(true);
   const [hidden, setHidden] = useState(false);
   const [fetched, setFetched] = useState<WhoopCachedSummary | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const mockSummary = mockKey ? mockWhoopSummary(mockKey, nowMs) : null;
   const summary = mockSummary ?? fetched;
+  const whoopError = searchParams.get('whoopError');
 
   useEffect(() => {
     setModeState(loadWhoopMode());
     setShowNumbersState(loadWhoopShowNumbers());
     setHidden(isWhoopLineHidden());
     if (!mockKey) setFetched(loadCachedWhoopSummary());
-  }, [mockKey]);
+    if (whoopError === 'invite') setMessage(WHOOP_INVITE_ONLY_MESSAGE);
+  }, [mockKey, whoopError]);
 
   useEffect(() => {
     if (mockKey) return;
@@ -50,7 +55,12 @@ export function useWhoop() {
         const data = (await response.json()) as WhoopCachedSummary;
         if (cancelled) return;
         setFetched(data);
-        if (data.connected) saveCachedWhoopSummary({ ...data, fetchedAt: Date.now() });
+        if (data.message) setMessage(data.message);
+        if (data.connected && data.status !== 'disconnected') {
+          saveCachedWhoopSummary({ ...data, fetchedAt: Date.now() });
+        } else {
+          clearCachedWhoopSummary();
+        }
       } catch {
         if (cancelled) return;
         const cached = loadCachedWhoopSummary();
@@ -102,16 +112,33 @@ export function useWhoop() {
       hideWhoopLineForToday();
       setHidden(true);
     },
-    connect: () => {
+    message,
+    connect: async () => {
       if (mockKey) return;
-      // Full navigation: the connect route sets an httpOnly cookie and 302s to WHOOP.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = '/api/whoop/connect';
+      try {
+        const response = await fetch('/api/whoop/connect?json=1');
+        const data = (await response.json()) as { error?: string; redirect?: string };
+        if (response.status === 401) {
+          await signInWithGoogle();
+          return;
+        }
+        if (!response.ok) {
+          setMessage(data.error ?? WHOOP_INVITE_ONLY_MESSAGE);
+          return;
+        }
+        if (data.redirect) {
+          window.location.href = data.redirect;
+        }
+      } catch {
+        setMessage(WHOOP_INVITE_ONLY_MESSAGE);
+      }
     },
     disconnect: async () => {
       if (!mockKey) {
         try {
-          await fetch('/api/whoop/disconnect', { method: 'POST' });
+          const response = await fetch('/api/whoop/disconnect', { method: 'POST' });
+          const data = (await response.json()) as { message?: string };
+          if (data.message) setMessage(data.message);
         } catch {
           // Local data still goes away.
         }

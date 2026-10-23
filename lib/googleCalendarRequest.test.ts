@@ -24,6 +24,17 @@ describe('handleGoogleCalendarGet', () => {
     expect(fetchList).not.toHaveBeenCalled();
   });
 
+  it('returns 403 when the user is signed in without calendar scopes', async () => {
+    const fetchList = vi.fn();
+    const result = await handleGoogleCalendarGet({
+      session: { accessToken: 'ya29.identity', hasCalendar: false },
+      url: new URL('https://focus-orb-one.vercel.app/api/calendar/google'),
+      fetchList,
+    });
+    expect(result.status).toBe(403);
+    expect(fetchList).not.toHaveBeenCalled();
+  });
+
   it('lists calendars and loads events when the access token is on the session', async () => {
     const fetchList = vi.fn(async () => [
       { id: 'primary', summary: 'Personal', primary: true },

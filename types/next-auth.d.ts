@@ -5,7 +5,8 @@ declare module "next-auth" {
     accessToken?: string;
     refreshToken?: string;
     expiresAt?: number;
-    user: DefaultSession["user"];
+    hasCalendar?: boolean;
+    user: DefaultSession["user"] & { id?: string };
   }
 }
 
@@ -14,5 +15,8 @@ declare module "next-auth/jwt" {
     accessToken?: string;
     refreshToken?: string;
     expiresAt?: number;
+    googleSub?: string;
+    googleScopes?: string;
+    hasCalendar?: boolean;
   }
 }

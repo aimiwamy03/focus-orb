@@ -1,7 +1,10 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
-vi.mock('@/app/actions', () => ({ signInWithGoogle: vi.fn() }));
+vi.mock('@/app/actions', () => ({
+  signInWithGoogle: vi.fn(),
+  signInWithGoogleCalendar: vi.fn(),
+}));
 
 import { Settings } from './Settings';
 import { MOCK_GOOGLE_CALENDARS, calendarLabelTags } from '@/lib/calendars';
@@ -244,7 +247,13 @@ describe('Settings sheet', () => {
       />
     );
     expect(screen.getByTestId('whoop-status').textContent).toBe('WHOOP disconnected');
-    expect(screen.getByTestId('whoop-connect').textContent).toContain('Reconnect');
+    expect(screen.getByTestId('whoop-connect').textContent).toContain('Reconnect WHOOP');
+    expect(screen.getByTestId('whoop-devices').textContent).toContain(
+      'Each device connects separately.'
+    );
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onWhoopConnect).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('whoop-consent-check'));
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onWhoopConnect).toHaveBeenCalledTimes(1);
   });

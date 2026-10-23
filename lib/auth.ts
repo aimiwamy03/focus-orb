@@ -3,7 +3,7 @@ import Google from "next-auth/providers/google";
 import {
   applyGoogleAccountToToken,
   attachGoogleAccessToSession,
-  GOOGLE_CALENDAR_SCOPES,
+  GOOGLE_IDENTITY_AUTH,
   googleClientId,
   googleClientSecret,
   googleJwtNeedsRefresh,
@@ -23,11 +23,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           clientId: googleId,
           clientSecret: googleSecret,
           authorization: {
-            params: {
-              scope: GOOGLE_CALENDAR_SCOPES,
-              access_type: "offline",
-              prompt: "consent",
-            },
+            params: { ...GOOGLE_IDENTITY_AUTH },
           },
         }),
       ]

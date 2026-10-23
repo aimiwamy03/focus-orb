@@ -28,7 +28,9 @@ export function isFirstOpen({
 export interface AuthSessionView {
   signedIn: boolean;
   hasGoogleAccess: boolean;
+  hasCalendar: boolean;
   email: string | null;
+  userId: string | null;
 }
 
 export function isGoogleConfigured(
@@ -43,23 +45,34 @@ export const SAMPLE_DAY_LINK = 'Try a sample day';
 
 export function interpretAuthSession(payload: unknown): AuthSessionView {
   if (!payload || typeof payload !== 'object') {
-    return { signedIn: false, hasGoogleAccess: false, email: null };
+    return {
+      signedIn: false,
+      hasGoogleAccess: false,
+      hasCalendar: false,
+      email: null,
+      userId: null,
+    };
   }
 
   const session = payload as {
-    user?: { email?: string | null; name?: string | null } | null;
+    user?: { email?: string | null; name?: string | null; id?: string | null } | null;
     accessToken?: unknown;
+    hasCalendar?: unknown;
   };
 
   const email =
     typeof session.user?.email === 'string' && session.user.email.trim()
       ? session.user.email
       : null;
+  const userId =
+    typeof session.user?.id === 'string' && session.user.id.trim() ? session.user.id : null;
   const signedIn = Boolean(session.user && (email || session.user.name));
   const hasGoogleAccess =
     typeof session.accessToken === 'string' && session.accessToken.length > 0;
+  const hasCalendar =
+    session.hasCalendar === true || (session.hasCalendar !== false && hasGoogleAccess);
 
-  return { signedIn, hasGoogleAccess, email };
+  return { signedIn, hasGoogleAccess, hasCalendar, email, userId };
 }
 
 export function shouldUseGoogleFromSession(view: AuthSessionView): boolean {
