@@ -9,6 +9,7 @@ export const INTRO_SKIP_HINT = 'Esc to skip';
 export const INTRO_HINT_COLOR = '#a1a1a6';
 export const INTRO_HINT_SIZE_PX = 16;
 export const INTRO_MIN_CAPTION_PX = 24;
+export const INTRO_TITLE_TRACKING = '0.04em';
 export const INTRO_NARROW_PX = 520;
 export const INTRO_NARROW_ART_ZOOM = 1.45;
 export const INTRO_ART_SRC = '/intro/intro-brain.webp';

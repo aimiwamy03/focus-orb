@@ -7,6 +7,7 @@ export interface FirstOpenState {
   authMethod: AuthMethod;
   whoopDemo?: boolean;
   homePreview?: boolean;
+  guestStart?: boolean;
 }
 
 export function isFirstOpen({
@@ -16,8 +17,10 @@ export function isFirstOpen({
   authMethod,
   whoopDemo = false,
   homePreview = false,
+  guestStart = false,
 }: FirstOpenState): boolean {
   return (
+    !guestStart &&
     !mockScenario &&
     !whoopDemo &&
     !homePreview &&
@@ -43,8 +46,20 @@ export function isGoogleConfigured(
 }
 
 export const WELCOME_LINE = 'A quiet timer that watches your calendar.';
+export const START_FOCUSING_LABEL = 'Start focusing';
 export const CONNECT_LABEL = 'Connect your calendar';
 export const SAMPLE_DAY_LINK = 'Try a sample day';
+export const GUEST_START_KEY = 'focusOrb:guestStart';
+
+export function loadGuestStart(): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  return sessionStorage.getItem(GUEST_START_KEY) === '1';
+}
+
+export function markGuestStart(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(GUEST_START_KEY, '1');
+}
 
 export function interpretAuthSession(payload: unknown): AuthSessionView {
   if (!payload || typeof payload !== 'object') {

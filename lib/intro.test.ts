@@ -4,6 +4,7 @@ import {
   INTRO_LINES,
   INTRO_MIN_CAPTION_PX,
   INTRO_SKIP_HINT,
+  INTRO_TITLE_TRACKING,
   INTRO_SOUND_LABEL,
   INTRO_TIMELINE,
   PLAY_INTRO_LABEL,
@@ -200,6 +201,7 @@ describe('intro timeline', () => {
     const copy = [...INTRO_LINES, INTRO_SKIP_HINT, PLAY_INTRO_LABEL, INTRO_SOUND_LABEL].join(' ');
     expect(copy).not.toMatch(/[—–]/);
     expect(INTRO_MIN_CAPTION_PX).toBeGreaterThanOrEqual(24);
+    expect(INTRO_TITLE_TRACKING).toBe('0.04em');
     expect(INTRO_HINT_COLOR).toBe('#a1a1a6');
     expect(introNarrow(375)).toBe(true);
     expect(introNarrow(1280)).toBe(false);
