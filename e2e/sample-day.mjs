@@ -85,7 +85,7 @@ const cardBox = await tips.getByTestId('shortcuts-card').boundingBox();
 const promptBox = await tips.getByTestId('focus-prompt').boundingBox();
 const agendaBox = await tips.getByTestId('agenda').boundingBox();
 if (!cardBox) fail('Shortcuts card missing on sample day');
-if (cardBox.x > 32) fail(`Sample-day tips should sit near the left edge, x=${cardBox.x}`);
+if (cardBox.x < 800) fail(`Sample-day tips should sit near the right edge, x=${cardBox.x}`);
 if (cardBox.y > 80) fail(`Sample-day tips should sit near the top, y=${cardBox.y}`);
 if (promptBox && overlap(
   { left: cardBox.x, top: cardBox.y, right: cardBox.x + cardBox.width, bottom: cardBox.y + cardBox.height },
@@ -100,8 +100,8 @@ if (agendaBox && overlap(
   fail('Sample-day tips overlap the left agenda card');
 }
 const cardClass = await tips.getByTestId('shortcuts-card').getAttribute('class');
-if (!cardClass || !cardClass.includes('fixed') || !cardClass.includes('top-4') || !cardClass.includes('left-4')) {
-  fail(`Sample-day tips should match live top-left help, got ${cardClass}`);
+if (!cardClass || !cardClass.includes('fixed') || !cardClass.includes('top-4') || !cardClass.includes('right-4')) {
+  fail(`Sample-day tips should match live top-right help, got ${cardClass}`);
 }
 if (cardClass.includes('text-center')) fail('Sample-day tips should not be centered');
 await publish(tips, 'sample_day_tips_desktop.png');
@@ -118,8 +118,8 @@ await narrow.goto(`${BASE}/?mock=back-to-back`, { waitUntil: 'networkidle' });
 await narrow.waitForSelector('[data-testid="shortcuts-card"]');
 const narrowBox = await narrow.getByTestId('shortcuts-card').boundingBox();
 if (!narrowBox) fail('Narrow sample-day tips missing');
-if (narrowBox.x > 32 || narrowBox.y > 80) {
-  fail(`Narrow tips should stay top-left, got x=${narrowBox.x} y=${narrowBox.y}`);
+if (narrowBox.x < 180 || narrowBox.y > 80) {
+  fail(`Narrow tips should stay top-right, got x=${narrowBox.x} y=${narrowBox.y}`);
 }
 await publish(narrow, 'sample_day_tips_narrow.png');
 await narrow.close();
@@ -134,8 +134,10 @@ if (!pipBefore) fail('Sample-day e2e needs a Document Picture-in-Picture shim');
 await mini.getByTestId('focus-task').blur();
 await mini.mouse.move(20, 20);
 await mini.waitForTimeout(200);
+await mini.getByTestId('help-toggle').click();
+await mini.waitForSelector('[data-testid="short-help"]');
 if ((await mini.getByTestId('pop-out').count()) !== 1) {
-  fail('Sample day should show Pop out when Document PiP is available');
+  fail('Sample day should show Pop out in the ? menu when Document PiP is available');
 }
 await mini.keyboard.press('p');
 const pip = mini.frameLocator('[data-testid="pip-window"]');

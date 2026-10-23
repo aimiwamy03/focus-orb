@@ -21,6 +21,8 @@
   --type-hint: clamp(14px, 0.2vw + 13px, 15px);
   --type-chrome: clamp(15px, 0.15vw + 13.5px, 16px);
   --type-key: 14px;
+  --keycap-size: 1.5rem;
+  --keycap-radius: 0.25rem;
   --type-log-heading: clamp(26px, 0.2vw + 25px, 28px);
   --color-log-accent: #8eb4c8;
   --type-log-body: clamp(17px, 0.15vw + 16px, 18px);
@@ -81,6 +83,42 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--keycap-size);
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: var(--keycap-radius);
+  padding: 0;
+  font-size: var(--type-key);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--color-orb-quiet);
+}
+
+.keycap-square {
+  width: var(--keycap-size);
+}
+
+.keycap-wide {
+  width: auto;
+  padding: 0 0.5em;
+}
+
+.help-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--keycap-size);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1;
 }
 
 .focus-log {

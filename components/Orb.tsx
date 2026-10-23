@@ -37,7 +37,6 @@ import {
 } from '@/lib/focusPrompt';
 import { CURSOR_HIDE_MS, isKeepCursorTarget, shouldHideCursor } from '@/lib/cursor';
 import {
-  LOG_LABEL,
   clearFocusLog,
   focusLogKey,
   loadFocusLog,
@@ -56,9 +55,7 @@ import {
   formatMiniStatus,
   LEAVE_TAB_HINT,
   loadPopOutOnLeave,
-  MINI_ONLY_LABEL,
   MINI_SIZE,
-  POP_OUT_LABEL,
   savePopOutOnLeave,
   scatterFromVisualInput,
 } from '@/lib/miniOrb';
@@ -67,7 +64,6 @@ import {
   stepVisualScatter,
 } from '@/lib/orbMotion';
 import {
-  FULLSCREEN_LABEL,
   isShortcutKey,
   loadShortcutsCardSeen,
   saveShortcutsCardSeen,
@@ -86,7 +82,6 @@ import { Satellites } from './Satellites';
 import { Welcome } from './Welcome';
 import { FocusIntro } from './FocusIntro';
 import { MiniOrbView } from './MiniOrbView';
-import { KeyHint } from './KeyHint';
 import { ShortcutsCard } from './ShortcutsCard';
 import { isFirstOpen, isGoogleConfigured } from '@/lib/onboarding';
 import {
@@ -846,6 +841,31 @@ export function Orb() {
     }
   };
 
+  const togglePopOut = () => {
+    if (!pipSupported) return;
+    if (miniWindow.isOpen) {
+      miniWindow.close();
+      setMiniOnly(false);
+    } else {
+      void miniWindow.open();
+    }
+  };
+
+  const toggleMiniOnly = async () => {
+    if (!pipSupported) return;
+    if (miniOnly) {
+      setMiniOnly(false);
+      return;
+    }
+    const ok = miniWindow.isOpen || (await miniWindow.open());
+    if (ok) setMiniOnly(true);
+  };
+
+  const openLog = () => {
+    setShowSettings(false);
+    setShowLog(true);
+  };
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -864,18 +884,25 @@ export function Orb() {
         e.preventDefault();
         handleOrbClickRef.current();
       } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        togglePopOut();
+      } else if (e.key === 'm' || e.key === 'M') {
         if (!pipSupported) return;
         e.preventDefault();
-        if (miniWindow.isOpen) miniWindow.close();
-        else void miniWindow.open();
+        if (miniOnlyRef.current) {
+          setMiniOnly(false);
+          return;
+        }
+        void Promise.resolve(miniWindow.isOpen || miniWindow.open()).then((ok) => {
+          if (ok) setMiniOnly(true);
+        });
       } else if (e.key === 'l' || e.key === 'L') {
         e.preventDefault();
         if (logOpenRef.current) {
           setShowLog(false);
           return;
         }
-        setShowSettings(false);
-        setShowLog(true);
+        openLog();
       } else if (e.key === 'Escape' && miniOnlyRef.current) {
         e.preventDefault();
         setMiniOnly(false);
@@ -1195,90 +1222,6 @@ export function Orb() {
         <Satellites count={day.state === 'in-run' ? day.remainingInRun.length : 0} />
       )}
 
-      {!firstOpen ? (
-        <div
-          className={`transition-opacity duration-300 ${
-            showChrome
-              ? 'visible opacity-100'
-              : 'invisible pointer-events-none opacity-0'
-          }`}
-        >
-          <div className="fixed top-4 right-4 z-40 flex items-center gap-1">
-            {pipSupported ? (
-              <>
-                <button
-                  type="button"
-                  data-testid="pop-out"
-                  onClick={() => {
-                    if (miniWindow.isOpen) {
-                      miniWindow.close();
-                      setMiniOnly(false);
-                    } else {
-                      void miniWindow.open();
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
-                  aria-pressed={miniWindow.isOpen}
-                >
-                  {POP_OUT_LABEL}
-                  <KeyHint label="P" />
-                </button>
-                <button
-                  type="button"
-                  data-testid="mini-only"
-                  onClick={async () => {
-                    if (miniOnly) {
-                      setMiniOnly(false);
-                      return;
-                    }
-                    const ok = miniWindow.isOpen || (await miniWindow.open());
-                    if (ok) setMiniOnly(true);
-                  }}
-                  className="px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
-                  aria-pressed={miniOnly}
-                >
-                  {MINI_ONLY_LABEL}
-                </button>
-              </>
-            ) : null}
-            <button
-              type="button"
-              data-testid="fullscreen-toggle"
-              onClick={toggleFullscreen}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
-              aria-label="Full screen"
-              aria-pressed={isFullscreen}
-            >
-              {FULLSCREEN_LABEL}
-              <KeyHint label="F" />
-            </button>
-            <button
-              type="button"
-              data-testid="focus-log-open"
-              onClick={() => {
-                setShowSettings(false);
-                setShowLog(true);
-              }}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
-              aria-pressed={showLog}
-            >
-              {LOG_LABEL}
-              <KeyHint label="L" />
-            </button>
-            <button
-              type="button"
-              data-testid="settings-gear"
-              onClick={() => setShowSettings(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet hover:text-orb-dim"
-              aria-label="Settings"
-            >
-              ⚙
-              <KeyHint label="S" />
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       {showShortcutsCard ? <ShortcutsCard onDismiss={dismissShortcutsCard} /> : null}
 
       <Hints
@@ -1293,6 +1236,14 @@ export function Orb() {
               ? { id: 'leave-tab', text: LEAVE_TAB_HINT }
               : null
         }
+        onAction={(id) => {
+          if (id === 'fullscreen') toggleFullscreen();
+          else if (id === 'settings') setShowSettings(true);
+          else if (id === 'focus') handleOrbClickRef.current();
+          else if (id === 'pop-out') togglePopOut();
+          else if (id === 'mini-only') void toggleMiniOnly();
+          else if (id === 'log') openLog();
+        }}
       />
 
       {miniWindow.portal}
