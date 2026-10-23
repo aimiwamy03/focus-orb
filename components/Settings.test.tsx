@@ -241,6 +241,11 @@ describe('Settings sheet', () => {
     expect(screen.getByTestId('whoop-status').textContent).toBe('WHOOP disconnected');
     expect(screen.getByTestId('whoop-connect').textContent).toContain('Connect WHOOP');
     expect(screen.getByTestId('whoop-connect')).toHaveProperty('disabled', true);
+    expect(screen.getByTestId('whoop-connect').className).toMatch(/settings-link/);
+    expect(screen.getByTestId('whoop-connect').className).toMatch(/underline/);
+    expect(screen.getByTestId('whoop-connect').className).not.toMatch(/rounded|bg-black|ring-1/);
+    expect(screen.getByTestId('whoop-consent-check').getAttribute('role')).toBe('switch');
+    expect(screen.getByTestId('whoop-consent-check').className).toMatch(/settings-toggle/);
     expect(screen.getByTestId('whoop-devices').textContent).toContain(
       'Each device connects separately.'
     );

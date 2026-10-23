@@ -109,16 +109,17 @@ export function WhoopSettings({
           <p className="text-[length:var(--type-whoop)] leading-snug text-orb-text">
             {WHOOP_CONSENT_COPY}
           </p>
-          <label className="flex items-start gap-3 text-[length:var(--type-whoop)] text-orb-text">
-            <input
-              type="checkbox"
-              data-testid="whoop-consent-check"
-              checked={consented}
-              onChange={(event) => setConsented(event.target.checked)}
-              className="mt-1 border-orb-quiet bg-black/30"
-            />
-            <span>{WHOOP_CONSENT_CHECK}</span>
-          </label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={consented}
+            data-testid="whoop-consent-check"
+            data-selected={consented ? 'true' : 'false'}
+            onClick={() => setConsented((value) => !value)}
+            className="settings-toggle text-left"
+          >
+            {WHOOP_CONSENT_CHECK}
+          </button>
         </div>
       ) : null}
 
@@ -128,14 +129,12 @@ export function WhoopSettings({
         data-highlighted={rowIndex === 0 ? 'true' : 'false'}
         onClick={() => (connected ? onDisconnect() : canConnect ? onConnect() : undefined)}
         disabled={!canConnect}
-        className={`flex w-full items-center justify-between rounded px-3 py-2 text-[length:var(--type-whoop)] ${
-          canConnect
-            ? 'bg-black/30 text-orb-text'
-            : 'cursor-not-allowed bg-transparent text-orb-quiet ring-1 ring-white/20'
+        className={`settings-link inline-flex items-center gap-2 underline decoration-1 underline-offset-4 ${
+          canConnect ? 'text-orb-text' : 'cursor-not-allowed text-orb-quiet'
         }`}
       >
         <span>{connectLabel}</span>
-        <span className="inline-flex items-center gap-1 text-orb-quiet">
+        <span className="inline-flex items-center gap-1 text-orb-quiet no-underline">
           <KeyHint label="Enter" />
         </span>
       </button>
