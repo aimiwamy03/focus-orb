@@ -13,6 +13,7 @@ export interface CalendarEvent {
   conferenceUri?: string;
   calendarId?: string;
   backgroundColor?: string;
+  eventType?: string;
 }
 
 export interface NextEventInfo {

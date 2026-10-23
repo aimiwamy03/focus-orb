@@ -8,6 +8,14 @@ export interface FocusLogEntry {
   minutes: number;
   planned: number;
   ended: FocusLogEnded;
+  pausedMinutes?: number;
+  minutesCounted?: number;
+  stageBefore?: number;
+  stageAfter?: number;
+  settleSkipped?: boolean;
+  distracted?: boolean | null;
+  focusRating?: number | null;
+  nextStep?: string | null;
 }
 
 export interface FocusLogTaskTotal {
@@ -288,6 +296,14 @@ function isEntry(value: unknown): value is FocusLogEntry {
   );
 }
 
+function optionalNumber(value: unknown): value is number | undefined {
+  return value == null || (typeof value === 'number' && Number.isFinite(value));
+}
+
+function optionalBool(value: unknown): value is boolean | null | undefined {
+  return value == null || typeof value === 'boolean';
+}
+
 export function loadFocusLog(key: string): FocusLogEntry[] {
   if (typeof localStorage === 'undefined') return [];
   try {
@@ -295,7 +311,18 @@ export function loadFocusLog(key: string): FocusLogEntry[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isEntry);
+    return parsed.filter((item) => {
+      if (!isEntry(item)) return false;
+      if (!optionalNumber(item.pausedMinutes)) return false;
+      if (!optionalNumber(item.minutesCounted)) return false;
+      if (!optionalNumber(item.stageBefore)) return false;
+      if (!optionalNumber(item.stageAfter)) return false;
+      if (!optionalBool(item.settleSkipped)) return false;
+      if (!optionalBool(item.distracted)) return false;
+      if (!optionalNumber(item.focusRating)) return false;
+      if (item.nextStep != null && typeof item.nextStep !== 'string') return false;
+      return true;
+    });
   } catch {
     return [];
   }
@@ -316,6 +343,18 @@ export function recordFocusLog(
 ): FocusLogEntry[] {
   const entry: FocusLogEntry = { ...draft, id: makeFocusLogId() };
   const next = [entry, ...loadFocusLog(key)];
+  saveFocusLog(key, next);
+  return next;
+}
+
+export function updateFocusLogEntry(
+  key: string,
+  id: string,
+  patch: Partial<Omit<FocusLogEntry, 'id'>>
+): FocusLogEntry[] {
+  const next = loadFocusLog(key).map((entry) =>
+    entry.id === id ? { ...entry, ...patch, id: entry.id } : entry
+  );
   saveFocusLog(key, next);
   return next;
 }

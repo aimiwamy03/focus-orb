@@ -1,5 +1,9 @@
 'use client';
 
+export function isSquareKeycap(label: string): boolean {
+  return label.length === 1;
+}
+
 export function KeyHint({
   label,
   className = '',
@@ -7,11 +11,15 @@ export function KeyHint({
   label: string;
   className?: string;
 }) {
+  const square = isSquareKeycap(label);
   return (
     <kbd
       data-testid={`keycap-${label}`}
       data-text-clear
-      className={`inline-flex h-[1.4em] min-w-[1.4em] items-center justify-center rounded border border-white/25 px-1.5 text-[length:var(--type-key)] font-normal leading-none text-orb-quiet ${className}`}
+      data-keycap={square ? 'square' : 'wide'}
+      className={`keycap inline-flex box-border items-center justify-center border border-white/25 rounded p-0 font-normal leading-none text-orb-quiet text-[length:var(--type-key)] h-6 ${
+        square ? 'keycap-square w-6' : 'keycap-wide w-auto px-2'
+      } ${className}`.trim()}
     >
       {label}
     </kbd>

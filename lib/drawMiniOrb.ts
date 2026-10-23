@@ -8,6 +8,9 @@ export interface MiniDrawFrame {
   dim: boolean;
   scale: number;
   glow: number;
+  halo?: number;
+  brightness?: number;
+  warmth?: number;
 }
 
 interface MiniPoint {
@@ -113,12 +116,23 @@ export function drawMiniOrb(
   ctx.fillStyle = MINI_BG;
   ctx.fillRect(0, 0, width, height);
 
+  const warmth = frame.warmth ?? 0;
+  const glowColor = `${255}, ${Math.round(255 - 12 * warmth)}, ${Math.round(255 - 28 * warmth)}`;
   if (frame.glow > 0) {
     const glowR = radius * (1.15 + 0.25 * frame.glow);
     const gradient = ctx.createRadialGradient(cx, cy, radius * 0.15, cx, cy, glowR);
-    gradient.addColorStop(0, `rgba(255,255,255,${0.22 * frame.glow})`);
-    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    gradient.addColorStop(0, `rgba(${glowColor},${0.22 * frame.glow})`);
+    gradient.addColorStop(1, `rgba(${glowColor},0)`);
     ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+  }
+  if ((frame.halo ?? 0) > 0) {
+    const halo = frame.halo ?? 0;
+    const ring = ctx.createRadialGradient(cx, cy, radius * 0.95, cx, cy, radius * (1.55 + 0.2 * halo));
+    ring.addColorStop(0, `rgba(${glowColor},0)`);
+    ring.addColorStop(0.55, `rgba(${glowColor},${0.16 * halo})`);
+    ring.addColorStop(1, `rgba(${glowColor},0)`);
+    ctx.fillStyle = ring;
     ctx.fillRect(0, 0, width, height);
   }
 
@@ -132,7 +146,7 @@ export function drawMiniOrb(
       scatter <= point.escapeAt
         ? 0
         : Math.min(1, (scatter - point.escapeAt) / (1 - point.escapeAt + 1e-6));
-    const startingKeep = point.shade * frame.density;
+    const startingKeep = point.shade * frame.density * (frame.brightness ?? 1);
     const keepProb =
       progress === 0
         ? startingKeep * (1 - 0.4 * scatter)

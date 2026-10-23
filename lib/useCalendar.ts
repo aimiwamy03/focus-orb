@@ -14,6 +14,7 @@ import {
   saveSelectedCalendarIds,
 } from './calendars';
 import { interpretAuthSession, isGoogleConfigured, shouldUseGoogleFromSession } from './onboarding';
+import { clearCachedWhoopSummary } from './whoop';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const STORAGE_KEY = 'focusOrb:calendarUrl';
@@ -113,7 +114,9 @@ export function useCalendar() {
         const response = await fetch('/api/calendar/google');
         if (cancelled) return;
         setIsGoogleConnected(response.ok);
-        if (!response.ok && response.status === 401) {
+        if (response.status === 403) {
+          setIsGoogleConnected(false);
+        } else if (!response.ok && response.status === 401) {
           setAuthMethod(null);
           setIsGoogleConnected(false);
           localStorage.removeItem(AUTH_METHOD_KEY);
@@ -313,6 +316,7 @@ export function useCalendar() {
 
   const disconnectGoogle = async () => {
     try {
+      clearCachedWhoopSummary();
       const response = await fetch('/api/auth/signout', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

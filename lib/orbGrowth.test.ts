@@ -1,0 +1,370 @@
+import { describe, expect, it, beforeEach } from 'vitest';
+import type { FocusLogEntry } from './focusLog';
+import {
+  ONE_THING_PROMPT,
+  ORB_BLOOM_MS,
+  ORB_BLOOM_PREVIEW_BEFORE,
+  ORB_BLOOM_PREVIEW_SESSION,
+  ORB_GROWTH,
+  ORB_SETTLE_BREATHS_PER_MIN,
+  ORB_SETTLE_CYCLE_MS,
+  ORB_SETTLE_IN_MS,
+  ORB_SETTLE_OUT_MS,
+  SETTLE_SESSION_KEY,
+  attachGrowthFields,
+  bloomLook,
+  bloomPayoffLook,
+  bloomProgress,
+  countedDayStreak,
+  countedMinutesToday,
+  crossedStage,
+  dayFinalStage,
+  focusDriftScale,
+  formatFocusedToday,
+  formatReturnLine,
+  visibleFocusedTodayMinutes,
+  idleBreathScale,
+  IDLE_BREATH_AMP_GATHERED,
+  IDLE_BREATH_AMP_SCATTERED,
+  IDLE_BREATH_FREQ,
+  IDLE_BREATH_STEP,
+  liveOrbPulse,
+  growthPointScale,
+  isOrbPreviewKey,
+  loadSettlePlayed,
+  markSettlePlayed,
+  mixLooks,
+  orbVisualState,
+  previewMinutes,
+  resolveDisplayMinutes,
+  sessionCounts,
+  settleBreathScale,
+  shouldPlaySettle,
+  stageForMinutes,
+} from './orbGrowth';
+
+function entry(partial: Partial<FocusLogEntry> & Pick<FocusLogEntry, 'id' | 'minutes' | 'ended'>): FocusLogEntry {
+  const start = partial.startMs ?? Date.now();
+  return {
+    task: 'write the spec',
+    startMs: start,
+    endMs: partial.endMs ?? start + partial.minutes * 60_000,
+    planned: partial.planned ?? 25,
+    ...partial,
+  };
+}
+
+const morning = new Date(2026, 9, 22, 10, 0, 0, 0);
+
+describe('growth stages', () => {
+  it('uses one tunable config and never shrinks a later stage', () => {
+    expect(ORB_GROWTH.stages.map((stage) => [stage.key, stage.minMinutes])).toEqual([
+      ['cluster', 0],
+      ['gathering', 45],
+      ['forming', 90],
+      ['full', 150],
+      ['radiant', 240],
+    ]);
+    expect(stageForMinutes(0).key).toBe('cluster');
+    expect(stageForMinutes(44).key).toBe('cluster');
+    expect(stageForMinutes(45).key).toBe('gathering');
+    expect(stageForMinutes(89).key).toBe('gathering');
+    expect(stageForMinutes(90).key).toBe('forming');
+    expect(stageForMinutes(149).key).toBe('forming');
+    expect(stageForMinutes(150).key).toBe('full');
+    expect(stageForMinutes(239).key).toBe('full');
+    expect(stageForMinutes(240).key).toBe('radiant');
+    expect(stageForMinutes(400).look.scale).toBe(stageForMinutes(240).look.scale);
+    expect(stageForMinutes(400).look.halo).toBe(1);
+    expect(ONE_THING_PROMPT).toBe("What's the one thing?");
+    expect(ONE_THING_PROMPT).not.toMatch(/[—–]/);
+  });
+});
+
+describe('session counting', () => {
+  it('counts completed sessions and 15 plus minute runs, minus paused time', () => {
+    expect(sessionCounts({ minutes: 12, ended: 'ended-early' })).toEqual({
+      counted: false,
+      minutes: 0,
+    });
+    expect(sessionCounts({ minutes: 14, ended: 'ended-session' }).counted).toBe(false);
+    expect(sessionCounts({ minutes: 15, ended: 'ended-early' })).toEqual({
+      counted: true,
+      minutes: 15,
+    });
+    expect(sessionCounts({ minutes: 8, ended: 'completed' })).toEqual({
+      counted: true,
+      minutes: 8,
+    });
+    expect(sessionCounts({ minutes: 25, pausedMinutes: 12, ended: 'ended-early' })).toEqual({
+      counted: false,
+      minutes: 0,
+    });
+    expect(sessionCounts({ minutes: 25, pausedMinutes: 5, ended: 'ended-early' })).toEqual({
+      counted: true,
+      minutes: 20,
+    });
+  });
+
+  it('sums only today and keeps yesterday stage from counted minutes', () => {
+    const today = morning.getTime();
+    const yesterday = today - 86_400_000;
+    const entries = [
+      entry({ id: 'short', minutes: 8, ended: 'ended-early', startMs: today }),
+      entry({ id: 'done', minutes: 50, ended: 'completed', startMs: today + 1 }),
+      entry({ id: 'pause', minutes: 25, pausedMinutes: 6, ended: 'ended-early', startMs: today + 2 }),
+      entry({
+        id: 'yday',
+        minutes: 90,
+        ended: 'completed',
+        startMs: yesterday,
+        stageAfter: 2,
+      }),
+    ];
+    expect(countedMinutesToday(entries, morning)).toBe(69);
+    expect(dayFinalStage(entries, new Date(yesterday))?.key).toBe('forming');
+    expect(dayFinalStage(entries, morning)?.key).toBe('gathering');
+  });
+
+  it('attaches stage before and after without inventing minutes', () => {
+    const existing = [entry({ id: 'am', minutes: 40, ended: 'completed', startMs: morning.getTime() })];
+    const draft = attachGrowthFields(
+      {
+        task: 'review pr',
+        startMs: morning.getTime() + 3_600_000,
+        endMs: morning.getTime() + 3_600_000 + 25 * 60_000,
+        minutes: 25,
+        planned: 25,
+        ended: 'completed',
+        pausedMinutes: 0,
+      },
+      { entries: existing, now: morning, settleSkipped: true }
+    );
+    expect(draft.minutesCounted).toBe(25);
+    expect(draft.stageBefore).toBe(0);
+    expect(draft.stageAfter).toBe(1);
+    expect(draft.settleSkipped).toBe(true);
+    expect(crossedStage(draft.stageBefore ?? 0, draft.stageAfter ?? 0)).toBe(true);
+  });
+});
+
+describe('settle and bloom motion', () => {
+  it('breathes six times a minute, 4s in and 6s out', () => {
+    expect(ORB_SETTLE_CYCLE_MS).toBe(10_000);
+    expect(ORB_SETTLE_BREATHS_PER_MIN).toBe(6);
+    expect(ORB_SETTLE_IN_MS).toBe(4_000);
+    expect(ORB_SETTLE_OUT_MS).toBe(6_000);
+    expect(settleBreathScale(0)).toBeCloseTo(1);
+    expect(settleBreathScale(4_000)).toBeGreaterThan(1.07);
+    expect(settleBreathScale(10_000)).toBeCloseTo(1);
+    expect(settleBreathScale(2_000, true)).toBe(1);
+  });
+
+  it('blooms in 2 to 3s and reduced motion only crossfades', () => {
+    expect(ORB_BLOOM_MS).toBeGreaterThanOrEqual(2_000);
+    expect(ORB_BLOOM_MS).toBeLessThanOrEqual(3_000);
+    expect(bloomProgress(0)).toBe(0);
+    expect(bloomProgress(ORB_BLOOM_MS)).toBe(1);
+    expect(bloomProgress(10, true)).toBe(1);
+    const from = stageForMinutes(0).look;
+    const to = stageForMinutes(45).look;
+    expect(bloomLook(from, to, 0).scale).toBeCloseTo(from.scale);
+    expect(bloomLook(from, to, ORB_BLOOM_MS).scale).toBeCloseTo(to.scale);
+    expect(bloomLook(from, to, 10, true).scale).toBeCloseTo(to.scale);
+    expect(bloomLook(from, from, 1_200, false, false).glow).toBeGreaterThan(from.glow);
+    expect(bloomPayoffLook(from, to, ORB_BLOOM_MS * 0.35).brightness).toBe(1);
+    expect(bloomPayoffLook(from, to, ORB_BLOOM_MS).brightness).toBeCloseTo(to.brightness);
+    expect(bloomPayoffLook(from, to, 10, true).brightness).toBeCloseTo(to.brightness);
+    const peak = orbVisualState({
+      minutes: 50,
+      moment: 'bloom',
+      elapsedMs: ORB_BLOOM_MS * 0.35,
+      fromStage: stageForMinutes(0),
+      toStage: stageForMinutes(50),
+    });
+    expect(peak.look.brightness).toBe(1);
+    const still = orbVisualState({ minutes: 18, moment: 'still' });
+    expect(still.look.brightness).toBeLessThan(1);
+  });
+
+  it('counts consecutive local days and holds a live streak past midnight', () => {
+    const late = new Date(2026, 9, 22, 23, 59, 0, 0);
+    const early = new Date(2026, 9, 23, 0, 1, 0, 0);
+    const noon = new Date(2026, 9, 23, 12, 0, 0, 0);
+    const three = [
+      entry({ id: 'd1', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 21, 10, 0, 0, 0).getTime() }),
+      entry({ id: 'd2', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 22, 10, 0, 0, 0).getTime() }),
+      entry({ id: 'd3', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 23, 10, 0, 0, 0).getTime() }),
+    ];
+    expect(countedDayStreak(three, noon)).toBe(3);
+    expect(
+      countedDayStreak(
+        [
+          entry({ id: 'late', minutes: 25, ended: 'completed', startMs: late.getTime() }),
+          entry({ id: 'early', minutes: 25, ended: 'completed', startMs: early.getTime() }),
+        ],
+        noon
+      )
+    ).toBe(2);
+    expect(
+      countedDayStreak(
+        [
+          entry({ id: 'yday', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 22, 10, 0, 0, 0).getTime() }),
+        ],
+        noon
+      )
+    ).toBe(1);
+    expect(
+      countedDayStreak(
+        [
+          entry({ id: 'gap', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 21, 10, 0, 0, 0).getTime() }),
+          entry({ id: 'today', minutes: 25, ended: 'completed', startMs: new Date(2026, 9, 23, 10, 0, 0, 0).getTime() }),
+        ],
+        noon
+      )
+    ).toBe(1);
+    expect(
+      countedDayStreak(
+        [entry({ id: 'short', minutes: 10, ended: 'ended-early', startMs: new Date(2026, 9, 22, 10, 0, 0, 0).getTime() })],
+        noon
+      )
+    ).toBe(0);
+    expect(formatReturnLine(50, 3)).toBe('50m today · 3 day streak');
+    expect(formatReturnLine(50, 3)).not.toMatch(/[—–]/);
+    expect(formatReturnLine(0, 3)).toBe('0m today · 3 day streak');
+    expect(formatReturnLine(0, 1)).toBeNull();
+    expect(formatFocusedToday(105, 3)).toBe('1h 45m focused today · 3 day streak');
+    expect(formatFocusedToday(105, 1)).toBe('1h 45m focused today.');
+  });
+
+  it('holds growth size still, then layers the original idle and focus pulse', () => {
+    const still = orbVisualState({ minutes: 50, moment: 'still' });
+    expect(still.breath).toBe(1);
+    expect(still.look.scale).toBe(stageForMinutes(50).look.scale);
+    expect(IDLE_BREATH_STEP).toBe(0.008);
+    expect(IDLE_BREATH_FREQ).toBe(0.45);
+    expect(IDLE_BREATH_AMP_GATHERED).toBe(0.05);
+    expect(IDLE_BREATH_AMP_SCATTERED).toBe(0.03);
+    expect(idleBreathScale(Math.PI / (2 * IDLE_BREATH_FREQ), 0)).toBeCloseTo(1.05);
+    expect(idleBreathScale(1, 0, true)).toBe(1);
+    const idle = liveOrbPulse({
+      moment: 'still',
+      settleOrBloomBreath: 1,
+      pulseTime: Math.PI / (2 * IDLE_BREATH_FREQ),
+      scatter: 0,
+      nowMs: 0,
+    });
+    expect(idle.breath).toBeCloseTo(1.05);
+    expect(idle.glowBoost).toBe(0);
+    const focusing = liveOrbPulse({
+      moment: 'focusing',
+      settleOrBloomBreath: 1,
+      pulseTime: 0,
+      scatter: 0,
+      nowMs: 2_500,
+    });
+    expect(focusing.breath).toBeGreaterThan(1.07);
+    expect(focusing.glowBoost).toBeGreaterThan(0.9);
+    expect(
+      liveOrbPulse({
+        moment: 'focusing',
+        settleOrBloomBreath: 1,
+        pulseTime: 0,
+        scatter: 0,
+        nowMs: 2_500,
+        reducedMotion: true,
+      }).breath
+    ).toBe(1);
+    expect(focusDriftScale(1_000, true)).toBe(1);
+    expect(growthPointScale(still.look, idle.breath, 1)).toBeGreaterThan(still.look.scale);
+  });
+
+  it('mixes looks without shrinking the cap', () => {
+    const a = stageForMinutes(150).look;
+    const b = stageForMinutes(240).look;
+    expect(mixLooks(a, b, 1).scale).toBe(1);
+    expect(mixLooks(a, b, 1).halo).toBe(1);
+  });
+});
+
+describe('preview and settle gates', () => {
+  it('reads orb preview keys and forced minutes', () => {
+    expect(isOrbPreviewKey('cluster')).toBe(true);
+    expect(isOrbPreviewKey('bloom')).toBe(true);
+    expect(isOrbPreviewKey('empty')).toBe(false);
+    expect(isOrbPreviewKey('orb-cluster'.slice(4))).toBe(true);
+    expect(previewMinutes('radiant')).toBe(240);
+    expect(previewMinutes('bloom')).toBe(ORB_BLOOM_PREVIEW_BEFORE + ORB_BLOOM_PREVIEW_SESSION);
+    expect(resolveDisplayMinutes({ logMinutes: 12, preview: 'full', orbMinutesParam: null })).toBe(
+      150
+    );
+    expect(resolveDisplayMinutes({ logMinutes: 12, preview: null, orbMinutesParam: '88' })).toBe(88);
+    expect(formatFocusedToday(105)).toBe('1h 45m focused today.');
+    expect(formatFocusedToday(105)).not.toMatch(/[—–]/);
+    expect(visibleFocusedTodayMinutes(0, 1, false)).toBe(1);
+    expect(visibleFocusedTodayMinutes(0, 50, true)).toBe(0);
+    expect(visibleFocusedTodayMinutes(50, 50, true)).toBe(50);
+    expect(formatFocusedToday(visibleFocusedTodayMinutes(0, 1, false))).toBe(
+      '1m focused today.'
+    );
+  });
+
+  it('plays settle once per visit unless forced or skipped', () => {
+    expect(
+      shouldPlaySettle({
+        settleParam: null,
+        preview: null,
+        sessionPlayed: false,
+        introOpen: false,
+        focusing: false,
+        miniOnly: false,
+        firstOpen: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldPlaySettle({
+        settleParam: '0',
+        preview: null,
+        sessionPlayed: false,
+        introOpen: false,
+        focusing: false,
+        miniOnly: false,
+        firstOpen: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldPlaySettle({
+        settleParam: null,
+        preview: 'cluster',
+        sessionPlayed: false,
+        introOpen: false,
+        focusing: false,
+        miniOnly: false,
+        firstOpen: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldPlaySettle({
+        settleParam: null,
+        preview: 'settle',
+        sessionPlayed: true,
+        introOpen: false,
+        focusing: false,
+        miniOnly: false,
+        firstOpen: false,
+      })
+    ).toBe(true);
+  });
+});
+
+describe('settle session flag', () => {
+  beforeEach(() => {
+    sessionStorage.removeItem(SETTLE_SESSION_KEY);
+  });
+
+  it('remembers a skipped or finished settle for this visit', () => {
+    expect(loadSettlePlayed()).toBe(false);
+    markSettlePlayed();
+    expect(loadSettlePlayed()).toBe(true);
+  });
+});

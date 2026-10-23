@@ -4,12 +4,16 @@ import {
   attachGoogleAccessToSession,
   authSecret,
   authUrl,
+  GOOGLE_CALENDAR_AUTH,
   GOOGLE_CALENDAR_SCOPES,
+  GOOGLE_IDENTITY_AUTH,
+  GOOGLE_IDENTITY_SCOPES,
   googleClientId,
   googleClientSecret,
   googleJwtNeedsRefresh,
   isGoogleAuthConfigured,
   refreshGoogleAccessToken,
+  sessionHasCalendarAccess,
   unconfiguredSessionBody,
 } from './googleAuth';
 
@@ -52,10 +56,20 @@ describe('Google auth env aliases', () => {
     expect(unconfiguredSessionBody()).toBeNull();
   });
 
-  it('requests calendar.readonly so events can load after sign-in', () => {
+  it('splits identity sign-in from incremental calendar scopes', () => {
+    expect(GOOGLE_IDENTITY_SCOPES).toBe('openid email profile');
+    expect(GOOGLE_IDENTITY_SCOPES).not.toContain('calendar');
+    expect(GOOGLE_IDENTITY_AUTH.scope).toBe(GOOGLE_IDENTITY_SCOPES);
     expect(GOOGLE_CALENDAR_SCOPES).toContain(
       'https://www.googleapis.com/auth/calendar.readonly'
     );
+    expect(GOOGLE_CALENDAR_SCOPES).toContain(
+      'https://www.googleapis.com/auth/calendar.events.readonly'
+    );
+    expect(GOOGLE_CALENDAR_SCOPES).not.toContain('calendar.write');
+    expect(GOOGLE_CALENDAR_SCOPES).not.toMatch(/vercel\.app/);
+    expect(GOOGLE_CALENDAR_AUTH.include_granted_scopes).toBe('true');
+    expect(GOOGLE_CALENDAR_AUTH.scope).toBe(GOOGLE_CALENDAR_SCOPES);
   });
 });
 
@@ -67,13 +81,42 @@ describe('Google tokens on the session', () => {
         access_token: 'ya29.access',
         refresh_token: '1//refresh',
         expires_at: 1_700_000_000,
+        providerAccountId: 'sub-amy',
+        scope: GOOGLE_IDENTITY_SCOPES,
       }
     );
     expect(token.accessToken).toBe('ya29.access');
     expect(token.refreshToken).toBe('1//refresh');
+    expect(token.googleSub).toBe('sub-amy');
+    expect(token.hasCalendar).toBe(false);
 
-    const session = attachGoogleAccessToSession({ user: { email: 'amy@x.com' } }, token);
+    const session = attachGoogleAccessToSession(
+      { user: { email: 'amy@x.com', id: undefined as string | undefined } },
+      token
+    );
     expect(session.accessToken).toBe('ya29.access');
+    expect(session.user?.id).toBe('sub-amy');
+    expect(session.hasCalendar).toBe(false);
+    expect(sessionHasCalendarAccess(session)).toBe(false);
+  });
+
+  it('marks calendar on after incremental consent', () => {
+    const token = applyGoogleAccountToToken(
+      { googleSub: 'sub-amy', hasCalendar: false, accessToken: 'old' },
+      {
+        access_token: 'ya29.cal',
+        refresh_token: '1//refresh',
+        expires_at: 1_700_000_000,
+        providerAccountId: 'sub-amy',
+        scope: GOOGLE_CALENDAR_SCOPES,
+      }
+    );
+    expect(token.hasCalendar).toBe(true);
+    expect(sessionHasCalendarAccess(token)).toBe(true);
+  });
+
+  it('keeps calendar on for older sessions that already have a token', () => {
+    expect(sessionHasCalendarAccess({ accessToken: 'ya29.legacy' })).toBe(true);
   });
 
   it('does not wipe an existing token when account is missing on later requests', () => {

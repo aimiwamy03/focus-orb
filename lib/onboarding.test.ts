@@ -18,6 +18,18 @@ describe('isFirstOpen', () => {
     ).toBe(true);
   });
 
+  it('skips the welcome screen for an orb growth preview', () => {
+    expect(
+      isFirstOpen({
+        mockScenario: null,
+        isGoogleConnected: false,
+        calendarUrl: '',
+        authMethod: null,
+        homePreview: true,
+      })
+    ).toBe(false);
+  });
+
   it('skips the welcome screen for a WHOOP mock without sign-in', () => {
     expect(
       isFirstOpen({
@@ -26,6 +38,18 @@ describe('isFirstOpen', () => {
         calendarUrl: '',
         authMethod: null,
         whoopDemo: true,
+      })
+    ).toBe(false);
+  });
+
+  it('skips the welcome screen after Start focusing', () => {
+    expect(
+      isFirstOpen({
+        mockScenario: null,
+        isGoogleConnected: false,
+        calendarUrl: '',
+        authMethod: null,
+        guestStart: true,
       })
     ).toBe(false);
   });
@@ -52,7 +76,9 @@ describe('interpretAuthSession', () => {
     expect(view).toEqual({
       signedIn: true,
       hasGoogleAccess: true,
+      hasCalendar: true,
       email: 'amy@example.com',
+      userId: null,
     });
     expect(shouldUseGoogleFromSession(view)).toBe(true);
   });
@@ -61,7 +87,9 @@ describe('interpretAuthSession', () => {
     expect(interpretAuthSession({})).toEqual({
       signedIn: false,
       hasGoogleAccess: false,
+      hasCalendar: false,
       email: null,
+      userId: null,
     });
     expect(shouldUseGoogleFromSession(interpretAuthSession(null))).toBe(false);
   });
@@ -70,8 +98,21 @@ describe('interpretAuthSession', () => {
     const view = interpretAuthSession({ user: { email: 'amy@example.com' } });
     expect(view.signedIn).toBe(true);
     expect(view.hasGoogleAccess).toBe(false);
+    expect(view.hasCalendar).toBe(false);
     expect(view.email).toBe('amy@example.com');
     expect(shouldUseGoogleFromSession(view)).toBe(true);
+  });
+
+  it('treats identity-only sign-in as signed in without calendar', () => {
+    const view = interpretAuthSession({
+      user: { email: 'amy@example.com', id: 'sub-amy' },
+      accessToken: 'ya29.identity',
+      hasCalendar: false,
+    });
+    expect(view.signedIn).toBe(true);
+    expect(view.hasGoogleAccess).toBe(true);
+    expect(view.hasCalendar).toBe(false);
+    expect(view.userId).toBe('sub-amy');
   });
 });
 

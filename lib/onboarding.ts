@@ -6,6 +6,8 @@ export interface FirstOpenState {
   calendarUrl: string;
   authMethod: AuthMethod;
   whoopDemo?: boolean;
+  homePreview?: boolean;
+  guestStart?: boolean;
 }
 
 export function isFirstOpen({
@@ -14,10 +16,14 @@ export function isFirstOpen({
   calendarUrl,
   authMethod,
   whoopDemo = false,
+  homePreview = false,
+  guestStart = false,
 }: FirstOpenState): boolean {
   return (
+    !guestStart &&
     !mockScenario &&
     !whoopDemo &&
+    !homePreview &&
     !isGoogleConnected &&
     !calendarUrl &&
     authMethod !== 'google' &&
@@ -28,7 +34,9 @@ export function isFirstOpen({
 export interface AuthSessionView {
   signedIn: boolean;
   hasGoogleAccess: boolean;
+  hasCalendar: boolean;
   email: string | null;
+  userId: string | null;
 }
 
 export function isGoogleConfigured(
@@ -38,28 +46,51 @@ export function isGoogleConfigured(
 }
 
 export const WELCOME_LINE = 'A quiet timer that watches your calendar.';
+export const START_FOCUSING_LABEL = 'Start focusing';
 export const CONNECT_LABEL = 'Connect your calendar';
 export const SAMPLE_DAY_LINK = 'Try a sample day';
+export const GUEST_START_KEY = 'focusOrb:guestStart';
+
+export function loadGuestStart(): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  return sessionStorage.getItem(GUEST_START_KEY) === '1';
+}
+
+export function markGuestStart(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(GUEST_START_KEY, '1');
+}
 
 export function interpretAuthSession(payload: unknown): AuthSessionView {
   if (!payload || typeof payload !== 'object') {
-    return { signedIn: false, hasGoogleAccess: false, email: null };
+    return {
+      signedIn: false,
+      hasGoogleAccess: false,
+      hasCalendar: false,
+      email: null,
+      userId: null,
+    };
   }
 
   const session = payload as {
-    user?: { email?: string | null; name?: string | null } | null;
+    user?: { email?: string | null; name?: string | null; id?: string | null } | null;
     accessToken?: unknown;
+    hasCalendar?: unknown;
   };
 
   const email =
     typeof session.user?.email === 'string' && session.user.email.trim()
       ? session.user.email
       : null;
+  const userId =
+    typeof session.user?.id === 'string' && session.user.id.trim() ? session.user.id : null;
   const signedIn = Boolean(session.user && (email || session.user.name));
   const hasGoogleAccess =
     typeof session.accessToken === 'string' && session.accessToken.length > 0;
+  const hasCalendar =
+    session.hasCalendar === true || (session.hasCalendar !== false && hasGoogleAccess);
 
-  return { signedIn, hasGoogleAccess, email };
+  return { signedIn, hasGoogleAccess, hasCalendar, email, userId };
 }
 
 export function shouldUseGoogleFromSession(view: AuthSessionView): boolean {

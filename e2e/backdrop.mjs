@@ -31,6 +31,7 @@ function seedScript(options) {
   return (opts) => {
     localStorage.clear();
     sessionStorage.setItem('focusOrb:introPlayed', '1');
+    sessionStorage.setItem('focusOrb:settlePlayed', '1');
     if (opts.shortcutsSeen) localStorage.setItem('focusOrb:shortcutsCard', '1');
     localStorage.setItem('focusOrb:hints', opts.hints);
     if (opts.backdrop === false) localStorage.setItem('focusOrb:showBackdrop', '0');
@@ -287,7 +288,10 @@ await focus.close();
 const logPage = await open(browser, '/?mock=empty', { width: 1280, height: 800 }, { log: logFixture() });
 await logPage.mouse.move(1100, 24);
 await logPage.waitForTimeout(200);
-await logPage.getByTestId('focus-log-open').click();
+if ((await logPage.getByTestId('focus-task').count()) === 1) {
+  await logPage.getByTestId('focus-task').blur();
+}
+await logPage.keyboard.press('l');
 await logPage.waitForSelector('[data-testid="focus-log"]');
 await publish(logPage, 'backdrop_log_1280.png');
 await copyFile(
@@ -326,7 +330,7 @@ await introPage.addInitScript(() => {
   sessionStorage.clear();
   localStorage.setItem('focusOrb:shortcutsCard', '1');
 });
-await introPage.goto(`${BASE}/?mock=empty&intro=1`, { waitUntil: 'networkidle' });
+await introPage.goto(`${BASE}/?mock=empty&intro=1&settle=0`, { waitUntil: 'networkidle' });
 await introPage.waitForSelector('[data-testid="focus-intro"]');
 if ((await introPage.getByTestId('star-dust-backdrop').count()) !== 1) {
   fail('Backdrop should already be mounted under the intro');

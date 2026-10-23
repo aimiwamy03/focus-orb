@@ -4,19 +4,31 @@ import {
   exchangeWhoopCode,
   factsFromWhoopPayloads,
   refreshWhoopTokens,
+  revokeWhoopSession,
   revokeWhoopToken,
   summarizeWhoopToday,
   type FetchLike,
 } from './whoopClient';
-import { whoopNeedsRefresh, type WhoopTokenSet } from './whoopAuth';
-import { handleWhoopCallback, handleWhoopDisconnect, handleWhoopToday } from './whoopRoutes';
-import { encryptWhoopPayload } from './whoopAuth';
+import {
+  createWhoopState,
+  encryptWhoopPayload,
+  whoopNeedsRefresh,
+  type WhoopTokenSet,
+} from './whoopAuth';
+import {
+  handleWhoopCallback,
+  handleWhoopConnect,
+  handleWhoopDisconnect,
+  handleWhoopToday,
+} from './whoopRoutes';
+import { WHOOP_INVITE_ONLY_MESSAGE, WHOOP_RECONNECT_LABEL, WHOOP_REVOKE_APP_LABEL } from './whoop';
 
 const ENV = {
   WHOOP_CLIENT_ID: 'whoop-id',
   WHOOP_CLIENT_SECRET: 'whoop-secret',
   AUTH_SECRET: 'test-nextauth-secret-value',
   NEXTAUTH_URL: 'http://localhost:3000',
+  WHOOP_INVITE_EMAILS: 'amy@example.com',
 };
 
 const ENDPOINTS: WhoopEndpoints = {
@@ -43,6 +55,7 @@ class FakeWhoop {
   refreshCalls = 0;
   revokeCalls: string[] = [];
   failRefresh = 0;
+  failRevoke = 0;
   statusByPath = new Map<string, number>();
   recoveries: unknown[] = [
     {
@@ -57,6 +70,11 @@ class FakeWhoop {
       score: {
         sleep_performance_percentage: 90,
         sleep_needed: { need_from_sleep_debt_milli: 0 },
+        stage_summary: {
+          total_light_sleep_time_milli: 3 * 60 * 60 * 1000,
+          total_slow_wave_sleep_time_milli: 90 * 60 * 1000,
+          total_rem_sleep_time_milli: 70 * 60 * 1000,
+        },
       },
     },
     {
@@ -103,6 +121,10 @@ class FakeWhoop {
     if (path === ENDPOINTS.revoke) {
       const body = new URLSearchParams(init?.body ?? '');
       this.revokeCalls.push(body.get('token') ?? '');
+      if (this.failRevoke > 0) {
+        this.failRevoke -= 1;
+        return jsonResponse(401, { error: 'expired' });
+      }
       return jsonResponse(200, {});
     }
     if (path.endsWith('/recovery')) return jsonResponse(200, { records: this.recoveries });
@@ -115,6 +137,7 @@ class FakeWhoop {
 
 function tokens(partial: Partial<WhoopTokenSet> = {}): WhoopTokenSet {
   return {
+    userId: 'sub-amy',
     email: 'amy@example.com',
     accessToken: 'access-1',
     refreshToken: 'refresh-1',
@@ -122,6 +145,8 @@ function tokens(partial: Partial<WhoopTokenSet> = {}): WhoopTokenSet {
     ...partial,
   };
 }
+
+const AMY = { email: 'amy@example.com', userId: 'sub-amy' };
 
 describe('WHOOP payload mapping', () => {
   it('ignores naps and maps pending, unscorable, and calibrating', () => {
@@ -135,6 +160,7 @@ describe('WHOOP payload mapping', () => {
     });
     expect(pending.recoveryState).toBe('pending');
     expect(pending.sleepPerformance).toBeNull();
+    expect(pending.sleepMinutes).toBeNull();
 
     const calibrating = factsFromWhoopPayloads({
       recoveries: [
@@ -156,6 +182,29 @@ describe('WHOOP payload mapping', () => {
     });
     expect(missing.recoveryState).toBe('unscorable');
     expect(missing.recovery).toBeNull();
+    expect(missing.sleepMinutes).toBeNull();
+
+    const slept = factsFromWhoopPayloads({
+      recoveries: [{ score_state: 'SCORED', score: { recovery_score: 42 } }],
+      sleeps: [
+        {
+          nap: false,
+          score: {
+            sleep_performance_percentage: 72,
+            stage_summary: {
+              total_light_sleep_time_milli: 3 * 60 * 60 * 1000,
+              total_slow_wave_sleep_time_milli: 90 * 60 * 1000,
+              total_rem_sleep_time_milli: 80 * 60 * 1000,
+            },
+          },
+        },
+      ],
+      cycles: [],
+      workouts: [],
+      nowMs: now,
+    });
+    expect(slept.sleepMinutes).toBe(350);
+    expect(slept.sleepPerformance).toBe(72);
   });
 });
 
@@ -224,6 +273,7 @@ describe('WHOOP fake server', () => {
         recovery: 82,
         recoveryState: 'scored' as const,
         sleepPerformance: 90,
+        sleepMinutes: 440,
         sleepDebtMinutes: 0,
         yesterdayStrain: 11,
         lastWorkoutEndedAt: null,
@@ -268,24 +318,71 @@ describe('WHOOP fake server', () => {
     });
     const sealed = encryptWhoopPayload(tokens(), ENV.AUTH_SECRET);
     const result = await handleWhoopDisconnect({
-      session: { email: 'amy@example.com' },
+      session: AMY,
       cookie: sealed,
       env: ENV,
       fetchImpl: whoop.fetch,
       endpoints: ENDPOINTS,
     });
-    expect(result.body).toEqual({ connected: false, status: 'disconnected' });
+    expect(result.body).toMatchObject({ connected: false, status: 'disconnected' });
     expect(result.cookies?.some((cookie) => cookie.name === 'whoop_session' && cookie.clear)).toBe(
       true
     );
   });
 
+  it('refreshes an expired token then revokes, or asks to remove the app', async () => {
+    const expired = new FakeWhoop();
+    expired.failRevoke = 2;
+    const first = await revokeWhoopSession(tokens(), {
+      fetchImpl: expired.fetch,
+      env: ENV,
+      endpoints: ENDPOINTS,
+    });
+    expect(first).toBe(true);
+    expect(expired.refreshCalls).toBe(1);
+    expect(expired.revokeCalls.length).toBeGreaterThan(2);
+
+    const stuck = new FakeWhoop();
+    stuck.failRevoke = 99;
+    stuck.failRefresh = 99;
+    const failed = await handleWhoopDisconnect({
+      session: AMY,
+      cookie: encryptWhoopPayload(tokens(), ENV.AUTH_SECRET),
+      env: ENV,
+      fetchImpl: stuck.fetch,
+      endpoints: ENDPOINTS,
+    });
+    expect(failed.body).toMatchObject({
+      connected: false,
+      status: 'disconnected',
+      message: WHOOP_REVOKE_APP_LABEL,
+    });
+    expect(failed.cookies?.some((cookie) => cookie.name === 'whoop_session' && cookie.clear)).toBe(
+      true
+    );
+  });
+
+  it('asks to reconnect WHOOP after a refresh token rotation miss', async () => {
+    const whoop = new FakeWhoop();
+    whoop.failRefresh = 99;
+    const { summary } = await summarizeWhoopToday(tokens({ expiresAt: 1_000 }), {
+      fetchImpl: whoop.fetch,
+      env: ENV,
+      endpoints: ENDPOINTS,
+      nowMs: 1_000,
+    });
+    expect(summary.status).toBe('reconnect');
+    expect(summary.message).toBe(WHOOP_RECONNECT_LABEL);
+    expect(summary.connected).toBe(false);
+  });
+
   it('rejects a callback when the state cookie does not match', async () => {
     const whoop = new FakeWhoop();
+    const state = createWhoopState('sub-amy', ENV.AUTH_SECRET);
     const result = await handleWhoopCallback({
-      session: { email: 'amy@example.com' },
-      requestUrl: 'http://localhost:3000/api/whoop/callback?code=x&state=aaaaaaaab',
-      stateCookie: 'bbbbbbbbb',
+      session: AMY,
+      requestUrl: `http://localhost:3000/api/whoop/callback?code=x&state=${state}`,
+      stateCookie: createWhoopState('sub-amy', ENV.AUTH_SECRET),
       env: ENV,
       fetchImpl: whoop.fetch,
       endpoints: ENDPOINTS,
@@ -294,12 +391,13 @@ describe('WHOOP fake server', () => {
     expect(result.cookies?.some((cookie) => cookie.name === 'whoop_session')).toBeFalsy();
   });
 
-  it('saves tokens on a valid callback and hides them from other emails', async () => {
+  it('saves tokens on a valid callback and rejects a different Google sub', async () => {
     const whoop = new FakeWhoop();
+    const state = createWhoopState('sub-amy', ENV.AUTH_SECRET);
     const callback = await handleWhoopCallback({
-      session: { email: 'amy@example.com' },
-      requestUrl: 'http://localhost:3000/api/whoop/callback?code=ok&state=abcdefghij',
-      stateCookie: 'abcdefghij',
+      session: AMY,
+      requestUrl: `http://localhost:3000/api/whoop/callback?code=ok&state=${state}`,
+      stateCookie: state,
       env: ENV,
       fetchImpl: whoop.fetch,
       endpoints: ENDPOINTS,
@@ -307,17 +405,30 @@ describe('WHOOP fake server', () => {
     const cookie = callback.cookies?.find((item) => item.name === 'whoop_session')?.value;
     expect(cookie).toBeTruthy();
 
-    const other = await handleWhoopToday({
-      session: { email: 'other@example.com' },
+    const otherEmail = await handleWhoopToday({
+      session: { userId: 'sub-amy', email: 'other@example.com' },
       cookie,
       env: ENV,
       fetchImpl: whoop.fetch,
       endpoints: ENDPOINTS,
     });
-    expect(other.body).toMatchObject({ connected: false, status: 'disconnected' });
+    expect(otherEmail.body).toMatchObject({ connected: false, status: 'disconnected' });
+    expect(otherEmail.cookies?.some((item) => item.name === 'whoop_session' && item.clear)).toBe(
+      true
+    );
+
+    const otherSub = await handleWhoopToday({
+      session: { userId: 'sub-b', email: 'amy@example.com' },
+      cookie,
+      env: ENV,
+      fetchImpl: whoop.fetch,
+      endpoints: ENDPOINTS,
+    });
+    expect(otherSub.body).toMatchObject({ connected: false, status: 'disconnected' });
+    expect(otherSub.cookies?.some((item) => item.name === 'whoop_session' && item.clear)).toBe(true);
 
     const mine = await handleWhoopToday({
-      session: { email: 'amy@example.com' },
+      session: AMY,
       cookie,
       env: ENV,
       fetchImpl: whoop.fetch,
@@ -326,6 +437,49 @@ describe('WHOOP fake server', () => {
     });
     expect(mine.body).toMatchObject({ connected: true, status: 'ok' });
     expect((mine.body as { facts: { recovery: number } }).facts.recovery).toBe(82);
+    const setCookie = mine.cookies?.find((item) => item.name === 'whoop_session')?.value ?? '';
+    expect(setCookie).not.toContain('recovery');
+  });
+
+  it('refuses connect and callback when the email is not invited', async () => {
+    const whoop = new FakeWhoop();
+    const empty = handleWhoopConnect({
+      session: AMY,
+      requestUrl: 'http://localhost:3000/api/whoop/connect',
+      env: { ...ENV, WHOOP_INVITE_EMAILS: '' },
+    });
+    expect(empty).toMatchObject({
+      status: 403,
+      body: { error: WHOOP_INVITE_ONLY_MESSAGE },
+    });
+
+    const other = handleWhoopConnect({
+      session: AMY,
+      requestUrl: 'http://localhost:3000/api/whoop/connect',
+      env: { ...ENV, WHOOP_INVITE_EMAILS: 'other@example.com' },
+    });
+    expect(other.status).toBe(403);
+
+    const state = createWhoopState('sub-amy', ENV.AUTH_SECRET);
+    const callback = await handleWhoopCallback({
+      session: AMY,
+      requestUrl: `http://localhost:3000/api/whoop/callback?code=ok&state=${state}`,
+      stateCookie: state,
+      env: { ...ENV, WHOOP_INVITE_EMAILS: 'other@example.com' },
+      fetchImpl: whoop.fetch,
+      endpoints: ENDPOINTS,
+    });
+    expect(callback.redirect).toContain('whoopError=invite');
+    expect(callback.cookies?.some((item) => item.name === 'whoop_session')).toBeFalsy();
+  });
+
+  it('sets private no-store on WHOOP responses', async () => {
+    const { whoopResponse } = await import('./whoopHttp');
+    const response = whoopResponse({
+      status: 200,
+      body: { connected: false, status: 'disconnected', facts: null },
+    });
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
   });
 });
 

@@ -1,4 +1,4 @@
-import { recoveryStateFromWhoop, WHOOP_SCOPES } from './whoop';
+import { recoveryStateFromWhoop, WHOOP_RECONNECT_LABEL, WHOOP_SCOPES } from './whoop';
 import {
   WHOOP_ENDPOINTS,
   isWhoopConfigured,
@@ -218,7 +218,7 @@ export async function refreshWhoopTokens(
   tokens: WhoopTokenSet,
   options: WhoopClientOptions & { readTokens?: ReadTokens; writeTokens?: WriteTokens } = {}
 ): Promise<WhoopTokenSet> {
-  const key = tokens.email.toLowerCase();
+  const key = tokens.userId || tokens.email.toLowerCase();
   const existing = inflightRefresh.get(key);
   if (existing) return existing;
 
@@ -253,11 +253,11 @@ export async function refreshWhoopTokens(
 export async function revokeWhoopToken(
   token: string,
   options: WhoopClientOptions = {}
-): Promise<void> {
+): Promise<boolean> {
   const env = envOf(options);
   const clientId = whoopClientId(env);
   const clientSecret = whoopClientSecret(env);
-  if (!clientId || !clientSecret) return;
+  if (!clientId || !clientSecret) return false;
   try {
     await whoopFetch(
       endpointsOf(options).revoke,
@@ -272,8 +272,28 @@ export async function revokeWhoopToken(
       },
       options
     );
+    return true;
   } catch {
-    // Disconnect still succeeds locally if WHOOP is down.
+    return false;
+  }
+}
+
+export async function revokeWhoopSession(
+  tokens: WhoopTokenSet,
+  options: WhoopClientOptions & { readTokens?: ReadTokens; writeTokens?: WriteTokens } = {}
+): Promise<boolean> {
+  const tryRevoke = async (current: WhoopTokenSet) => {
+    const refreshOk = await revokeWhoopToken(current.refreshToken, options);
+    const accessOk = await revokeWhoopToken(current.accessToken, options);
+    return refreshOk && accessOk;
+  };
+
+  if (await tryRevoke(tokens)) return true;
+  try {
+    const refreshed = await refreshWhoopTokens(tokens, options);
+    return await tryRevoke(refreshed);
+  } catch {
+    return false;
   }
 }
 
@@ -295,8 +315,39 @@ interface WhoopSleepRecord {
   score?: {
     sleep_performance_percentage?: number;
     sleep_needed?: { need_from_sleep_debt_milli?: number };
+    stage_summary?: {
+      total_sleep_time_milli?: number;
+      total_light_sleep_time_milli?: number;
+      total_slow_wave_sleep_time_milli?: number;
+      total_rem_sleep_time_milli?: number;
+      total_in_bed_time_milli?: number;
+      total_awake_time_milli?: number;
+    };
   } | null;
   end?: string | null;
+}
+
+export function sleepMinutesFromScore(
+  score: WhoopSleepRecord['score'] | null | undefined
+): number | null {
+  if (!score) return null;
+  const stages = score.stage_summary;
+  if (!stages) return null;
+  if (typeof stages.total_sleep_time_milli === 'number') {
+    return stages.total_sleep_time_milli / 60_000;
+  }
+  const light = stages.total_light_sleep_time_milli;
+  const sws = stages.total_slow_wave_sleep_time_milli;
+  const rem = stages.total_rem_sleep_time_milli;
+  if (typeof light === 'number' && typeof sws === 'number' && typeof rem === 'number') {
+    return (light + sws + rem) / 60_000;
+  }
+  const inBed = stages.total_in_bed_time_milli;
+  const awake = stages.total_awake_time_milli;
+  if (typeof inBed === 'number' && typeof awake === 'number') {
+    return (inBed - awake) / 60_000;
+  }
+  return null;
 }
 
 interface WhoopCycleRecord {
@@ -359,6 +410,7 @@ export function factsFromWhoopPayloads(input: {
       typeof sleep?.score?.sleep_performance_percentage === 'number'
         ? sleep.score.sleep_performance_percentage
         : null,
+    sleepMinutes: sleepMinutesFromScore(sleep?.score),
     sleepDebtMinutes:
       typeof sleep?.score?.sleep_needed?.need_from_sleep_debt_milli === 'number'
         ? sleep.score.sleep_needed.need_from_sleep_debt_milli / 60_000
@@ -407,7 +459,19 @@ export async function summarizeWhoopToday(
   const nowMs = options.nowMs ?? Date.now();
   let current = tokens;
   if (whoopNeedsRefresh(current, nowMs)) {
-    current = await refreshWhoopTokens(current, options);
+    try {
+      current = await refreshWhoopTokens(current, options);
+    } catch {
+      const summary: WhoopCachedSummary = {
+        connected: false,
+        email: current.email,
+        status: 'reconnect',
+        facts: null,
+        fetchedAt: nowMs,
+        message: WHOOP_RECONNECT_LABEL,
+      };
+      return { tokens: current, summary };
+    }
   }
 
   try {
@@ -419,7 +483,6 @@ export async function summarizeWhoopToday(
       facts,
       fetchedAt: nowMs,
     };
-    current = { ...current, summary };
     await options.writeTokens?.(current);
     return { tokens: current, summary };
   } catch (error) {

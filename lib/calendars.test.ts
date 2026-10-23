@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   defaultSelectedCalendarIds,
+  fetchGoogleCalendarEvents,
   fetchGoogleCalendarList,
   fetchMergedGoogleEvents,
   mergeEventsFromCalendars,
@@ -176,6 +177,37 @@ describe('mocked Google API', () => {
     const onlyPrimary = await fetchMergedGoogleEvents('mock-token', ['primary'], range, fetchImpl);
     expect(onlyPrimary.map((event) => event.summary)).toEqual(['Lunch']);
     expect(onlyPrimary.some((event) => event.summary === 'Sprint planning')).toBe(false);
+  });
+
+  it('asks Google for default and fromGmail event types', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      expect(url).toContain('eventTypes=default');
+      expect(url).toContain('eventTypes=fromGmail');
+      expect(url).toContain('singleEvents=true');
+      return jsonResponse({
+        items: [
+          {
+            summary: 'Mindspace Open House',
+            eventType: 'fromGmail',
+            transparency: 'transparent',
+            start: { dateTime: '2026-10-22T09:00:00-07:00' },
+            end: { dateTime: '2026-10-22T17:00:00-07:00' },
+          },
+        ],
+      });
+    });
+    const events = await fetchGoogleCalendarEvents(
+      'mock-token',
+      'aimiw.amy03@gmail.com',
+      {
+        timeMin: '2026-10-22T00:00:00.000Z',
+        timeMax: '2026-10-23T00:00:00.000Z',
+      },
+      fetchImpl
+    );
+    expect(events[0]?.summary).toBe('Mindspace Open House');
+    expect(events[0]?.eventType).toBe('fromGmail');
+    expect(events[0]?.transparency).toBe('transparent');
   });
 
   it('keeps events from other calendars when an imported reader calendar fails', async () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SHORTCUT_ROWS, SHORTCUTS_LABEL } from '@/lib/shortcuts';
+import { SHORTCUT_ROWS, SHORTCUTS_LABEL, type ShortcutId } from '@/lib/shortcuts';
 import { KeyHint } from './KeyHint';
 
 const HINTS_KEY = 'focusOrb:hints';
@@ -29,6 +29,7 @@ interface HintsProps {
   revision?: number;
   banner?: { id: HintId; text: string } | null;
   teach?: boolean;
+  onAction?: (id: ShortcutId) => void;
 }
 
 export function Hints({
@@ -37,6 +38,7 @@ export function Hints({
   revision = 0,
   banner = null,
   teach = false,
+  onAction,
 }: HintsProps) {
   const [seen, setSeen] = useState<Record<string, boolean>>({});
   const [ready, setReady] = useState(false);
@@ -48,6 +50,7 @@ export function Hints({
   }, [revision]);
 
   const next = teach && banner && !seen[banner.id] ? banner : null;
+  const shown = chromeVisible || helpOpen;
 
   useEffect(() => {
     if (!active || !ready || !next || helpOpen) return;
@@ -83,13 +86,11 @@ export function Hints({
         type="button"
         data-testid="help-toggle"
         onClick={() => setHelpOpen((open) => !open)}
-        className={`fixed top-4 left-4 z-40 rounded-full px-3 py-1.5 text-[length:var(--type-chrome)] text-orb-quiet transition-opacity duration-300 hover:text-orb-dim ${
-          chromeVisible
-            ? 'visible opacity-100'
-            : 'invisible pointer-events-none opacity-0'
+        className={`help-toggle fixed top-4 right-4 z-40 flex h-6 w-6 items-center justify-center p-0 text-[length:var(--type-chrome)] leading-none text-orb-quiet transition-opacity duration-300 hover:text-orb-dim ${
+          shown ? 'visible opacity-100' : 'invisible pointer-events-none opacity-0'
         }`}
         aria-label={SHORTCUTS_LABEL}
-        title={SHORTCUTS_LABEL}
+        aria-expanded={helpOpen}
       >
         ?
       </button>
@@ -98,20 +99,29 @@ export function Hints({
         <div
           data-testid="short-help"
           data-text-clear
-          className="fixed top-14 left-4 z-40 max-w-xs space-y-2 text-[length:var(--type-hint)] leading-5 text-orb-dim"
+          className="fixed top-14 right-4 z-40 space-y-2 text-[length:var(--type-hint)] leading-5 text-orb-dim"
         >
           {SHORTCUT_ROWS.map((row) => (
-            <div key={row.key} className="flex items-center gap-2">
-              <KeyHint label={row.key} />
+            <button
+              key={row.id}
+              type="button"
+              data-testid={row.testId}
+              onClick={() => {
+                onAction?.(row.id);
+                setHelpOpen(false);
+              }}
+              className="chrome-row flex w-full items-center justify-end gap-2 border-0 bg-transparent p-0 text-[length:var(--type-hint)] leading-5 text-orb-dim hover:text-orb-text"
+            >
               <span>{row.action}</span>
-            </div>
+              <KeyHint label={row.key} />
+            </button>
           ))}
         </div>
       ) : next && ready && (chromeVisible || Boolean(next)) ? (
         <div
           data-testid="hint"
           data-text-clear
-          className="fixed top-14 left-4 z-40 text-[length:var(--type-hint)] leading-5 text-orb-quiet"
+          className="fixed top-14 right-4 z-40 text-right text-[length:var(--type-hint)] leading-5 text-orb-quiet"
         >
           {next.text}
         </div>

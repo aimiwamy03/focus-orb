@@ -35,6 +35,7 @@ describe('FocusLog panel', () => {
     );
     expect(screen.getByTestId('focus-log-day-label-Today').textContent).toBe('Today');
     expect(screen.getByTestId('focus-log-day-total-Today').textContent).toBe('1h 35m');
+    expect(screen.getByTestId('focus-log-day-stage-Yesterday').textContent).toBe('Forming');
     expect(screen.queryByTestId('focus-log-by-task')).toBeNull();
     const first = screen.getByTestId('focus-log-row-today-review');
     expect(first.getAttribute('data-highlighted')).toBe('true');

@@ -1,7 +1,10 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
-vi.mock('@/app/actions', () => ({ signInWithGoogle: vi.fn() }));
+vi.mock('@/app/actions', () => ({
+  signInWithGoogle: vi.fn(),
+  signInWithGoogleCalendar: vi.fn(),
+}));
 
 import { Settings } from './Settings';
 import { MOCK_GOOGLE_CALENDARS, calendarLabelTags } from '@/lib/calendars';
@@ -55,8 +58,7 @@ describe('Settings sheet', () => {
     expect(screen.getByTestId('clear-log').textContent).toBe('Clear log');
   });
 
-  it('toggles Play intro and Intro sound', () => {
-    const setPlayIntro = vi.fn();
+  it('toggles Intro sound and has no Play intro checkbox', () => {
     const setIntroSound = vi.fn();
     render(
       <Settings
@@ -74,20 +76,38 @@ describe('Settings sheet', () => {
         toggleCalendar={() => {}}
         defaultDuration={50}
         setDefaultDuration={() => {}}
-        playIntro
-        setPlayIntro={setPlayIntro}
         introSound={false}
         setIntroSound={setIntroSound}
       />
     );
-    expect(screen.getByTestId('play-intro')).toBeTruthy();
+    expect(screen.queryByTestId('play-intro')).toBeNull();
     expect(screen.getByTestId('intro-sound')).toBeTruthy();
-    expect(screen.getByText('Play intro')).toBeTruthy();
     expect(screen.getByText('Intro sound')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('play-intro'));
-    expect(setPlayIntro).toHaveBeenCalledWith(false);
     fireEvent.click(screen.getByTestId('intro-sound'));
     expect(setIntroSound).toHaveBeenCalledWith(true);
+  });
+
+  it('defaults Intro sound on when the user has never set it', () => {
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod="google"
+        selectAuthMethod={() => {}}
+        isGoogleConnected
+        disconnectGoogle={async () => {}}
+        calendars={MOCK_GOOGLE_CALENDARS}
+        selectedCalendarIds={['primary']}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        setIntroSound={() => {}}
+      />
+    );
+    expect(screen.getByTestId('intro-sound').getAttribute('aria-checked')).toBe('true');
   });
 
   it('toggles Backdrop and defaults it on', () => {
@@ -112,8 +132,8 @@ describe('Settings sheet', () => {
         setShowBackdrop={setShowBackdrop}
       />
     );
-    const toggle = screen.getByTestId('show-backdrop') as HTMLInputElement;
-    expect(toggle.checked).toBe(true);
+    const toggle = screen.getByTestId('show-backdrop');
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
     expect(screen.getByText('Backdrop')).toBeTruthy();
     fireEvent.click(toggle);
     expect(setShowBackdrop).toHaveBeenCalledWith(false);
@@ -219,8 +239,53 @@ describe('Settings sheet', () => {
       />
     );
     expect(screen.getByTestId('whoop-status').textContent).toBe('WHOOP disconnected');
-    expect(screen.getByTestId('whoop-connect').textContent).toContain('Reconnect');
+    expect(screen.getByTestId('whoop-connect').textContent).toContain('Connect WHOOP');
+    expect(screen.getByTestId('whoop-connect')).toHaveProperty('disabled', true);
+    expect(screen.getByTestId('whoop-connect').className).toMatch(/settings-link/);
+    expect(screen.getByTestId('whoop-connect').className).toMatch(/underline/);
+    expect(screen.getByTestId('whoop-connect').className).not.toMatch(/rounded|bg-black|ring-1/);
+    expect(screen.getByTestId('whoop-consent-check').getAttribute('role')).toBe('switch');
+    expect(screen.getByTestId('whoop-consent-check').className).toMatch(/settings-toggle/);
+    expect(screen.getByTestId('whoop-devices').textContent).toContain(
+      'Each device connects separately.'
+    );
+    expect(screen.getByTestId('calendar-unconfigured').className).toMatch(/settings-copy/);
+    expect(screen.getByTestId('ical-toggle').className).toMatch(/settings-link/);
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onWhoopConnect).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('whoop-consent-check'));
+    expect(screen.getByTestId('whoop-connect')).toHaveProperty('disabled', false);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onWhoopConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('says Reconnect WHOOP only after a failed refresh', () => {
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod={null}
+        selectAuthMethod={() => {}}
+        isGoogleConnected={false}
+        disconnectGoogle={async () => {}}
+        calendars={[]}
+        selectedCalendarIds={[]}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        whoopConnected={false}
+        whoopStatus="reconnect"
+        whoopMode="suggest"
+        setWhoopMode={() => {}}
+        whoopShowNumbers
+        setWhoopShowNumbers={() => {}}
+        onWhoopConnect={() => {}}
+        onWhoopDisconnect={() => {}}
+      />
+    );
+    expect(screen.getByTestId('whoop-connect').textContent).toContain('Reconnect WHOOP');
   });
 });

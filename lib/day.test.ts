@@ -5,6 +5,7 @@ import {
   mergeBusyBlocks,
   filterDayEvents,
   isSkippedEvent,
+  hidesFromAgenda,
   statusLineText,
   focusingLine,
   orbClickMinutes,
@@ -43,9 +44,10 @@ describe('isSkippedEvent / filterDayEvents', () => {
     expect(isSkippedEvent(cancelled)).toBe(true);
   });
 
-  it('skips free / transparent events', () => {
+  it('skips free / transparent events for busy time but still lists them', () => {
     const free = ev('Focus block', at(13, 30), at(14), { transparency: 'transparent' });
     expect(isSkippedEvent(free)).toBe(true);
+    expect(hidesFromAgenda(free)).toBe(false);
   });
 
   it('skips all-day events', () => {

@@ -4,14 +4,19 @@ import {
   INTRO_LINES,
   INTRO_MIN_CAPTION_PX,
   INTRO_SKIP_HINT,
+  INTRO_TITLE_TRACKING,
   INTRO_SOUND_LABEL,
   INTRO_TIMELINE,
-  PLAY_INTRO_LABEL,
+  REPLAY_INTRO_LABEL,
   introArtZoom,
   introClockSpeed,
   introFrame,
   introNarrow,
+  introSoundCuesAt,
   introSoundEvents,
+  introSoundPref,
+  shouldPlayEndResolve,
+  introPointerUnlocksSound,
   isIntroSkipKey,
   isStoredFocusRunning,
   loadIntroPlayed,
@@ -106,13 +111,38 @@ describe('intro gating', () => {
   it('stores session played and toggle defaults', () => {
     expect(loadIntroPlayed()).toBe(false);
     expect(loadPlayIntro()).toBe(true);
-    expect(loadIntroSound()).toBe(false);
+    expect(loadIntroSound()).toBe(true);
     markIntroPlayed();
     savePlayIntro(false);
     saveIntroSound(true);
     expect(loadIntroPlayed()).toBe(true);
     expect(loadPlayIntro()).toBe(false);
     expect(loadIntroSound()).toBe(true);
+  });
+
+  it('defaults intro sound on, and only an explicit off persists', () => {
+    expect(introSoundPref(null)).toBe(true);
+    expect(introSoundPref(undefined)).toBe(true);
+    expect(introSoundPref('1')).toBe(true);
+    expect(introSoundPref('0')).toBe(false);
+    expect(shouldPlayEndResolve({ introSound: true, reducedMotion: false })).toBe(true);
+    expect(shouldPlayEndResolve({ introSound: false, reducedMotion: false })).toBe(false);
+    expect(shouldPlayEndResolve({ introSound: true, reducedMotion: true })).toBe(false);
+    expect(loadIntroSound()).toBe(true);
+    saveIntroSound(false);
+    expect(loadIntroSound()).toBe(false);
+    localStorage.removeItem('focusOrb:introSound');
+    expect(loadIntroSound()).toBe(true);
+  });
+
+  it('aligns late audio to the current intro time without a prompt', () => {
+    const late = introSoundCuesAt(2);
+    expect(late.find((cue) => cue.name === 'bed')).toMatchObject({ when: 0, offset: 2 });
+    expect(late.some((cue) => cue.name === 'turn' && cue.when === 0)).toBe(false);
+    const early = introSoundCuesAt(0);
+    expect(early[0]).toMatchObject({ name: 'bed', when: 0, offset: 0 });
+    expect(introPointerUnlocksSound(true)).toBe(true);
+    expect(introPointerUnlocksSound(false)).toBe(false);
   });
 
   it('detects a restored focus session from localStorage', () => {
@@ -172,9 +202,12 @@ describe('intro timeline', () => {
     expect(isIntroSkipKey('a')).toBe(false);
     expect(parseIntroFreeze('3.2')).toBe(3.2);
     expect(parseIntroFreeze(null)).toBeNull();
-    const copy = [...INTRO_LINES, INTRO_SKIP_HINT, PLAY_INTRO_LABEL, INTRO_SOUND_LABEL].join(' ');
+    const copy = [...INTRO_LINES, INTRO_SKIP_HINT, REPLAY_INTRO_LABEL, INTRO_SOUND_LABEL].join(' ');
+    expect(INTRO_SKIP_HINT).toBe('Skip (Esc)');
+    expect(REPLAY_INTRO_LABEL).toBe('Replay intro');
     expect(copy).not.toMatch(/[—–]/);
     expect(INTRO_MIN_CAPTION_PX).toBeGreaterThanOrEqual(24);
+    expect(INTRO_TITLE_TRACKING).toBe('0.04em');
     expect(INTRO_HINT_COLOR).toBe('#a1a1a6');
     expect(introNarrow(375)).toBe(true);
     expect(introNarrow(1280)).toBe(false);

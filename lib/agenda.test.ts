@@ -25,7 +25,7 @@ import {
   mergeEventsFromCalendars,
   parseGoogleDate,
 } from './calendars';
-import { buildDayModel, statusLineText } from './day';
+import { buildDayModel, isSkippedEvent, statusLineText } from './day';
 
 function at(day: Date, hours: number, minutes = 0): Date {
   const next = new Date(day);
@@ -60,8 +60,13 @@ describe('formatAgendaRange', () => {
     );
   });
 
-  it('labels an event in progress as Now', () => {
-    expect(formatAgendaRange(at(wednesday, 11, 0), at(wednesday, 12, 0), wednesday)).toBe('Now');
+  it('labels an event in progress as Now, until the end clock', () => {
+    expect(formatAgendaRange(at(wednesday, 11, 0), at(wednesday, 12, 0), wednesday)).toBe(
+      'Now, until 12pm'
+    );
+    expect(formatAgendaRange(at(wednesday, 9, 0), at(wednesday, 17, 0), wednesday)).toBe(
+      'Now, until 5pm'
+    );
   });
 });
 
@@ -184,6 +189,73 @@ describe("Amy's imported Thursday week", () => {
   });
 });
 
+describe("Amy's live Thursday 11:50am", () => {
+  const now = new Date(2026, 9, 22, 11, 50, 0, 0);
+  const tomorrow = new Date(2026, 9, 23, 11, 50, 0, 0);
+  const events = [
+    ev('Mindspace Open House', at(now, 9), at(now, 17), {
+      transparency: 'transparent',
+      eventType: 'fromGmail',
+      calendarId: AMY_PRIMARY_CALENDAR_ID,
+    }),
+    ev('Production Agent Lab - Workshop', at(now, 10), at(now, 20), {
+      calendarId: AMY_SELF_IMPORT_ID,
+    }),
+    ev('Sleep', at(now, 22), at(now, 22, 30), {
+      calendarId: AMY_SELF_IMPORT_ID,
+    }),
+    ev('Zoom', at(tomorrow, 10), at(tomorrow, 11), {
+      conferenceUri: 'https://zoom.us/j/1',
+    }),
+    ev('Catch-up', at(tomorrow, 10), at(tomorrow, 11)),
+    ev('Interview', at(tomorrow, 10), at(tomorrow, 11)),
+    ev('recap with myself', at(tomorrow, 20), at(tomorrow, 20, 30), {
+      calendarId: AMY_SELF_IMPORT_ID,
+    }),
+    ev('Sleep', at(tomorrow, 22), at(tomorrow, 22, 30), {
+      calendarId: AMY_SELF_IMPORT_ID,
+    }),
+  ];
+
+  it('lists in-progress transparent fromGmail and the imported workshop', () => {
+    const leftover = remainingToday(events, now);
+    expect(leftover.map((event) => event.summary)).toEqual([
+      'Mindspace Open House',
+      'Production Agent Lab - Workshop',
+      'Sleep',
+    ]);
+    const sections = buildAgenda(events, now);
+    expect(sections[0].emptyLabel).toBeNull();
+    expect(sections[0].items.map((item) => item.title)).toEqual([
+      'Mindspace Open House',
+      'Production Agent Lab - Workshop',
+      'Sleep',
+    ]);
+    expect(sections[0].items[0].timeLabel).toBe('Now, until 5pm');
+    expect(sections[0].items[0].isNow).toBe(true);
+    expect(sections[0].items[1].timeLabel).toBe('Now, until 8pm');
+    expect(sections[1].emptyLabel).toBeNull();
+    expect(sections[1].items.map((item) => item.title)).toEqual([
+      'Zoom',
+      'Catch-up',
+      'Interview',
+      'recap with myself',
+      'Sleep',
+    ]);
+  });
+
+  it('does not treat the transparent open house as busy, but the opaque workshop is', () => {
+    expect(isSkippedEvent(events[0])).toBe(true);
+    expect(isSkippedEvent(events[1])).toBe(false);
+    const model = buildDayModel(events, now);
+    expect(model.currentEvent?.summary).toBe('Production Agent Lab - Workshop');
+    expect(model.state).toBe('in-meeting');
+    expect(model.currentRun?.events.map((event) => event.summary)).not.toContain(
+      'Mindspace Open House'
+    );
+  });
+});
+
 describe('visibility and copy', () => {
   it('builds the more specific free-until line', () => {
     expect(freeUntilThen('7:00', 'Design review')).toBe('Free until 7:00, then Design review.');
@@ -208,7 +280,7 @@ describe('visibility and copy', () => {
     expect(shouldShowAgenda({ ...base, surface: 'completed' })).toBe(true);
     expect(shouldShowAgenda({ ...base, surface: 'meeting-soon' })).toBe(true);
     expect(shouldShowAgenda({ ...base, surface: 'session-confirm' })).toBe(true);
-    expect(shouldShowAgenda({ ...base, surface: 'in-meeting' })).toBe(false);
+    expect(shouldShowAgenda({ ...base, surface: 'in-meeting' })).toBe(true);
   });
 
   it('keeps a gap between the panel and the orb', () => {

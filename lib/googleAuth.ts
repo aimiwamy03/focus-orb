@@ -1,22 +1,58 @@
-export const GOOGLE_CALENDAR_SCOPES = [
-  'openid',
-  'email',
-  'profile',
+export const GOOGLE_IDENTITY_SCOPES = 'openid email profile';
+
+export const GOOGLE_CALENDAR_EXTRA_SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/calendar.events.readonly',
+] as const;
+
+export const GOOGLE_CALENDAR_SCOPES = [
+  GOOGLE_IDENTITY_SCOPES,
+  ...GOOGLE_CALENDAR_EXTRA_SCOPES,
 ].join(' ');
+
+export const GOOGLE_IDENTITY_AUTH = {
+  scope: GOOGLE_IDENTITY_SCOPES,
+  access_type: 'offline',
+  prompt: 'consent',
+} as const;
+
+export const GOOGLE_CALENDAR_AUTH = {
+  scope: GOOGLE_CALENDAR_SCOPES,
+  access_type: 'offline',
+  prompt: 'consent',
+  include_granted_scopes: 'true',
+} as const;
 
 export interface GoogleToken {
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: number;
   error?: string;
+  googleSub?: string;
+  sub?: string;
+  googleScopes?: string;
+  hasCalendar?: boolean;
 }
 
 export interface GoogleAccountTokens {
   access_token?: string;
   refresh_token?: string | null;
   expires_at?: number;
+  providerAccountId?: string;
+  scope?: string;
+}
+
+export function googleHasCalendarScope(scope?: string | null): boolean {
+  return Boolean(scope?.includes('https://www.googleapis.com/auth/calendar.readonly'));
+}
+
+export function sessionHasCalendarAccess(session: {
+  accessToken?: string | null;
+  hasCalendar?: boolean;
+}): boolean {
+  if (!session.accessToken) return false;
+  if (session.hasCalendar === false) return false;
+  return true;
 }
 
 export function googleClientId(
@@ -58,21 +94,37 @@ export function applyGoogleAccountToToken(
   token: GoogleToken,
   account: GoogleAccountTokens | null | undefined
 ): GoogleToken {
-  if (!account?.access_token) return token;
+  let next = token;
+  if (account?.providerAccountId) {
+    next = { ...next, googleSub: account.providerAccountId };
+  }
+  if (account?.scope != null) {
+    next = {
+      ...next,
+      googleScopes: account.scope,
+      hasCalendar: googleHasCalendarScope(account.scope),
+    };
+  }
+  if (!account?.access_token) return next;
   return {
-    ...token,
+    ...next,
     accessToken: account.access_token,
-    refreshToken: account.refresh_token || token.refreshToken,
+    refreshToken: account.refresh_token || next.refreshToken,
     expiresAt: account.expires_at,
     error: undefined,
   };
 }
 
-export function attachGoogleAccessToSession<T extends object>(
-  session: T,
-  token: GoogleToken
-): T & { accessToken?: string } {
-  return Object.assign(session, { accessToken: token.accessToken });
+export function attachGoogleAccessToSession<
+  T extends { user?: { id?: string | null; email?: string | null; name?: string | null } | null },
+>(session: T, token: GoogleToken): T & { accessToken?: string; hasCalendar?: boolean } {
+  const id = token.googleSub ?? token.sub;
+  const user = session.user ? { ...session.user, id: id ?? session.user.id } : session.user;
+  return Object.assign(session, {
+    accessToken: token.accessToken,
+    hasCalendar: token.hasCalendar,
+    user,
+  });
 }
 
 export function googleJwtNeedsRefresh(

@@ -10,6 +10,8 @@ export const TYPE_CSS = `:root {
   --type-hint: ${clampCss(TYPE_SCALE.hint)};
   --type-chrome: ${clampCss(TYPE_SCALE.chrome)};
   --type-key: ${clampCss(TYPE_SCALE.key)};
+  --keycap-size: 1.5rem;
+  --keycap-radius: 0.25rem;
   --type-log-heading: ${clampCss(TYPE_SCALE.logHeading)};
   --type-log-body: ${clampCss(TYPE_SCALE.logBody)};
   --type-whoop: ${clampCss(TYPE_SCALE.whoop)};
