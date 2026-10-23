@@ -48,7 +48,7 @@ export function VoiceMicButton({
       }}
       onPointerUp={onHoldEnd}
       onPointerCancel={onHoldEnd}
-      className="fixed top-4 left-16 z-40 min-h-[44px] px-2 text-[length:var(--type-chrome)] text-orb-text hover:text-orb-dim"
+      className="min-h-[44px] bg-transparent px-0 text-left text-[length:var(--type-whoop)] leading-snug text-orb-text hover:text-white"
     >
       {VOICE_MIC_LABEL}
     </button>

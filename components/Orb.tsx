@@ -1366,8 +1366,19 @@ export function Orb() {
     >
       <StarDustBackdrop enabled={showBackdrop} />
       {!miniOnly && !showSettings && !showLog && !firstOpen ? (
-        <div className="absolute left-4 top-4 z-20">
+        <div
+          data-testid="home-start"
+          className="absolute left-4 top-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col items-start gap-2"
+        >
           <LegalLinks testId="home-legal" current="home" />
+          {!showIntro && !showShortcutsCard ? (
+            <VoiceMicButton
+              visible
+              holding={voice.phase === 'listening'}
+              onHoldStart={voice.holdStart}
+              onHoldEnd={voice.holdEnd}
+            />
+          ) : null}
         </div>
       ) : null}
       <canvas
@@ -1538,12 +1549,6 @@ export function Orb() {
         }}
       />
 
-      <VoiceMicButton
-        visible={!firstOpen && !miniOnly && !showSettings && !showLog && !showIntro && !showShortcutsCard}
-        holding={voice.phase === 'listening'}
-        onHoldStart={voice.holdStart}
-        onHoldEnd={voice.holdEnd}
-      />
       <VoiceOverlay
         phase={voice.phase}
         liveTranscript={voice.liveTranscript}
