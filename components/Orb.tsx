@@ -181,7 +181,7 @@ export function Orb() {
   const [showBackdrop, setShowBackdrop] = useState(true);
   const [showIntro, setShowIntro] = useState(false);
   const [playIntro, setPlayIntro] = useState(true);
-  const [introSound, setIntroSound] = useState(false);
+  const [introSound, setIntroSound] = useState(true);
   const [viewSize, setViewSize] = useState({ w: 1280, h: 800 });
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const cursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

@@ -183,7 +183,13 @@ if ((await settings.getByTestId('play-intro').count()) !== 1) {
 if ((await settings.getByTestId('intro-sound').count()) !== 1) {
   fail('Settings should include Intro sound');
 }
-await settings.getByTestId('play-intro').scrollIntoViewIfNeeded();
+if (!(await settings.getByTestId('intro-sound').isChecked())) {
+  fail('Intro sound should be on by default');
+}
+await settings.getByTestId('settings-body').evaluate((el) => {
+  el.scrollTop = el.scrollHeight;
+});
+await settings.getByTestId('intro-sound').waitFor();
 await publish(settings, 'intro_settings_toggles.png');
 await settings.close();
 

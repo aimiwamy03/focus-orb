@@ -187,6 +187,34 @@ export function introSoundEvents(timeline: IntroTimeline = INTRO_TIMELINE): Intr
   return events;
 }
 
+export interface IntroSoundCue {
+  name: IntroAudioName;
+  volume: number;
+  when: number;
+  offset: number;
+}
+
+export function introSoundCuesAt(
+  elapsed: number,
+  events: IntroSoundEvent[] = introSoundEvents()
+): IntroSoundCue[] {
+  const t = Math.max(0, elapsed);
+  const cues: IntroSoundCue[] = [];
+  for (const event of events) {
+    if (t <= event.at) {
+      cues.push({ name: event.name, volume: event.volume, when: event.at - t, offset: 0 });
+      continue;
+    }
+    if (event.name !== 'bed') continue;
+    cues.push({ name: event.name, volume: event.volume, when: 0, offset: t - event.at });
+  }
+  return cues;
+}
+
+export function introPointerUnlocksSound(waitingForGesture: boolean): boolean {
+  return waitingForGesture;
+}
+
 export interface IntroFrame {
   artOpacity: number;
   artTransform: string;
@@ -300,9 +328,15 @@ export function savePlayIntro(value: boolean): void {
   localStorage.setItem(PLAY_INTRO_KEY, value ? '1' : '0');
 }
 
+export const DEFAULT_INTRO_SOUND = true;
+
+export function introSoundPref(stored: string | null | undefined): boolean {
+  return stored !== '0';
+}
+
 export function loadIntroSound(): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  return localStorage.getItem(INTRO_SOUND_KEY) === '1';
+  if (typeof localStorage === 'undefined') return DEFAULT_INTRO_SOUND;
+  return introSoundPref(localStorage.getItem(INTRO_SOUND_KEY));
 }
 
 export function saveIntroSound(value: boolean): void {

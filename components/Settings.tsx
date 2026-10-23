@@ -86,7 +86,7 @@ export function Settings({
   onClearLog,
   playIntro = true,
   setPlayIntro,
-  introSound = false,
+  introSound = true,
   setIntroSound,
   showBackdrop = true,
   setShowBackdrop,

@@ -90,6 +90,31 @@ describe('Settings sheet', () => {
     expect(setIntroSound).toHaveBeenCalledWith(true);
   });
 
+  it('defaults Intro sound on when the user has never set it', () => {
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod="google"
+        selectAuthMethod={() => {}}
+        isGoogleConnected
+        disconnectGoogle={async () => {}}
+        calendars={MOCK_GOOGLE_CALENDARS}
+        selectedCalendarIds={['primary']}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        playIntro
+        setPlayIntro={() => {}}
+        setIntroSound={() => {}}
+      />
+    );
+    expect((screen.getByTestId('intro-sound') as HTMLInputElement).checked).toBe(true);
+  });
+
   it('toggles Backdrop and defaults it on', () => {
     const setShowBackdrop = vi.fn();
     render(
