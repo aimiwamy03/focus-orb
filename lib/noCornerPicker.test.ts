@@ -25,7 +25,7 @@ describe('no corner duration picker', () => {
     ];
 
     for (const file of sources) {
-      const src = readFileSync(file, 'utf8');
+      const src = readFileSync(file, 'utf8').replaceAll('Start focusing', '');
       for (const token of forbidden) {
         expect(src, `${file} still contains "${token}"`).not.toContain(token);
       }

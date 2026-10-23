@@ -42,6 +42,18 @@ describe('isFirstOpen', () => {
     ).toBe(false);
   });
 
+  it('skips the welcome screen after Start focusing', () => {
+    expect(
+      isFirstOpen({
+        mockScenario: null,
+        isGoogleConnected: false,
+        calendarUrl: '',
+        authMethod: null,
+        guestStart: true,
+      })
+    ).toBe(false);
+  });
+
   it('hides the mock onboarding after Google sign-in, even before localStorage is set', () => {
     expect(
       isFirstOpen({

@@ -107,7 +107,12 @@ import { FocusIntro } from './FocusIntro';
 import { FocusSettle } from './FocusSettle';
 import { MiniOrbView } from './MiniOrbView';
 import { ShortcutsCard } from './ShortcutsCard';
-import { isFirstOpen, isGoogleConfigured } from '@/lib/onboarding';
+import {
+  isFirstOpen,
+  isGoogleConfigured,
+  loadGuestStart,
+  markGuestStart,
+} from '@/lib/onboarding';
 import {
   isStoredFocusRunning,
   loadIntroPlayed,
@@ -221,6 +226,7 @@ export function Orb() {
   const [focusRating, setFocusRating] = useState<number | null>(null);
   const [playIntro, setPlayIntro] = useState(true);
   const [introSound, setIntroSound] = useState(true);
+  const [guestStart, setGuestStart] = useState(false);
   const [viewSize, setViewSize] = useState({ w: 1280, h: 800 });
   const overlayTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const cursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -339,6 +345,7 @@ export function Orb() {
     authMethod: calendar.authMethod,
     whoopDemo: whoop.demo,
     homePreview: Boolean(orbPreview),
+    guestStart,
   });
 
   const showChrome =
@@ -1129,6 +1136,15 @@ export function Orb() {
     setShowLog(true);
   };
 
+  const beginGuestStart = useCallback(() => {
+    markGuestStart();
+    setGuestStart(true);
+  }, []);
+
+  useEffect(() => {
+    setGuestStart(loadGuestStart());
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1138,6 +1154,12 @@ export function Orb() {
       }
       
       if (isShortcutKey(e.key)) dismissShortcutsCard();
+
+      if (firstOpenRef.current && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        beginGuestStart();
+        return;
+      }
 
       if (e.key === 'f' || e.key === 'F') {
         toggleFullscreen();
@@ -1174,7 +1196,7 @@ export function Orb() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dismissShortcutsCard, miniWindow, pipSupported]);
+  }, [beginGuestStart, dismissShortcutsCard, miniWindow, pipSupported]);
 
   const bumpHint = (id: 'click' | 'hover' | 'fullscreen') => {
     markHintSeen(id);
@@ -1220,7 +1242,10 @@ export function Orb() {
   };
 
   const handleOrbClick = () => {
-    if (firstOpen) return;
+    if (firstOpen) {
+      beginGuestStart();
+      return;
+    }
     if (showSettle) {
       finishSettle(true);
       return;
@@ -1397,7 +1422,12 @@ export function Orb() {
       <canvas
         ref={canvasRef}
         data-testid="orb-canvas"
-        className={`pointer-events-none absolute inset-0 z-[1] ${miniOnly ? 'opacity-0' : ''}`}
+        className={`absolute inset-0 z-[1] ${miniOnly ? 'opacity-0' : ''} ${
+          firstOpen ? 'pointer-events-auto' : 'pointer-events-none'
+        }`}
+        onClick={() => {
+          if (firstOpen) beginGuestStart();
+        }}
       />
 
       {mountAgenda ? <Agenda sections={agendaSections} faded={agendaFaded} /> : null}
@@ -1411,9 +1441,10 @@ export function Orb() {
         >
           {FLOATING_RESTORE_LABEL}
         </button>
-      ) : firstOpen ? (
+      ) : firstOpen && !showIntro ? (
         <Welcome
           googleConfigured={isGoogleConfigured()}
+          onStart={beginGuestStart}
           onConnect={() => {
             if (isGoogleConfigured()) {
               calendar.selectAuthMethod('google');
@@ -1423,7 +1454,7 @@ export function Orb() {
             setShowSettings(true);
           }}
         />
-      ) : (
+      ) : firstOpen ? null : (
         <div
           ref={stackRef}
           data-testid="bottom-stack"
