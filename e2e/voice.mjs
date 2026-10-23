@@ -32,6 +32,7 @@ async function seed(page) {
     (hints) => {
       localStorage.clear();
       sessionStorage.setItem('focusOrb:introPlayed', '1');
+      sessionStorage.setItem('focusOrb:settlePlayed', '1');
       localStorage.setItem('focusOrb:hints', hints);
       localStorage.setItem('focusOrb:shortcutsCard', '1');
       Object.defineProperty(window, 'speechSynthesis', {
@@ -49,9 +50,63 @@ function contrastOk(className, label) {
   }
 }
 
+function boxesIntersect(a, b) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+async function assertMicClearsNav(page, label) {
+  const nav = page.getByTestId('home-legal');
+  const mic = page.getByTestId('voice-mic');
+  if ((await nav.count()) !== 1) fail(`${label}: home nav missing`);
+  if ((await mic.count()) !== 1) fail(`${label}: Mic missing`);
+  const navBox = await nav.boundingBox();
+  const micBox = await mic.boundingBox();
+  const wordBox = await page.getByTestId('legal-home').boundingBox();
+  if (!navBox || !micBox || !wordBox) fail(`${label}: missing nav or Mic box`);
+  if (boxesIntersect(navBox, micBox)) fail(`${label}: Mic overlaps the nav`);
+  if (boxesIntersect(wordBox, micBox)) fail(`${label}: Mic overlaps Focus Orb`);
+  const style = await mic.evaluate((el) => {
+    const computed = getComputedStyle(el);
+    return {
+      size: parseFloat(computed.fontSize),
+      color: computed.color,
+      radius: computed.borderRadius,
+      bg: computed.backgroundColor,
+    };
+  });
+  if (style.size < 17) fail(`${label}: Mic should be 17px+, got ${style.size}`);
+  if (style.color !== 'rgb(232, 232, 232)') fail(`${label}: Mic should be high contrast, got ${style.color}`);
+  if (style.radius !== '0px') fail(`${label}: Mic should not be a pill, radius ${style.radius}`);
+  if (style.bg !== 'rgba(0, 0, 0, 0)' && style.bg !== 'transparent') {
+    fail(`${label}: Mic should have no fill, got ${style.bg}`);
+  }
+}
+
 const browser = await chromium.launch({ args: ['--use-gl=angle'] });
 
 try {
+  for (const width of [1440, 1280, 390]) {
+    const height = width === 390 ? 844 : 900;
+    const app = await browser.newPage({ viewport: { width, height } });
+    await seed(app);
+    await app.goto(`${BASE}/?mock=empty&intro=0`, { waitUntil: 'load' });
+    await app.waitForTimeout(400);
+    await assertMicClearsNav(app, `${width} app`);
+    await app.close();
+
+    const signedOut = await browser.newPage({ viewport: { width, height } });
+    await seed(signedOut);
+    await signedOut.goto(`${BASE}/?intro=0`, { waitUntil: 'load' });
+    await signedOut.waitForTimeout(400);
+    if ((await signedOut.getByTestId('voice-mic').count()) !== 0) {
+      fail(`${width} signed-out first open should not show Mic`);
+    }
+    if ((await signedOut.getByTestId('home-legal').count()) !== 0) {
+      fail(`${width} signed-out first open should not show the top nav`);
+    }
+    await signedOut.close();
+  }
+
   const help = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await seed(help);
   await help.goto(`${BASE}/?mock=open-afternoon&hover=1&voice=mock`, { waitUntil: 'networkidle' });
@@ -75,6 +130,7 @@ try {
   await seed(listen);
   await listen.goto(`${BASE}/?mock=open-afternoon&hover=1&voice=mock`, { waitUntil: 'networkidle' });
   await listen.waitForSelector('[data-testid="voice-mic"]');
+  await assertMicClearsNav(listen, '1280 app');
   await listen.keyboard.down('v');
   await listen.waitForSelector('[data-testid="voice-listening"]');
   const listening = listen.getByTestId('voice-listening');

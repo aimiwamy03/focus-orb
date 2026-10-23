@@ -1,11 +1,26 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { VoiceOverlay } from './VoiceOverlay';
-import { VOICE_LISTENING, VOICE_NOT_SETUP } from '@/lib/voiceCopy';
+import { VoiceMicButton, VoiceOverlay } from './VoiceOverlay';
+import { VOICE_LISTENING, VOICE_MIC_LABEL, VOICE_NOT_SETUP } from '@/lib/voiceCopy';
 
 afterEach(() => cleanup());
 
 const noop = () => {};
+
+describe('VoiceMicButton', () => {
+  it('is large high-contrast text, not a pill, and not pinned over the wordmark', () => {
+    render(
+      <VoiceMicButton visible holding={false} onHoldStart={vi.fn()} onHoldEnd={vi.fn()} />
+    );
+    const mic = screen.getByTestId('voice-mic');
+    expect(mic.textContent).toBe(VOICE_MIC_LABEL);
+    expect(mic.className).toMatch(/type-whoop/);
+    expect(mic.className).toMatch(/text-orb-text/);
+    expect(mic.className).not.toMatch(/left-16/);
+    expect(mic.className).not.toMatch(/rounded-full/);
+    expect(mic.className).not.toMatch(/bg-white/);
+  });
+});
 
 describe('VoiceOverlay', () => {
   it('shows listening, confirm, conflict, and error without pills or em dashes', () => {
