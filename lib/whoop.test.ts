@@ -24,6 +24,11 @@ import {
   WHOOP_LEARNING_LABEL,
   WHOOP_NO_DATA_LABEL,
   WHOOP_DISCONNECTED_LABEL,
+  WHOOP_RECONNECT_LABEL,
+  WHOOP_SUMMARY_KEY,
+  clearCachedWhoopSummary,
+  loadCachedWhoopSummary,
+  saveCachedWhoopSummary,
   WHOOP_USUAL,
   type WhoopFacts,
   type WhoopState,
@@ -337,6 +342,7 @@ describe('WHOOP why line and best window', () => {
 describe('settings copy and mode', () => {
   it('labels disconnected, empty, and calibrating days', () => {
     expect(whoopSettingsStatus('disconnected')).toBe(WHOOP_DISCONNECTED_LABEL);
+    expect(whoopSettingsStatus('reconnect')).toBe(WHOOP_RECONNECT_LABEL);
     expect(whoopSettingsStatus('no-data')).toBe(WHOOP_NO_DATA_LABEL);
     expect(whoopSettingsStatus('calibrating')).toBe(WHOOP_LEARNING_LABEL);
     expect(whoopSettingsStatus('ok')).toBeNull();
@@ -373,5 +379,22 @@ describe('hide line and nudge limit', () => {
     recordWhoopNudge('red', 90, 25, noon);
     expect(shouldStopWhoopNudge('red', noon)).toBe(true);
     expect(shouldStopWhoopNudge('green', noon)).toBe(false);
+  });
+});
+
+describe('WHOOP summary cache', () => {
+  it('clears the leftover local summary', () => {
+    saveCachedWhoopSummary({
+      connected: true,
+      email: 'amy@example.com',
+      status: 'ok',
+      facts: null,
+      fetchedAt: noon,
+    });
+    expect(localStorage.getItem(WHOOP_SUMMARY_KEY)).toBeTruthy();
+    expect(loadCachedWhoopSummary()?.email).toBe('amy@example.com');
+    clearCachedWhoopSummary();
+    expect(localStorage.getItem(WHOOP_SUMMARY_KEY)).toBeNull();
+    expect(loadCachedWhoopSummary()).toBeNull();
   });
 });

@@ -18,5 +18,7 @@ describe('Welcome', () => {
     expect(screen.getByTestId('welcome-line').textContent).toBe(WELCOME_LINE);
     expect(screen.queryByTestId('connect-calendar')).toBeNull();
     expect(screen.getByTestId('sample-day').textContent).toBe(SAMPLE_DAY_LINK);
+    expect(screen.getByTestId('welcome-legal').textContent).toMatch(/Health data/);
+    expect(screen.getByTestId('legal-privacy').textContent).toBe('Privacy');
   });
 });

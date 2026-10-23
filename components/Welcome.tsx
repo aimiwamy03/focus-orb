@@ -1,5 +1,6 @@
 'use client';
 
+import { LegalLinks } from './LegalLinks';
 import {
   CONNECT_LABEL,
   SAMPLE_DAY_LINK,
@@ -51,6 +52,9 @@ export function Welcome({ onConnect, googleConfigured }: WelcomeProps) {
             </a>
           </span>
         )}
+      </div>
+      <div className="pointer-events-auto mt-4 flex justify-center">
+        <LegalLinks testId="welcome-legal" />
       </div>
     </div>
   );

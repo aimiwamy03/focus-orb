@@ -1,4 +1,4 @@
-import { recoveryStateFromWhoop, WHOOP_SCOPES } from './whoop';
+import { recoveryStateFromWhoop, WHOOP_RECONNECT_LABEL, WHOOP_SCOPES } from './whoop';
 import {
   WHOOP_ENDPOINTS,
   isWhoopConfigured,
@@ -218,7 +218,7 @@ export async function refreshWhoopTokens(
   tokens: WhoopTokenSet,
   options: WhoopClientOptions & { readTokens?: ReadTokens; writeTokens?: WriteTokens } = {}
 ): Promise<WhoopTokenSet> {
-  const key = tokens.email.toLowerCase();
+  const key = tokens.userId || tokens.email.toLowerCase();
   const existing = inflightRefresh.get(key);
   if (existing) return existing;
 
@@ -253,11 +253,11 @@ export async function refreshWhoopTokens(
 export async function revokeWhoopToken(
   token: string,
   options: WhoopClientOptions = {}
-): Promise<void> {
+): Promise<boolean> {
   const env = envOf(options);
   const clientId = whoopClientId(env);
   const clientSecret = whoopClientSecret(env);
-  if (!clientId || !clientSecret) return;
+  if (!clientId || !clientSecret) return false;
   try {
     await whoopFetch(
       endpointsOf(options).revoke,
@@ -272,8 +272,28 @@ export async function revokeWhoopToken(
       },
       options
     );
+    return true;
   } catch {
-    // Disconnect still succeeds locally if WHOOP is down.
+    return false;
+  }
+}
+
+export async function revokeWhoopSession(
+  tokens: WhoopTokenSet,
+  options: WhoopClientOptions & { readTokens?: ReadTokens; writeTokens?: WriteTokens } = {}
+): Promise<boolean> {
+  const tryRevoke = async (current: WhoopTokenSet) => {
+    const refreshOk = await revokeWhoopToken(current.refreshToken, options);
+    const accessOk = await revokeWhoopToken(current.accessToken, options);
+    return refreshOk && accessOk;
+  };
+
+  if (await tryRevoke(tokens)) return true;
+  try {
+    const refreshed = await refreshWhoopTokens(tokens, options);
+    return await tryRevoke(refreshed);
+  } catch {
+    return false;
   }
 }
 
@@ -439,7 +459,19 @@ export async function summarizeWhoopToday(
   const nowMs = options.nowMs ?? Date.now();
   let current = tokens;
   if (whoopNeedsRefresh(current, nowMs)) {
-    current = await refreshWhoopTokens(current, options);
+    try {
+      current = await refreshWhoopTokens(current, options);
+    } catch {
+      const summary: WhoopCachedSummary = {
+        connected: false,
+        email: current.email,
+        status: 'reconnect',
+        facts: null,
+        fetchedAt: nowMs,
+        message: WHOOP_RECONNECT_LABEL,
+      };
+      return { tokens: current, summary };
+    }
   }
 
   try {
@@ -451,7 +483,6 @@ export async function summarizeWhoopToday(
       facts,
       fetchedAt: nowMs,
     };
-    current = { ...current, summary };
     await options.writeTokens?.(current);
     return { tokens: current, summary };
   } catch (error) {

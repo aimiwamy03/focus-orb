@@ -78,12 +78,18 @@ export const WHOOP_NUDGE_KEY = 'focusOrb:whoopNudges';
 export const WHOOP_DISCONNECTED_LABEL = 'WHOOP disconnected';
 export const WHOOP_NO_DATA_LABEL = 'No WHOOP data today';
 export const WHOOP_LEARNING_LABEL = 'WHOOP is still learning you';
-export const WHOOP_CONNECT_LABEL = 'Connect';
-export const WHOOP_RECONNECT_LABEL = 'Reconnect';
+export const WHOOP_CONNECT_LABEL = 'Connect WHOOP';
+export const WHOOP_RECONNECT_LABEL = 'Reconnect WHOOP';
 export const WHOOP_DISCONNECT_LABEL = 'Disconnect';
 export const WHOOP_SHOW_NUMBERS_LABEL = 'Show numbers';
 export const WHOOP_SECTION_LABEL = 'WHOOP';
 export const WHOOP_PENDING_LINE = 'Recovery not ready yet.';
+export const WHOOP_REVOKE_APP_LABEL = 'Remove Focus Orb in the WHOOP app.';
+export const WHOOP_INVITE_ONLY_MESSAGE = 'WHOOP is invite-only during beta.';
+export const WHOOP_DEVICES_NOTE = 'Each device connects separately.';
+export const WHOOP_CONSENT_COPY =
+  'WHOOP reads your recovery, sleep, and cycles. Those numbers stay in this browser. Focus Orb does not keep a database of them. The cookie holds only the sign-in tokens, not your scores. Disconnect in Settings to revoke access and delete the cookie.';
+export const WHOOP_CONSENT_CHECK = 'I understand and want to connect WHOOP';
 
 export type WhoopRecoveryState =
   | 'scored'
@@ -98,7 +104,8 @@ export type WhoopConnectionStatus =
   | 'pending'
   | 'no-data'
   | 'calibrating'
-  | 'error';
+  | 'error'
+  | 'reconnect';
 
 export interface WhoopFacts {
   recovery: number | null;
@@ -132,6 +139,7 @@ export interface WhoopCachedSummary {
   status: WhoopConnectionStatus;
   facts: WhoopFacts | null;
   fetchedAt: number;
+  message?: string;
 }
 
 export interface WhoopNudgeRecord {
@@ -457,6 +465,7 @@ export function suggestWhoop(
 
 export function whoopSettingsStatus(status: WhoopConnectionStatus): string | null {
   if (status === 'disconnected') return WHOOP_DISCONNECTED_LABEL;
+  if (status === 'reconnect') return WHOOP_RECONNECT_LABEL;
   if (status === 'no-data') return WHOOP_NO_DATA_LABEL;
   if (status === 'calibrating') return WHOOP_LEARNING_LABEL;
   return null;
