@@ -57,6 +57,11 @@ class FakeWhoop {
       score: {
         sleep_performance_percentage: 90,
         sleep_needed: { need_from_sleep_debt_milli: 0 },
+        stage_summary: {
+          total_light_sleep_time_milli: 3 * 60 * 60 * 1000,
+          total_slow_wave_sleep_time_milli: 90 * 60 * 1000,
+          total_rem_sleep_time_milli: 70 * 60 * 1000,
+        },
       },
     },
     {
@@ -135,6 +140,7 @@ describe('WHOOP payload mapping', () => {
     });
     expect(pending.recoveryState).toBe('pending');
     expect(pending.sleepPerformance).toBeNull();
+    expect(pending.sleepMinutes).toBeNull();
 
     const calibrating = factsFromWhoopPayloads({
       recoveries: [
@@ -156,6 +162,29 @@ describe('WHOOP payload mapping', () => {
     });
     expect(missing.recoveryState).toBe('unscorable');
     expect(missing.recovery).toBeNull();
+    expect(missing.sleepMinutes).toBeNull();
+
+    const slept = factsFromWhoopPayloads({
+      recoveries: [{ score_state: 'SCORED', score: { recovery_score: 42 } }],
+      sleeps: [
+        {
+          nap: false,
+          score: {
+            sleep_performance_percentage: 72,
+            stage_summary: {
+              total_light_sleep_time_milli: 3 * 60 * 60 * 1000,
+              total_slow_wave_sleep_time_milli: 90 * 60 * 1000,
+              total_rem_sleep_time_milli: 80 * 60 * 1000,
+            },
+          },
+        },
+      ],
+      cycles: [],
+      workouts: [],
+      nowMs: now,
+    });
+    expect(slept.sleepMinutes).toBe(350);
+    expect(slept.sleepPerformance).toBe(72);
   });
 });
 
@@ -224,6 +253,7 @@ describe('WHOOP fake server', () => {
         recovery: 82,
         recoveryState: 'scored' as const,
         sleepPerformance: 90,
+        sleepMinutes: 440,
         sleepDebtMinutes: 0,
         yesterdayStrain: 11,
         lastWorkoutEndedAt: null,

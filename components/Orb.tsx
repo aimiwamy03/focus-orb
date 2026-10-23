@@ -106,7 +106,7 @@ import {
 } from '@/lib/backdrop';
 import { SAMPLE_DAY_LABEL } from '@/lib/fixtures';
 import { signInWithGoogle } from '@/app/actions';
-import { recordWhoopNudge } from '@/lib/whoop';
+import { formatWhoopWindow, recordWhoopNudge, whoopBestWindow } from '@/lib/whoop';
 import { useWhoop } from '@/lib/useWhoop';
 import { StarDustBackdrop } from './StarDustBackdrop';
 
@@ -281,6 +281,12 @@ export function Orb() {
   });
   const untilMinutes = untilMeetingDuration(day);
   const activeTask = sessionTask || taskDraft || loadLastTask() || FALLBACK_TASK;
+  const whoopWindow = (() => {
+    const facts = whoop.summary?.facts;
+    if (!facts) return null;
+    const window = whoopBestWindow(facts, day.gaps, now);
+    return window ? formatWhoopWindow(window.start, window.end) : null;
+  })();
 
   const miniFocusStatus = formatMiniFocusStatus({
     surface,
@@ -1119,6 +1125,7 @@ export function Orb() {
                   : statusLineText(day, now)
               }
               whoopLine={surface === 'ask' ? whoop.line : null}
+              whoopWindow={surface === 'ask' && whoop.line ? whoopWindow : null}
               whoopOfferMinutes={surface === 'ask' && whoop.mode !== 'off' ? whoop.offerMinutes : null}
               whoopAdapt={whoop.mode === 'adapt'}
               onHideWhoopLine={whoop.hideLine}

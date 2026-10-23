@@ -295,8 +295,39 @@ interface WhoopSleepRecord {
   score?: {
     sleep_performance_percentage?: number;
     sleep_needed?: { need_from_sleep_debt_milli?: number };
+    stage_summary?: {
+      total_sleep_time_milli?: number;
+      total_light_sleep_time_milli?: number;
+      total_slow_wave_sleep_time_milli?: number;
+      total_rem_sleep_time_milli?: number;
+      total_in_bed_time_milli?: number;
+      total_awake_time_milli?: number;
+    };
   } | null;
   end?: string | null;
+}
+
+export function sleepMinutesFromScore(
+  score: WhoopSleepRecord['score'] | null | undefined
+): number | null {
+  if (!score) return null;
+  const stages = score.stage_summary;
+  if (!stages) return null;
+  if (typeof stages.total_sleep_time_milli === 'number') {
+    return stages.total_sleep_time_milli / 60_000;
+  }
+  const light = stages.total_light_sleep_time_milli;
+  const sws = stages.total_slow_wave_sleep_time_milli;
+  const rem = stages.total_rem_sleep_time_milli;
+  if (typeof light === 'number' && typeof sws === 'number' && typeof rem === 'number') {
+    return (light + sws + rem) / 60_000;
+  }
+  const inBed = stages.total_in_bed_time_milli;
+  const awake = stages.total_awake_time_milli;
+  if (typeof inBed === 'number' && typeof awake === 'number') {
+    return (inBed - awake) / 60_000;
+  }
+  return null;
 }
 
 interface WhoopCycleRecord {
@@ -359,6 +390,7 @@ export function factsFromWhoopPayloads(input: {
       typeof sleep?.score?.sleep_performance_percentage === 'number'
         ? sleep.score.sleep_performance_percentage
         : null,
+    sleepMinutes: sleepMinutesFromScore(sleep?.score),
     sleepDebtMinutes:
       typeof sleep?.score?.sleep_needed?.need_from_sleep_debt_milli === 'number'
         ? sleep.score.sleep_needed.need_from_sleep_debt_milli / 60_000

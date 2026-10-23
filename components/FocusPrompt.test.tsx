@@ -237,15 +237,31 @@ describe('game-menu rows', () => {
       onHideWhoopLine,
     });
     const line = screen.getByTestId('whoop-line');
-    expect(line.textContent).toBe('Recovery 28%. Shorter blocks today.');
+    expect(line.textContent).toContain('WHOOP');
+    expect(line.textContent).toContain('Recovery 28%. Shorter blocks today.');
     expect(line.className).toContain('text-orb-quiet');
     expect(line.className).not.toMatch(/bg-|rounded-full|badge/);
-    expect(screen.getByTestId('whoop-offer').textContent).toBe('WHOOP suggests 25m');
+    const link = screen.getByTestId('whoop-link') as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toBe('https://app.whoop.com');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(screen.getByTestId('whoop-offer').textContent).toBe('25m today');
     expect(screen.getByTestId('whoop-offer').className).toContain('whoop-offer');
     expect(screen.getByTestId('whoop-offer').className).not.toMatch(/rounded-full|badge/);
     expect(screen.queryByTestId('prompt-context')).toBeNull();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onHideWhoopLine).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a second WHOOP window line without pills or em dashes', () => {
+    renderPrompt('ask', {
+      whoopLine: 'Recovery 42%, slept 5h 50m (72%), so 25m blocks today.',
+      whoopWindow: 'Best focus window 2 to 4 PM.',
+      whoopOfferMinutes: 25,
+    });
+    expect(screen.getByTestId('whoop-window').textContent).toBe('Best focus window 2 to 4 PM.');
+    expect(screen.getByTestId('whoop-window').textContent).not.toMatch(/[—–]/);
+    expect(screen.getByTestId('whoop-line').className).not.toMatch(/rounded-full|badge/);
   });
 
   it('picks the WHOOP length from the muted offer by click and keyboard', () => {
@@ -254,7 +270,7 @@ describe('game-menu rows', () => {
       whoopOfferMinutes: 25,
       choice: 50,
     });
-    expect(screen.getByTestId('whoop-offer').textContent).toBe('WHOOP suggests 25m');
+    expect(screen.getByTestId('whoop-offer').textContent).toBe('25m today');
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(screen.getByTestId('whoop-offer').getAttribute('data-highlighted')).toBe('true');
