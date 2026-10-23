@@ -166,7 +166,7 @@ export function Settings({
           className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6"
         >
         <div className="space-y-2">
-          <label className="text-[length:var(--type-status)] font-medium text-orb-dim">
+          <label className="text-[length:var(--type-whoop)] font-medium text-orb-text">
             Calendars
           </label>
           {isGoogleConnected ? (
@@ -213,7 +213,10 @@ export function Settings({
               {isConnecting ? 'Connecting...' : 'Connect Google Calendar'}
             </button>
           ) : (
-            <p className="text-[length:var(--type-hint)] text-orb-quiet">
+            <p
+              data-testid="calendar-unconfigured"
+              className="text-[length:var(--type-whoop)] text-orb-text"
+            >
               Google Calendar is not configured. Try a sample day from the first screen.
             </p>
           )}
@@ -222,7 +225,8 @@ export function Settings({
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-[length:var(--type-hint)] text-orb-quiet transition-colors hover:text-orb-dim"
+                data-testid="ical-toggle"
+                className="text-[length:var(--type-whoop)] text-orb-text transition-colors hover:text-white"
               >
                 {showAdvanced ? 'Hide iCal URL' : 'Add iCal URL'}
               </button>

@@ -258,9 +258,14 @@ await assertNoIssueBadge(page, 'settings disconnected');
 if ((await page.getByTestId('whoop-status').textContent()) !== 'WHOOP disconnected') {
   fail('Disconnected settings status missing');
 }
-if (!(await page.getByTestId('whoop-connect').textContent())?.includes('Reconnect WHOOP')) {
-  fail('Disconnected settings should offer Reconnect WHOOP');
+if (!(await page.getByTestId('whoop-connect').textContent())?.includes('Connect WHOOP')) {
+  fail('Never-connected settings should offer Connect WHOOP');
 }
+if (await page.getByTestId('whoop-connect').isEnabled()) {
+  fail('Connect WHOOP should stay disabled until consent is checked');
+}
+await measureMutedType(page.getByTestId('calendar-unconfigured'), 'calendar unconfigured');
+await measureMutedType(page.getByTestId('ical-toggle'), 'Add iCal URL');
 if ((await page.getByTestId('whoop-consent').count()) !== 1) {
   fail('Disconnected settings should show the WHOOP opt-in');
 }

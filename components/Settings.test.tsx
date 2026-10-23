@@ -247,14 +247,50 @@ describe('Settings sheet', () => {
       />
     );
     expect(screen.getByTestId('whoop-status').textContent).toBe('WHOOP disconnected');
-    expect(screen.getByTestId('whoop-connect').textContent).toContain('Reconnect WHOOP');
+    expect(screen.getByTestId('whoop-connect').textContent).toContain('Connect WHOOP');
+    expect(screen.getByTestId('whoop-connect')).toHaveProperty('disabled', true);
     expect(screen.getByTestId('whoop-devices').textContent).toContain(
       'Each device connects separately.'
     );
+    expect(screen.getByTestId('calendar-unconfigured').className).toMatch(/type-whoop/);
+    expect(screen.getByTestId('calendar-unconfigured').className).toMatch(/text-orb-text/);
+    expect(screen.getByTestId('ical-toggle').className).toMatch(/type-whoop/);
+    expect(screen.getByTestId('ical-toggle').className).toMatch(/text-orb-text/);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onWhoopConnect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('whoop-consent-check'));
+    expect(screen.getByTestId('whoop-connect')).toHaveProperty('disabled', false);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onWhoopConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('says Reconnect WHOOP only after a failed refresh', () => {
+    render(
+      <Settings
+        onClose={() => {}}
+        calendarUrl=""
+        setCalendarUrl={() => {}}
+        scatterWindow={15}
+        setScatterWindow={() => {}}
+        authMethod={null}
+        selectAuthMethod={() => {}}
+        isGoogleConnected={false}
+        disconnectGoogle={async () => {}}
+        calendars={[]}
+        selectedCalendarIds={[]}
+        toggleCalendar={() => {}}
+        defaultDuration={50}
+        setDefaultDuration={() => {}}
+        whoopConnected={false}
+        whoopStatus="reconnect"
+        whoopMode="suggest"
+        setWhoopMode={() => {}}
+        whoopShowNumbers
+        setWhoopShowNumbers={() => {}}
+        onWhoopConnect={() => {}}
+        onWhoopDisconnect={() => {}}
+      />
+    );
+    expect(screen.getByTestId('whoop-connect').textContent).toContain('Reconnect WHOOP');
   });
 });

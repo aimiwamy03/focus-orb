@@ -52,7 +52,7 @@ export function WhoopSettings({
   const statusLabel = whoopSettingsStatus(status);
   const connectLabel = connected
     ? WHOOP_DISCONNECT_LABEL
-    : status === 'disconnected' || status === 'reconnect'
+    : status === 'reconnect'
       ? WHOOP_RECONNECT_LABEL
       : WHOOP_CONNECT_LABEL;
   const canConnect = connected || consented;
@@ -128,7 +128,11 @@ export function WhoopSettings({
         data-highlighted={rowIndex === 0 ? 'true' : 'false'}
         onClick={() => (connected ? onDisconnect() : canConnect ? onConnect() : undefined)}
         disabled={!canConnect}
-        className="flex w-full items-center justify-between rounded bg-black/30 px-3 py-2 text-[length:var(--type-whoop)] text-orb-text disabled:cursor-not-allowed disabled:opacity-50"
+        className={`flex w-full items-center justify-between rounded px-3 py-2 text-[length:var(--type-whoop)] ${
+          canConnect
+            ? 'bg-black/30 text-orb-text'
+            : 'cursor-not-allowed bg-transparent text-orb-quiet ring-1 ring-white/20'
+        }`}
       >
         <span>{connectLabel}</span>
         <span className="inline-flex items-center gap-1 text-orb-quiet">
