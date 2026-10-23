@@ -91,6 +91,11 @@ try {
     await seed(app);
     await app.goto(`${BASE}/?mock=empty&intro=0`, { waitUntil: 'load' });
     await app.waitForTimeout(400);
+    if ((await app.getByTestId('voice-mic').count()) !== 0) {
+      fail(`${width} app without a voice key should hide Mic`);
+    }
+    await app.goto(`${BASE}/?mock=empty&intro=0&voice=mock`, { waitUntil: 'load' });
+    await app.waitForTimeout(400);
     await assertMicClearsNav(app, `${width} app`);
     await app.close();
 
@@ -184,18 +189,28 @@ try {
   const error = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await seed(error);
   await error.goto(`${BASE}/?mock=open-afternoon&hover=1`, { waitUntil: 'networkidle' });
-  await error.waitForSelector('[data-testid="voice-mic"]');
+  await error.waitForTimeout(400);
+  if ((await error.getByTestId('voice-mic').count()) !== 0) {
+    fail('Mic should stay hidden when the server has no voice key');
+  }
   await error.keyboard.down('v');
-  await error.waitForSelector('[data-testid="voice-error"]', { timeout: 8000 });
-  const errorText = (await error.getByTestId('voice-error').innerText()).trim();
-  if (errorText !== "Voice isn't set up yet") fail(`Error copy was "${errorText}"`);
-  contrastOk(await error.getByTestId('voice-error').getAttribute('class'), 'error');
+  await error.waitForTimeout(400);
+  if ((await error.getByTestId('voice-error').count()) !== 0) {
+    fail('V should not open a voice error when the mic is hidden');
+  }
   await publish(error, 'voice_error.png');
   await error.keyboard.up('v');
   await error.close();
 
   const denied = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await seed(denied);
+  await denied.route('**/api/voice/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ enabled: true }),
+    });
+  });
   await denied.route('**/api/voice/token', async (route) => {
     await route.fulfill({
       status: 200,

@@ -331,6 +331,17 @@ export function formatFocusedToday(minutes: number): string {
   return `${formatDayFocused(Math.max(0, minutes))} focused today.`;
 }
 
+export function visibleFocusedTodayMinutes(
+  logMinutes: number,
+  sessionMinutes: number | null | undefined,
+  sessionCounted: boolean
+): number {
+  const log = Math.max(0, logMinutes);
+  if (sessionMinutes == null || sessionCounted) return log;
+  if (!(sessionMinutes > 0)) return log;
+  return log + Math.max(1, Math.round(sessionMinutes));
+}
+
 export function formatDayStage(stage: OrbStage | null): string | null {
   return stage ? stage.name : null;
 }

@@ -3,6 +3,7 @@ import { assemblyAiSocketUrl } from './voiceSocket';
 import {
   assemblyAiApiKey,
   mintVoiceToken,
+  voiceEnabled,
   VOICE_NOT_SETUP_ERROR,
 } from './voiceToken';
 
@@ -11,6 +12,8 @@ describe('assemblyAiApiKey', () => {
     expect(assemblyAiApiKey({ ASSEMBLYAI_API_KEY: ' aai_test ' })).toBe('aai_test');
     expect(assemblyAiApiKey({ ASSEMBLYAI_API_KEY: '' })).toBeUndefined();
     expect(assemblyAiApiKey({})).toBeUndefined();
+    expect(voiceEnabled({ ASSEMBLYAI_API_KEY: 'aai_test' })).toBe(true);
+    expect(voiceEnabled({})).toBe(false);
   });
 });
 

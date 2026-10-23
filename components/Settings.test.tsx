@@ -58,8 +58,7 @@ describe('Settings sheet', () => {
     expect(screen.getByTestId('clear-log').textContent).toBe('Clear log');
   });
 
-  it('toggles Play intro and Intro sound', () => {
-    const setPlayIntro = vi.fn();
+  it('toggles Intro sound and has no Play intro checkbox', () => {
     const setIntroSound = vi.fn();
     render(
       <Settings
@@ -77,18 +76,13 @@ describe('Settings sheet', () => {
         toggleCalendar={() => {}}
         defaultDuration={50}
         setDefaultDuration={() => {}}
-        playIntro
-        setPlayIntro={setPlayIntro}
         introSound={false}
         setIntroSound={setIntroSound}
       />
     );
-    expect(screen.getByTestId('play-intro')).toBeTruthy();
+    expect(screen.queryByTestId('play-intro')).toBeNull();
     expect(screen.getByTestId('intro-sound')).toBeTruthy();
-    expect(screen.getByText('Play intro')).toBeTruthy();
     expect(screen.getByText('Intro sound')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('play-intro'));
-    expect(setPlayIntro).toHaveBeenCalledWith(false);
     fireEvent.click(screen.getByTestId('intro-sound'));
     expect(setIntroSound).toHaveBeenCalledWith(true);
   });
@@ -110,12 +104,10 @@ describe('Settings sheet', () => {
         toggleCalendar={() => {}}
         defaultDuration={50}
         setDefaultDuration={() => {}}
-        playIntro
-        setPlayIntro={() => {}}
         setIntroSound={() => {}}
       />
     );
-    expect((screen.getByTestId('intro-sound') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByTestId('intro-sound').getAttribute('aria-checked')).toBe('true');
   });
 
   it('toggles Backdrop and defaults it on', () => {
@@ -140,8 +132,8 @@ describe('Settings sheet', () => {
         setShowBackdrop={setShowBackdrop}
       />
     );
-    const toggle = screen.getByTestId('show-backdrop') as HTMLInputElement;
-    expect(toggle.checked).toBe(true);
+    const toggle = screen.getByTestId('show-backdrop');
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
     expect(screen.getByText('Backdrop')).toBeTruthy();
     fireEvent.click(toggle);
     expect(setShowBackdrop).toHaveBeenCalledWith(false);
@@ -252,10 +244,8 @@ describe('Settings sheet', () => {
     expect(screen.getByTestId('whoop-devices').textContent).toContain(
       'Each device connects separately.'
     );
-    expect(screen.getByTestId('calendar-unconfigured').className).toMatch(/type-whoop/);
-    expect(screen.getByTestId('calendar-unconfigured').className).toMatch(/text-orb-text/);
-    expect(screen.getByTestId('ical-toggle').className).toMatch(/type-whoop/);
-    expect(screen.getByTestId('ical-toggle').className).toMatch(/text-orb-text/);
+    expect(screen.getByTestId('calendar-unconfigured').className).toMatch(/settings-copy/);
+    expect(screen.getByTestId('ical-toggle').className).toMatch(/settings-link/);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onWhoopConnect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('whoop-consent-check'));

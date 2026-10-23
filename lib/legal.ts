@@ -1,4 +1,4 @@
-export const CONTACT_EMAIL = 'hello@example.com';
+export const CONTACT_EMAIL = 'aimiw.amy03@gmail.com';
 export const GOOGLE_PERMISSIONS_URL = 'https://myaccount.google.com/permissions';
 export const GOOGLE_LIMITED_USE_URL =
   'https://developers.google.com/terms/api-services-user-data-policy';
@@ -77,7 +77,7 @@ export const PRIVACY_REVOKE_BODY = [
 ].join(' ');
 
 export const PRIVACY_CONTACT_HEADING = 'Contact';
-export const PRIVACY_CONTACT_BODY = `Questions about privacy: ${CONTACT_EMAIL}. This is a placeholder address until a real inbox is set.`;
+export const PRIVACY_CONTACT_BODY = `Questions about privacy: ${CONTACT_EMAIL}.`;
 
 export const PRIVACY_LIMITED_USE =
   "Focus Orb's use and transfer of information received from Google APIs to any other app will adhere to the Google API Services User Data Policy, including the Limited Use requirements.";
@@ -112,7 +112,7 @@ export const HEALTH_DATA_STOP_HEADING = 'How to stop';
 export const HEALTH_DATA_STOP_BODY =
   'Disconnect in Settings. That asks WHOOP to revoke access and deletes the cookie. Sign out also deletes the cookie on this browser. If revoke fails, remove Focus Orb in the WHOOP app.';
 
-export const HEALTH_DATA_CONTACT_BODY = `Questions: ${CONTACT_EMAIL}. This is a placeholder address until a real inbox is set.`;
+export const HEALTH_DATA_CONTACT_BODY = `Questions: ${CONTACT_EMAIL}.`;
 
 export const TERMS_INTRO =
   'These terms are a simple agreement for using Focus Orb. If you do not agree, do not use the app.';
@@ -122,7 +122,7 @@ export const TERMS_BODY = [
   'Google Calendar and WHOOP stay theirs. Focus Orb is not those products, and it does not promise their uptime.',
   'The app is provided as is, without warranties. Your focus log lives in your browser. You can clear it in Settings.',
   'We may change the app, these terms, or the privacy policy. The current pages are the ones that apply.',
-  `Questions: ${CONTACT_EMAIL}. This is a placeholder address until a real inbox is set.`,
+  `Questions: ${CONTACT_EMAIL}.`,
 ].join(' ');
 
 const APP_SHELL_KEYS = [

@@ -10,6 +10,12 @@ export function assemblyAiApiKey(
   return key ? key : undefined;
 }
 
+export function voiceEnabled(
+  env: NodeJS.Dict<string | undefined> = process.env
+): boolean {
+  return Boolean(assemblyAiApiKey(env));
+}
+
 export type VoiceTokenResult =
   | { status: 200; body: { token: string; expires_in_seconds: number } }
   | { status: 503; body: { error: string } }
