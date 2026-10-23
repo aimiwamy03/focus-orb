@@ -41,7 +41,7 @@ export function FocusIntro({
   const cubeRef = useRef<HTMLDivElement>(null);
   const restRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLSpanElement>(null);
-  const hintRef = useRef<HTMLParagraphElement>(null);
+  const hintRef = useRef<HTMLButtonElement>(null);
   const faceRefs = useRef<Array<HTMLDivElement | null>>([]);
   const rafRef = useRef(0);
   const startRef = useRef(0);
@@ -336,9 +336,19 @@ export function FocusIntro({
           <span ref={copyRef} data-testid="focus-intro-caption" className="focus-intro-copy" />
         </div>
       </div>
-      <p ref={hintRef} data-testid="focus-intro-hint" className="focus-intro-hint">
+      <button
+        ref={hintRef}
+        type="button"
+        data-testid="focus-intro-hint"
+        className="focus-intro-hint"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          skip();
+        }}
+      >
         {INTRO_SKIP_HINT}
-      </p>
+      </button>
     </div>
   );
 }

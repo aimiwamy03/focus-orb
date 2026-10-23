@@ -18,6 +18,7 @@ import { orbLayout, textClearCloudRadius, type OrbLayout } from '@/lib/layout';
 import {
   DurationChoice,
   FALLBACK_TASK,
+  isPresetDuration,
   type PromptSurface,
   formatMeetingSoonCopy,
   formatMiniFocusStatus,
@@ -52,6 +53,8 @@ import {
   attachGrowthFields,
   countedMinutesToday,
   formatFocusedToday,
+  sessionCounts,
+  visibleFocusedTodayMinutes,
   growthPointScale,
   IDLE_BREATH_STEP,
   liveOrbPulse,
@@ -117,11 +120,10 @@ import {
   isStoredFocusRunning,
   loadIntroPlayed,
   loadIntroSound,
-  loadPlayIntro,
   markIntroPlayed,
   parseIntroFreeze,
+  REPLAY_INTRO_LABEL,
   saveIntroSound,
-  savePlayIntro,
   shouldPlayIntro,
 } from '@/lib/intro';
 import {
@@ -224,7 +226,7 @@ export function Orb() {
   const [bloomDone, setBloomDone] = useState(true);
   const [nextStep, setNextStep] = useState('');
   const [focusRating, setFocusRating] = useState<number | null>(null);
-  const [playIntro, setPlayIntro] = useState(true);
+  const [voiceReady, setVoiceReady] = useState(false);
   const [introSound, setIntroSound] = useState(true);
   const [guestStart, setGuestStart] = useState(false);
   const [viewSize, setViewSize] = useState({ w: 1280, h: 800 });
@@ -233,6 +235,7 @@ export function Orb() {
   const handleOrbClickRef = useRef<() => void>(() => {});
   const miniOnlyRef = useRef(false);
   const firstOpenRef = useRef(false);
+  const askOpenRef = useRef(false);
   const settingsOpenRef = useRef(false);
   const logOpenRef = useRef(false);
   const introOpenRef = useRef(false);
@@ -522,13 +525,12 @@ export function Orb() {
     const play = shouldPlayIntro({
       introParam,
       sessionPlayed: loadIntroPlayed(),
-      playIntro: loadPlayIntro(),
+      playIntro: true,
       focusing: isStoredFocusRunning(),
       miniOnly: miniOnlyParam,
     });
     if (play) markIntroPlayed();
     setShowIntro(play);
-    setPlayIntro(loadPlayIntro());
     setIntroSound(loadIntroSound());
     const playSettle = shouldPlaySettle({
       settleParam,
@@ -1074,7 +1076,7 @@ export function Orb() {
   );
 
   const voice = useVoiceStart({
-    enabled: !firstOpen && !miniOnly && !showSettings && !showLog && !showIntro,
+    enabled: voiceReady && !miniOnly && !showSettings && !showLog && !showIntro,
     mock: Boolean(voiceMock),
     gapMinutes: day.gapMinutes,
     nextEventTitle: day.nextEvent?.summary ?? null,
@@ -1141,12 +1143,58 @@ export function Orb() {
     setGuestStart(true);
   }, []);
 
+  const focusTaskInput = useCallback(() => {
+    beginGuestStart();
+    const field = document.querySelector<HTMLInputElement>('[data-testid="focus-task"]');
+    field?.focus({ preventScroll: true });
+  }, [beginGuestStart]);
+
+  const replayIntro = useCallback(() => {
+    setShowSettings(false);
+    setShowLog(false);
+    setShowIntro(true);
+  }, []);
+
   useEffect(() => {
     setGuestStart(loadGuestStart());
   }, []);
 
+  useEffect(() => {
+    if (voiceMock) {
+      setVoiceReady(true);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/voice/status')
+      .then((response) => response.json())
+      .then((body: { enabled?: unknown }) => {
+        if (!cancelled && body?.enabled === true) setVoiceReady(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [voiceMock]);
+
   // Keyboard shortcuts
   useEffect(() => {
+    const focusAskField = (e: KeyboardEvent) => {
+      if (introOpenRef.current || settleOpenRef.current) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      if (!askOpenRef.current || (e.key !== 'Enter' && e.key !== ' ')) return;
+      const menuArmed =
+        e.key === 'Enter' &&
+        document
+          .querySelector('[data-testid="focus-prompt"]')
+          ?.getAttribute('data-menu-armed') === 'true';
+      if (menuArmed) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      focusTaskInput();
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (introOpenRef.current || settleOpenRef.current) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -1154,12 +1202,6 @@ export function Orb() {
       }
       
       if (isShortcutKey(e.key)) dismissShortcutsCard();
-
-      if (firstOpenRef.current && (e.key === 'Enter' || e.key === ' ')) {
-        e.preventDefault();
-        beginGuestStart();
-        return;
-      }
 
       if (e.key === 'f' || e.key === 'F') {
         toggleFullscreen();
@@ -1193,10 +1235,14 @@ export function Orb() {
         setMiniOnly(false);
       }
     };
-    
+
+    window.addEventListener('keydown', focusAskField, true);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [beginGuestStart, dismissShortcutsCard, miniWindow, pipSupported]);
+    return () => {
+      window.removeEventListener('keydown', focusAskField, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [dismissShortcutsCard, focusTaskInput, miniWindow, pipSupported]);
 
   const bumpHint = (id: 'click' | 'hover' | 'fullscreen') => {
     markHintSeen(id);
@@ -1215,6 +1261,7 @@ export function Orb() {
     choice: DurationChoice = durationChoice
   ) => {
     startedByVoiceRef.current = false;
+    beginGuestStart();
     const minutes = resolveDuration(choice, untilMinutes);
     const name = resolveStartTask(taskName ?? taskDraft, loadLastTask(), recentTasks);
     const nextRecent = rememberTask(name, recentTasks);
@@ -1242,8 +1289,8 @@ export function Orb() {
   };
 
   const handleOrbClick = () => {
-    if (firstOpen) {
-      beginGuestStart();
+    if (surface === 'ask') {
+      focusTaskInput();
       return;
     }
     if (showSettle) {
@@ -1293,7 +1340,7 @@ export function Orb() {
   }, [doneParam, focusParam, plannedParam, promptParam, seedCompleted, startBreak, startFocus, taskParam]);
 
   useEffect(() => {
-    if (untilMinutes != null && typeof durationChoice === 'number' && durationChoice > untilMinutes) {
+    if (untilMinutes != null && isPresetDuration(durationChoice) && durationChoice > untilMinutes) {
       setDurationChoice('until');
     }
   }, [untilMinutes, durationChoice]);
@@ -1332,6 +1379,7 @@ export function Orb() {
   }, []);
 
   firstOpenRef.current = firstOpen;
+  askOpenRef.current = surface === 'ask';
   settingsOpenRef.current = showSettings;
   logOpenRef.current = showLog;
   introOpenRef.current = showIntro;
@@ -1403,15 +1451,23 @@ export function Orb() {
       }}
     >
       <StarDustBackdrop enabled={showBackdrop} />
-      {!miniOnly && !showSettings && !showLog && !firstOpen ? (
+      {!firstOpen && !miniOnly && !showSettings && !showLog && !showIntro ? (
         <div
           data-testid="home-start"
           className="absolute left-4 top-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col items-start gap-2"
         >
           <LegalLinks testId="home-legal" current="home" />
-          {!showIntro && !showShortcutsCard ? (
+          <button
+            type="button"
+            data-testid="replay-intro"
+            onClick={replayIntro}
+            className="welcome-secondary-link text-left"
+          >
+            {REPLAY_INTRO_LABEL}
+          </button>
+          {!showShortcutsCard ? (
             <VoiceMicButton
-              visible
+              visible={voiceReady}
               holding={voice.phase === 'listening'}
               onHoldStart={voice.holdStart}
               onHoldEnd={voice.holdEnd}
@@ -1423,10 +1479,10 @@ export function Orb() {
         ref={canvasRef}
         data-testid="orb-canvas"
         className={`absolute inset-0 z-[1] ${miniOnly ? 'opacity-0' : ''} ${
-          firstOpen ? 'pointer-events-auto' : 'pointer-events-none'
+          firstOpen || surface === 'ask' ? 'pointer-events-auto' : 'pointer-events-none'
         }`}
         onClick={() => {
-          if (firstOpen) beginGuestStart();
+          if (surface === 'ask') focusTaskInput();
         }}
       />
 
@@ -1441,25 +1497,12 @@ export function Orb() {
         >
           {FLOATING_RESTORE_LABEL}
         </button>
-      ) : firstOpen && !showIntro ? (
-        <Welcome
-          googleConfigured={isGoogleConfigured()}
-          onStart={beginGuestStart}
-          onConnect={() => {
-            if (isGoogleConfigured()) {
-              calendar.selectAuthMethod('google');
-              void signInWithGoogleCalendar();
-              return;
-            }
-            setShowSettings(true);
-          }}
-        />
-      ) : firstOpen ? null : (
+      ) : (
         <div
           ref={stackRef}
           data-testid="bottom-stack"
           className={`absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-[length:var(--stack-gap)] px-4 pb-[length:var(--stack-pad)] pt-1 ${
-            showSettings ? 'invisible pointer-events-none' : ''
+            showSettings || showIntro ? 'invisible pointer-events-none' : ''
           }`}
         >
           {showSettle ? (
@@ -1498,7 +1541,22 @@ export function Orb() {
               completedMinutes={completed?.minutes}
               completedPlanned={completed?.planned}
               focusedToday={
-                completed ? formatFocusedToday(displayMinutes) : null
+                completed
+                  ? formatFocusedToday(
+                      orbPreview
+                        ? displayMinutes
+                        : visibleFocusedTodayMinutes(
+                            logMinutes,
+                            completed.minutes,
+                            Boolean(
+                              focusLog[0] &&
+                                focusLog[0].task === completed.task &&
+                                Math.round(focusLog[0].minutes) === Math.round(completed.minutes) &&
+                                sessionCounts(focusLog[0]).counted
+                            )
+                          )
+                    )
+                  : null
               }
               blooming={blooming}
               nextStep={nextStep}
@@ -1543,6 +1601,20 @@ export function Orb() {
               }}
             />
           )}
+          {firstOpen && surface === 'ask' && !showSettle ? (
+            <Welcome
+              googleConfigured={isGoogleConfigured()}
+              onReplayIntro={replayIntro}
+              onConnect={() => {
+                if (isGoogleConfigured()) {
+                  calendar.selectAuthMethod('google');
+                  void signInWithGoogleCalendar();
+                  return;
+                }
+                setShowSettings(true);
+              }}
+            />
+          ) : null}
           {calendar.mockScenario ? (
             <div
               data-testid="sample-day-label"
@@ -1656,11 +1728,6 @@ export function Orb() {
             saveShowBackdrop(value);
           }}
           onClearLog={() => setFocusLog(clearFocusLog(logKey))}
-          playIntro={playIntro}
-          setPlayIntro={(value) => {
-            setPlayIntro(value);
-            savePlayIntro(value);
-          }}
           introSound={introSound}
           setIntroSound={(value) => {
             setIntroSound(value);

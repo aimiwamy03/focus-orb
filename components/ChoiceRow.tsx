@@ -109,13 +109,10 @@ export function choiceClass(
     return `${ring} duration-chip rounded-none bg-transparent px-1 pb-1 text-[length:var(--type-whoop)] leading-snug tracking-wide text-orb-quiet hover:text-orb-text`;
   }
   if (disabled) {
-    return `${ring} rounded-full px-3.5 py-1.5 text-[length:var(--type-chip)] tracking-wide text-orb-placeholder`;
-  }
-  if (highlighted) {
-    return `${ring} rounded-full px-3.5 py-1.5 text-[length:var(--type-button)] tracking-wide bg-orb-highlight text-orb-text ring-2 ring-orb-ring`;
-  }
-  if (tone === 'quiet') {
-    return `${ring} rounded-full px-3.5 py-1.5 text-[length:var(--type-button)] tracking-wide text-orb-quiet hover:text-orb-text`;
-  }
-  return `${ring} rounded-full px-[length:var(--btn-px)] py-[length:var(--btn-py)] text-[length:var(--type-button)] text-orb-quiet hover:text-orb-dim`;
+      return `${ring} rounded-none bg-transparent px-1 pb-1 text-[length:var(--type-whoop)] leading-snug tracking-wide text-orb-placeholder`;
+    }
+    if (highlighted) {
+      return `${ring} rounded-none bg-transparent px-1 pb-1 text-[length:var(--type-whoop)] leading-snug tracking-wide text-orb-text underline decoration-1 underline-offset-[6px]`;
+    }
+    return `${ring} rounded-none bg-transparent px-1 pb-1 text-[length:var(--type-whoop)] leading-snug tracking-wide text-orb-quiet hover:text-orb-text`;
 }

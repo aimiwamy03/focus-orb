@@ -4,7 +4,14 @@ import { getMockEvents, parseNowParam } from './fixtures';
 import {
   ASK_PROMPT,
   BREAK_MINUTES,
+  canStartCustom,
   capDuration,
+  CUSTOM_DURATION_LABEL,
+  CUSTOM_RANGE_ERROR,
+  CUSTOM_UNTIL_ERROR,
+  customDurationError,
+  isCustomDuration,
+  parseCustomMinutes,
   END_EARLY_PROMPT,
   END_SESSION_LABEL,
   END_SESSION_PROMPT,
@@ -111,6 +118,24 @@ describe('recent task storage', () => {
     expect(loadLastDuration()).toBe('until');
     saveLastDuration(50);
     expect(loadLastDuration()).toBe(50);
+    saveLastDuration(40);
+    expect(loadLastDuration()).toBe(40);
+    expect(isCustomDuration(40)).toBe(true);
+    expect(isCustomDuration(50)).toBe(false);
+    expect(isCustomDuration('custom')).toBe(true);
+    expect(parseCustomMinutes('40')).toBe(40);
+    expect(parseCustomMinutes('')).toBeNull();
+    expect(parseCustomMinutes('0')).toBeNull();
+    expect(parseCustomMinutes('181')).toBeNull();
+    expect(parseCustomMinutes('12.5')).toBeNull();
+    expect(customDurationError('')).toBeNull();
+    expect(customDurationError('181')).toBe(CUSTOM_RANGE_ERROR);
+    expect(customDurationError('40', 20)).toBe(CUSTOM_UNTIL_ERROR);
+    expect(canStartCustom('')).toEqual({ ok: false, error: null });
+    expect(canStartCustom('40')).toEqual({ ok: true, minutes: 40 });
+    expect(CUSTOM_DURATION_LABEL).toBe('Custom');
+    expect(CUSTOM_RANGE_ERROR).not.toMatch(/[—–]/);
+    expect(CUSTOM_UNTIL_ERROR).not.toMatch(/[—–]/);
   });
 });
 
@@ -178,6 +203,7 @@ describe('promptSurface', () => {
   it('asks when free, yields to meetings, and prefers the focus states', () => {
     expect(
       promptSurface({
+        firstOpen: true,
         isFocusing: false,
         isBreak: false,
         stopConfirm: false,

@@ -4,9 +4,13 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ANOTHER_ROUND_LABEL,
   ASK_PROMPT,
-  DONE_LABEL,
+  CUSTOM_DURATION_LABEL,
   DURATION_CHIPS,
   DurationChoice,
+  TAKE_BREAK_LABEL,
+  canStartCustom,
+  customDurationError,
+  isCustomDuration,
   END_EARLY_PROMPT,
   END_LABEL,
   END_SESSION_LABEL,
@@ -105,6 +109,12 @@ function durationItems(untilMinutes: number | null): MenuItem[] {
       action: 'duration' as const,
       disabled: untilMinutes != null && minutes > untilMinutes,
     })),
+    {
+      id: 'duration-custom',
+      label: CUSTOM_DURATION_LABEL,
+      value: 'custom' as const,
+      action: 'duration' as const,
+    },
     ...(untilMinutes != null
       ? [
           {
@@ -162,7 +172,7 @@ function itemsFor(
   }
   if (surface === 'completed') {
     return [
-      { id: 'take-break', label: DONE_LABEL, action: 'break' },
+      { id: 'take-break', label: TAKE_BREAK_LABEL, action: 'break' },
       { id: 'another-round', label: ANOTHER_ROUND_LABEL, action: 'another' },
     ];
   }
@@ -209,6 +219,10 @@ function NextStepNote({
 
 function defaultIndex(surface: PromptSurface, items: MenuItem[], choice: DurationChoice): number {
   if (surface === 'ask') {
+    if (isCustomDuration(choice)) {
+      const custom = items.findIndex((item) => item.value === 'custom');
+      return custom >= 0 ? custom : 0;
+    }
     const match = items.findIndex((item) => item.action === 'duration' && item.value === choice);
     return match >= 0 ? match : 0;
   }
@@ -257,7 +271,16 @@ export function FocusPrompt({
   onFocusRating,
 }: FocusPromptProps) {
   const [mounted, setMounted] = useState(false);
+  const [menuArmed, setMenuArmed] = useState(false);
+  const [customDraft, setCustomDraft] = useState(
+    isCustomDuration(choice) && typeof choice === 'number' ? String(choice) : ''
+  );
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (isCustomDuration(choice) && typeof choice === 'number') {
+      setCustomDraft(String(choice));
+    }
+  }, [choice]);
 
   const suggestions = useMemo(() => visibleAskSuggestions(recentTasks, task), [recentTasks, task]);
   const items = useMemo(
@@ -300,6 +323,9 @@ export function FocusPrompt({
     onTaskChange,
     surface,
     items,
+    choice,
+    customDraft,
+    untilMinutes,
   });
   handlersRef.current = {
     onStart,
@@ -316,10 +342,14 @@ export function FocusPrompt({
     onTaskChange,
     surface,
     items,
+    choice,
+    customDraft,
+    untilMinutes,
   };
 
   const itemKey = items.map((item) => `${item.id}:${item.disabled ? 1 : 0}`).join('|');
   useEffect(() => {
+    setMenuArmed(false);
     setMenu(
       createMenuState({
         count: items.length,
@@ -342,6 +372,19 @@ export function FocusPrompt({
     const { surface: kind } = handlersRef.current;
     if (item.action === 'duration') {
       const duration = item.value as DurationChoice;
+      if (duration === 'custom') {
+        const parsed = canStartCustom(
+          handlersRef.current.customDraft,
+          handlersRef.current.untilMinutes
+        );
+        if (!parsed.ok) {
+          handlersRef.current.onChoiceChange('custom');
+          return;
+        }
+        handlersRef.current.onChoiceChange(parsed.minutes);
+        handlersRef.current.onStart(undefined, parsed.minutes);
+        return;
+      }
       handlersRef.current.onChoiceChange(duration);
       handlersRef.current.onStart(undefined, duration);
       return;
@@ -351,7 +394,14 @@ export function FocusPrompt({
       return;
     }
     if (item.action === 'start') {
-      handlersRef.current.onStart();
+      const current = handlersRef.current;
+      if (isCustomDuration(current.choice)) {
+        const parsed = canStartCustom(current.customDraft, current.untilMinutes);
+        if (!parsed.ok) return;
+        current.onStart(undefined, parsed.minutes);
+        return;
+      }
+      current.onStart();
       return;
     }
     if (item.action === 'recent') {
@@ -443,8 +493,13 @@ export function FocusPrompt({
           event.key === 'ArrowDown' ||
           event.key === 'Tab')
       ) {
+        setMenuArmed(true);
         const item = handlersRef.current.items[result.state.index];
-        if ((item?.action === 'duration' || item?.action === 'whoop') && !item.disabled) {
+        if (
+          (item?.action === 'duration' || item?.action === 'whoop') &&
+          !item.disabled &&
+          item.value !== 'custom'
+        ) {
           handlersRef.current.onChoiceChange(item.value as DurationChoice);
         }
       }
@@ -468,8 +523,18 @@ export function FocusPrompt({
       ? menu.index - durationOffset
       : -1;
 
+  const customSelected = isCustomDuration(choice);
+  const customError = customSelected ? customDurationError(customDraft, untilMinutes) : null;
+  const customReady = customSelected ? canStartCustom(customDraft, untilMinutes) : null;
+  const startBlocked = Boolean(customSelected && !customReady?.ok);
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (startBlocked) return;
+    if (customReady?.ok) {
+      onStart(undefined, customReady.minutes);
+      return;
+    }
     onStart();
   };
 
@@ -479,6 +544,7 @@ export function FocusPrompt({
     <div
       data-testid="focus-prompt"
       data-surface={surface}
+      data-menu-armed={menuArmed ? 'true' : 'false'}
       className="relative z-20 flex w-[min(32rem,92vw)] shrink-0 cursor-auto flex-col items-center gap-[length:var(--stack-gap)] text-center"
     >
       {surface === 'ask' && whoopLine ? (
@@ -550,7 +616,10 @@ export function FocusPrompt({
                 size={1}
                 autoFocus
                 onChange={(event) => onTaskChange(event.target.value)}
-                onFocus={() => setMenu((current) => ({ ...current, focus: 'input' }))}
+                onFocus={() => {
+                  setMenuArmed(false);
+                  setMenu((current) => ({ ...current, focus: 'input' }));
+                }}
                 onBlur={() => setMenu((current) => ({ ...current, focus: 'row' }))}
                 placeholder={FALLBACK_TASK}
                 autoComplete="off"
@@ -591,14 +660,40 @@ export function FocusPrompt({
             items={durations}
             highlighted={durationHighlight}
             underlined={
-              whoopAdapt && typeof choice === 'number'
-                ? durations.findIndex((item) => item.value === choice)
-                : -1
+              customSelected
+                ? durations.findIndex((item) => item.value === 'custom')
+                : whoopAdapt && typeof choice === 'number'
+                  ? durations.findIndex((item) => item.value === choice)
+                  : -1
             }
             onHighlight={(index) => highlightIndex(durationOffset + index)}
             onConfirm={(index) => confirmIndex(durationOffset + index)}
             confirmOnClick={false}
           />
+          {customSelected ? (
+            <div className="flex flex-col items-center gap-2">
+              <input
+                data-testid="custom-minutes"
+                className="custom-minutes"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={customDraft}
+                aria-label="Custom minutes"
+                onChange={(event) => {
+                  const next = event.target.value.replace(/\D/g, '');
+                  setCustomDraft(next);
+                  const parsed = canStartCustom(next, untilMinutes);
+                  if (parsed.ok) onChoiceChange(parsed.minutes);
+                  else onChoiceChange('custom');
+                }}
+              />
+              {customError ? (
+                <p data-testid="custom-minutes-error" className="custom-minutes-error">
+                  {customError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {whoopIndex >= 0 && whoopOfferMinutes != null ? (
             <button
               type="button"
@@ -640,21 +735,21 @@ export function FocusPrompt({
             <span>to start</span>
           </div>
           <button
-            type="submit"
+            type="button"
             tabIndex={-1}
             data-testid="focus-start"
             data-highlighted={menu.index === startIndex ? 'true' : 'false'}
+            disabled={startBlocked}
             onMouseDown={(event) => event.preventDefault()}
             onMouseEnter={() => highlightIndex(startIndex)}
-            className="inline-flex min-h-[44px] cursor-pointer items-center justify-center bg-transparent"
+            onClick={() => {
+              if (startBlocked) return;
+              if (customReady?.ok) onStart(undefined, customReady.minutes);
+              else onStart();
+            }}
+            className="inline-flex min-h-[44px] cursor-pointer items-center justify-center bg-transparent disabled:cursor-default"
           >
-            <span
-              className={
-                menu.index === startIndex
-                  ? choiceClass('button', true, false)
-                  : 'rounded-full border border-white/20 bg-white/15 px-[length:var(--btn-px)] py-[length:var(--btn-py)] text-[length:var(--type-button)] font-medium tracking-wide text-orb-text hover:bg-white/25 outline-none focus:outline-none'
-              }
-            >
+            <span className={choiceClass('chip', menu.index === startIndex, startBlocked)}>
               {START_LABEL}
             </span>
           </button>
@@ -706,9 +801,10 @@ export function FocusPrompt({
           <div data-text-clear className="text-[length:var(--type-heading)] leading-tight text-orb-text">
             {END_EARLY_PROMPT}
           </div>
-          <ChoiceRow
-            testId="stop-confirm-row"
-            items={items}
+            <ChoiceRow
+              testId="stop-confirm-row"
+              tone="chip"
+              items={items}
             highlighted={menu.index}
             onHighlight={highlightIndex}
             onConfirm={confirmIndex}
@@ -725,9 +821,10 @@ export function FocusPrompt({
           >
             {END_SESSION_PROMPT}
           </div>
-          <ChoiceRow
-            testId="session-confirm-row"
-            items={items}
+            <ChoiceRow
+              testId="session-confirm-row"
+              tone="chip"
+              items={items}
             highlighted={menu.index}
             onHighlight={highlightIndex}
             onConfirm={confirmIndex}
@@ -781,7 +878,7 @@ export function FocusPrompt({
                       data-testid={`rating-${value}`}
                       data-selected={focusRating === value ? 'true' : 'false'}
                       onClick={() => onFocusRating?.(value)}
-                      className={`min-h-[44px] min-w-[44px] bg-transparent text-[length:var(--type-button)] leading-snug ${
+                      className={`min-h-[44px] min-w-[44px] bg-transparent text-[length:var(--type-whoop)] leading-snug ${
                         focusRating === value
                           ? 'text-orb-text underline decoration-1 underline-offset-[6px]'
                           : 'text-orb-quiet hover:text-orb-text'
@@ -794,6 +891,7 @@ export function FocusPrompt({
               </div>
               <ChoiceRow
                 testId="completed-row"
+                tone="chip"
                 items={items}
                 highlighted={menu.index}
                 onHighlight={highlightIndex}
@@ -814,8 +912,9 @@ export function FocusPrompt({
             {contextLine}
           </div>
           {items.length > 0 ? (
-            <ChoiceRow
+              <ChoiceRow
               testId="meeting-row"
+              tone="chip"
               items={items}
               highlighted={menu.index}
               onHighlight={highlightIndex}

@@ -34,7 +34,7 @@ function renderPrompt(
       task={extra.task ?? ''}
       onTaskChange={handlers.onTaskChange}
       recentTasks={recents}
-      choice={50}
+      choice={extra.choice ?? 50}
       onChoiceChange={handlers.onChoiceChange}
       untilMinutes={null}
       focusMinutes={null}
@@ -177,12 +177,39 @@ describe('game-menu rows', () => {
     expect(screen.queryByTestId('next-step')).toBeNull();
   });
 
-  it('defaults completed to Another round', () => {
+  it('defaults completed to Start another and labels Take a break without pills', () => {
     const { onAnotherRound, onBreak } = renderPrompt('completed');
+    expect(screen.getByTestId('take-break').textContent).toBe('Take a break');
     expect(screen.getByTestId('another-round').getAttribute('data-highlighted')).toBe('true');
+    expect(screen.getByTestId('another-round').textContent).not.toMatch(/[—–]/);
+    expect(screen.getByTestId('take-break').className).not.toMatch(/rounded-full/);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onAnotherRound).toHaveBeenCalledTimes(1);
     expect(onBreak).not.toHaveBeenCalled();
+  });
+
+  it('lets Custom become a 1 to 180 minute field and blocks Start when empty', () => {
+    const { onChoiceChange, onStart } = renderPrompt('ask', { choice: 'custom' });
+    expect(screen.getByTestId('duration-custom').textContent).toBe('Custom');
+    expect(screen.getByTestId('custom-minutes')).toBeTruthy();
+    expect(screen.queryByTestId('custom-minutes-error')).toBeNull();
+    expect(screen.getByTestId('focus-start')).toHaveProperty('disabled', true);
+    fireEvent.click(screen.getByTestId('duration-50m'));
+    expect(onChoiceChange).toHaveBeenCalledWith(50);
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
+  it('accepts a typed custom length', () => {
+    const { onChoiceChange, onStart } = renderPrompt('ask', { choice: 'custom' });
+    const field = screen.getByTestId('custom-minutes');
+    fireEvent.change(field, { target: { value: '40' } });
+    expect(onChoiceChange).toHaveBeenCalledWith(40);
+    fireEvent.change(field, { target: { value: '181' } });
+    expect(screen.getByTestId('custom-minutes-error').textContent).toBe(
+      'Enter a whole number from 1 to 180.'
+    );
+    expect(screen.getByTestId('focus-start')).toHaveProperty('disabled', true);
+    expect(onStart).not.toHaveBeenCalled();
   });
 
   it('moves duration chips with arrows and starts on Enter', () => {
@@ -252,6 +279,8 @@ describe('game-menu rows', () => {
     fireEvent.keyDown(input, { key: 'ArrowRight' });
     expect(screen.getByTestId('duration-90m').getAttribute('data-highlighted')).toBe('true');
     fireEvent.keyDown(input, { key: 'ArrowRight' });
+    expect(screen.getByTestId('duration-custom').getAttribute('data-highlighted')).toBe('true');
+    fireEvent.keyDown(input, { key: 'ArrowRight' });
     expect(screen.getByTestId('focus-start').getAttribute('data-highlighted')).toBe('true');
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onStart).toHaveBeenCalledTimes(1);
@@ -308,6 +337,7 @@ describe('game-menu rows', () => {
       choice: 50,
     });
     expect(screen.getByTestId('whoop-offer').textContent).toBe('25m today');
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(screen.getByTestId('whoop-offer').getAttribute('data-highlighted')).toBe('true');

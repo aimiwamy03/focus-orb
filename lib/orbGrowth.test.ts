@@ -19,6 +19,7 @@ import {
   dayFinalStage,
   focusDriftScale,
   formatFocusedToday,
+  visibleFocusedTodayMinutes,
   idleBreathScale,
   IDLE_BREATH_AMP_GATHERED,
   IDLE_BREATH_AMP_SCATTERED,
@@ -234,6 +235,12 @@ describe('preview and settle gates', () => {
     expect(resolveDisplayMinutes({ logMinutes: 12, preview: null, orbMinutesParam: '88' })).toBe(88);
     expect(formatFocusedToday(105)).toBe('1h 45m focused today.');
     expect(formatFocusedToday(105)).not.toMatch(/[—–]/);
+    expect(visibleFocusedTodayMinutes(0, 1, false)).toBe(1);
+    expect(visibleFocusedTodayMinutes(0, 50, true)).toBe(0);
+    expect(visibleFocusedTodayMinutes(50, 50, true)).toBe(50);
+    expect(formatFocusedToday(visibleFocusedTodayMinutes(0, 1, false))).toBe(
+      '1m focused today.'
+    );
   });
 
   it('plays settle once per visit unless forced or skipped', () => {

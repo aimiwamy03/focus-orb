@@ -66,6 +66,7 @@ describe('FocusIntro', () => {
       'BRAIN'
     );
     expect(screen.getByTestId('focus-intro-hint').textContent).toBe(INTRO_SKIP_HINT);
+    expect(screen.getByTestId('focus-intro-hint').tagName).toBe('BUTTON');
     expect(INTRO_LINES[1].toLowerCase()).toContain('brain');
     expect(document.querySelector('.focus-intro-fuse')).toBeNull();
   });
@@ -77,6 +78,17 @@ describe('FocusIntro', () => {
       <FocusIntro soundEnabled={false} reducedMotion={false} freezeAt={1.8} onDone={onDone} />
     );
     fireEvent.keyDown(window, { key });
+    vi.advanceTimersByTime(300);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips when Skip (Esc) is clicked', () => {
+    vi.useFakeTimers();
+    const onDone = vi.fn();
+    render(
+      <FocusIntro soundEnabled={false} reducedMotion={false} freezeAt={1.8} onDone={onDone} />
+    );
+    fireEvent.click(screen.getByTestId('focus-intro-hint'));
     vi.advanceTimersByTime(300);
     expect(onDone).toHaveBeenCalledTimes(1);
   });

@@ -136,8 +136,13 @@ await page.screenshot({ path: path.join(OUT, 'after_ask_90m.png') });
 
 await page.keyboard.press('ArrowRight');
 await page.waitForTimeout(150);
+if ((await highlighted(page, 'duration-custom')) !== 'true') {
+  fail('Second ArrowRight did not highlight Custom');
+}
+await page.keyboard.press('ArrowRight');
+await page.waitForTimeout(150);
 if ((await highlighted(page, 'focus-start')) !== 'true') {
-  fail('Second ArrowRight did not highlight Start');
+  fail('Third ArrowRight did not highlight Start');
 }
 
 const active = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'));

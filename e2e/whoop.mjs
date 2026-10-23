@@ -202,6 +202,7 @@ if (/\d+%/.test(quiet) || /\d+h \d+m/.test(quiet) || /\d+m blocks/.test(quiet)) 
 await open(page, '/?whoop=red');
 await page.keyboard.press('ArrowRight');
 await page.keyboard.press('ArrowRight');
+await page.keyboard.press('ArrowRight');
 if ((await page.getByTestId('whoop-offer').getAttribute('data-highlighted')) !== 'true') {
   fail('Right arrow should reach 25m today');
 }
@@ -360,8 +361,8 @@ if (!(await page.getByTestId('health-data-heading').textContent())?.includes('Co
 if (!(await page.getByTestId('health-data-store').textContent())?.includes('does not keep a database')) {
   fail('Health data should say there is no database');
 }
-if (!(await page.getByTestId('health-data-contact').textContent())?.includes('hello@example.com')) {
-  fail('Health data should use the privacy contact email');
+if (!(await page.getByTestId('health-data-contact').textContent())?.includes('aimiw.amy03@gmail.com')) {
+  fail('Health data should use the contact email');
 }
 
 await browser.close();

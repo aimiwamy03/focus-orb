@@ -7,7 +7,7 @@ import {
   INTRO_TITLE_TRACKING,
   INTRO_SOUND_LABEL,
   INTRO_TIMELINE,
-  PLAY_INTRO_LABEL,
+  REPLAY_INTRO_LABEL,
   introArtZoom,
   introClockSpeed,
   introFrame,
@@ -198,7 +198,9 @@ describe('intro timeline', () => {
     expect(isIntroSkipKey('a')).toBe(false);
     expect(parseIntroFreeze('3.2')).toBe(3.2);
     expect(parseIntroFreeze(null)).toBeNull();
-    const copy = [...INTRO_LINES, INTRO_SKIP_HINT, PLAY_INTRO_LABEL, INTRO_SOUND_LABEL].join(' ');
+    const copy = [...INTRO_LINES, INTRO_SKIP_HINT, REPLAY_INTRO_LABEL, INTRO_SOUND_LABEL].join(' ');
+    expect(INTRO_SKIP_HINT).toBe('Skip (Esc)');
+    expect(REPLAY_INTRO_LABEL).toBe('Replay intro');
     expect(copy).not.toMatch(/[—–]/);
     expect(INTRO_MIN_CAPTION_PX).toBeGreaterThanOrEqual(24);
     expect(INTRO_TITLE_TRACKING).toBe('0.04em');

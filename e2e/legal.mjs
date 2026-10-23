@@ -122,8 +122,8 @@ for (const id of [
 ]) {
   if ((await privacy.getByTestId(id).count()) !== 1) fail(`Privacy missing ${id}`);
 }
-if (!((await privacy.getByTestId('privacy-contact').textContent()) || '').includes('hello@example.com')) {
-  fail('Privacy should include the contact placeholder');
+if (!((await privacy.getByTestId('privacy-contact').textContent()) || '').includes('aimiw.amy03@gmail.com')) {
+  fail('Privacy should include the contact email');
 }
 if (!((await privacy.getByTestId('privacy-whoop').textContent()) || '').includes('whoop_session cookie')) {
   fail('Privacy should cover the WHOOP cookie');

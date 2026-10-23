@@ -79,9 +79,9 @@ const hintStyle = await stills.getByTestId('focus-intro-hint').evaluate((el) => 
   const style = getComputedStyle(el);
   return { color: style.color, size: parseFloat(style.fontSize) };
 });
-if (hintStyle.size < 15) fail(`Skip hint should be at least 15px, got ${hintStyle.size}`);
-if (hintStyle.color !== 'rgb(161, 161, 166)') {
-  fail(`Skip hint should be #a1a1a6, got ${hintStyle.color}`);
+if (hintStyle.size < 17) fail(`Skip hint should be at least 17px, got ${hintStyle.size}`);
+if (hintStyle.color !== 'rgb(208, 208, 212)') {
+  fail(`Skip hint should be #d0d0d4, got ${hintStyle.color}`);
 }
 if ((await stills.locator('.focus-intro-fuse').count()) !== 0) {
   fail('Desktop rest caption should not show a fuse hairline');
@@ -178,13 +178,13 @@ await settings.addInitScript(() => {
 });
 await settings.goto(`${BASE}/?mock=empty&intro=0&settings=1`, { waitUntil: 'networkidle' });
 await settings.waitForTimeout(500);
-if ((await settings.getByTestId('play-intro').count()) !== 1) {
-  fail('Settings should include Play intro');
+if ((await settings.getByTestId('play-intro').count()) !== 0) {
+  fail('Settings should not include Play intro');
 }
 if ((await settings.getByTestId('intro-sound').count()) !== 1) {
   fail('Settings should include Intro sound');
 }
-if (!(await settings.getByTestId('intro-sound').isChecked())) {
+if ((await settings.getByTestId('intro-sound').getAttribute('aria-checked')) !== 'true') {
   fail('Intro sound should be on by default');
 }
 await settings.getByTestId('settings-body').evaluate((el) => {

@@ -27,75 +27,62 @@ async function seedFirstOpen(page) {
   });
 }
 
-async function openHandoff(page, search = '/?intro=0') {
+async function openLanding(page, search = '/?intro=0') {
   await seedFirstOpen(page);
   await page.goto(`${BASE}${search}`, { waitUntil: 'domcontentloaded' });
   if (search.includes('intro=1') && !search.includes('t=')) {
     await page.getByTestId('focus-intro').waitFor();
-    await page.keyboard.press('Escape');
+    await page.getByTestId('focus-intro-hint').click();
     await page.getByTestId('focus-intro').waitFor({ state: 'detached', timeout: 4000 });
   }
-  await page.getByTestId('start-focusing').waitFor({ timeout: 8000 });
+  await page.getByTestId('focus-task').waitFor({ timeout: 8000 });
 }
 
-async function assertHandoff(page, label) {
-  const start = page.getByTestId('start-focusing');
-  if ((await start.count()) !== 1) fail(`${label}: Start focusing should be visible`);
+async function assertLanding(page, label) {
+  if ((await page.getByTestId('start-focusing').count()) !== 0) {
+    fail(`${label}: Start focusing should be gone`);
+  }
+  if ((await page.locator("text=What's the one thing?").count()) !== 1) {
+    fail(`${label}: landing should show What's the one thing?`);
+  }
+  const start = page.getByTestId('focus-start');
   const metrics = await start.evaluate((el) => {
     const style = getComputedStyle(el);
-    const secondary = document.querySelector('[data-testid="welcome-secondary"]');
-    const secondStyle = secondary ? getComputedStyle(secondary) : null;
+    const inner = el.querySelector('span');
+    const innerStyle = inner ? getComputedStyle(inner) : style;
     return {
-      text: el.textContent,
-      font: parseFloat(style.fontSize),
-      color: style.color,
-      radius: style.borderRadius,
-      bg: style.backgroundColor,
-      className: el.className,
-      secondFont: secondStyle ? parseFloat(secondStyle.fontSize) : 0,
+      font: parseFloat(innerStyle.fontSize),
+      radius: innerStyle.borderRadius,
+      className: `${el.className} ${inner?.className || ''}`,
     };
   });
-  if (metrics.text !== 'Start focusing') fail(`${label}: missing Start focusing label`);
-  if (metrics.font < 22) fail(`${label}: Start focusing should be 22px+, got ${metrics.font}`);
-  if (metrics.secondFont < 17) fail(`${label}: secondary links should be 17px+, got ${metrics.secondFont}`);
-  if (metrics.font <= metrics.secondFont) {
-    fail(`${label}: Start focusing (${metrics.font}) should outrank secondary (${metrics.secondFont})`);
-  }
+  if (metrics.font < 17) fail(`${label}: Start should be 17px+, got ${metrics.font}`);
   if (metrics.className.includes('rounded-full') || metrics.radius !== '0px') {
-    fail(`${label}: Start focusing should not be a pill, radius ${metrics.radius}`);
+    fail(`${label}: Start should not be a pill, radius ${metrics.radius}`);
   }
-  if (metrics.bg !== 'rgba(0, 0, 0, 0)' && metrics.bg !== 'transparent') {
-    fail(`${label}: Start focusing should not have a filled background, got ${metrics.bg}`);
-  }
-  if ((await page.getByTestId('sample-day').count()) !== 1) {
-    fail(`${label}: Sample day should stay as a secondary action`);
-  }
-  if ((await page.getByTestId('welcome-about').count()) !== 1) {
-    fail(`${label}: About should stay secondary`);
-  }
-}
-
-async function assertAsk(page, label) {
-  await page.getByTestId('focus-task').waitFor({ timeout: 4000 });
-  if ((await page.locator("text=What's the one thing?").count()) !== 1) {
-    fail(`${label}: should land on What's the one thing?`);
-  }
-  const focused = await page.getByTestId('focus-task').evaluate((el) => document.activeElement === el);
-  if (!focused) fail(`${label}: task input should be focused`);
   for (const minutes of [25, 50, 90]) {
     if ((await page.getByTestId(`duration-${minutes}m`).count()) !== 1) {
       fail(`${label}: ${minutes}m should be ready`);
     }
   }
-  if ((await page.getByTestId('start-focusing').count()) !== 0) {
-    fail(`${label}: Start focusing should be gone after the handoff`);
+  if ((await page.getByTestId('duration-custom').count()) !== 1) {
+    fail(`${label}: Custom should be in the duration row`);
+  }
+  if ((await page.getByTestId('replay-intro').count()) !== 1) {
+    fail(`${label}: Replay intro should be visible`);
+  }
+  if ((await page.getByTestId('sample-day').count()) !== 1) {
+    fail(`${label}: Sample day should stay secondary`);
+  }
+  if ((await page.getByTestId('voice-mic').count()) !== 0) {
+    fail(`${label}: mic should stay hidden without a voice key`);
   }
 }
 
 const browser = await chromium.launch({ args: ['--use-gl=angle'] });
 
 for (const [width, height, tag] of [
-  [1440, 900, '1440'],
+  [1280, 800, '1280'],
   [390, 844, '390'],
 ]) {
   const page = await browser.newPage({
@@ -103,59 +90,148 @@ for (const [width, height, tag] of [
     hasTouch: width === 390,
     isMobile: width === 390,
   });
-  await openHandoff(page, '/?intro=1');
-  await assertHandoff(page, tag);
-  await publish(page, `handoff_after_${tag}.png`);
-  if (width === 390) await page.getByTestId('start-focusing').tap();
-  else await page.getByTestId('start-focusing').click();
-  await assertAsk(page, `${tag}-click`);
-  await publish(page, `ask_after_start_${tag}.png`);
+  await openLanding(page, '/?intro=1');
+  await assertLanding(page, tag);
+  await publish(page, `landing_after_${tag}.png`);
   await page.close();
 }
 
-const enterPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await openHandoff(enterPage, '/?intro=0');
-await enterPage.keyboard.press('Enter');
-await assertAsk(enterPage, 'enter');
-await enterPage.close();
+const focusPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await openLanding(focusPage, '/?intro=0');
+await focusPage.getByTestId('focus-task').evaluate((el) => el.blur());
+await focusPage.waitForTimeout(80);
+await focusPage.keyboard.press('Enter');
+if ((await focusPage.getByTestId('focus-countdown').count()) !== 0) {
+  fail('enter: should focus the task, not start a block');
+}
+const focusedEnter = await focusPage.getByTestId('focus-task').evaluate((el) => document.activeElement === el);
+if (!focusedEnter) fail('enter: task input should be focused');
+await focusPage.getByTestId('focus-task').evaluate((el) => el.blur());
+await focusPage.waitForTimeout(80);
+await focusPage.keyboard.press(' ');
+if ((await focusPage.getByTestId('focus-countdown').count()) !== 0) {
+  fail('space: should focus the task, not start a block');
+}
+const focusedSpace = await focusPage.getByTestId('focus-task').evaluate((el) => document.activeElement === el);
+if (!focusedSpace) fail('space: task input should be focused');
+await focusPage.close();
 
-const orbPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await openHandoff(orbPage, '/?intro=0');
+const orbPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await openLanding(orbPage, '/?intro=0');
 const orbBox = await orbPage.getByTestId('orb-canvas').boundingBox();
 if (!orbBox) fail('orb-click: canvas missing');
 await orbPage.mouse.click(orbBox.x + orbBox.width / 2, orbBox.y + orbBox.height * 0.38);
-await assertAsk(orbPage, 'orb-click');
+const focusedOrb = await orbPage.getByTestId('focus-task').evaluate((el) => document.activeElement === el);
+if (!focusedOrb) fail('orb-click: task input should be focused');
 await orbPage.close();
 
+const replay = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await openLanding(replay, '/?intro=0');
+await replay.getByTestId('replay-intro').click();
+await replay.getByTestId('focus-intro').waitFor({ timeout: 4000 });
+if ((await replay.getByTestId('focus-intro-hint').textContent()) !== 'Skip (Esc)') {
+  fail('replay: skip control should say Skip (Esc)');
+}
+await replay.getByTestId('focus-intro-hint').click();
+await replay.getByTestId('focus-intro').waitFor({ state: 'detached', timeout: 4000 });
+await replay.getByTestId('focus-task').waitFor();
+await replay.close();
+
 for (const [width, height, tag] of [
-  [1440, 900, '1440'],
+  [1280, 800, '1280'],
   [390, 844, '390'],
 ]) {
-  const card = await browser.newPage({ viewport: { width, height } });
-  await seedFirstOpen(card);
-  await card.goto(`${BASE}/?intro=1&t=1.8`, { waitUntil: 'domcontentloaded' });
-  await card.getByTestId('focus-intro-caption').waitFor();
-  const tracking = await card.getByTestId('focus-intro-caption').evaluate((el) => {
-    const style = getComputedStyle(el);
-    const box = el.getBoundingClientRect();
-    return {
-      letterSpacing: style.letterSpacing,
-      fontSize: parseFloat(style.fontSize),
-      wraps: box.height > parseFloat(style.fontSize) * 1.8,
-      overflow: box.right > window.innerWidth + 2,
-      text: el.textContent,
-    };
+  const custom = await browser.newPage({
+    viewport: { width, height },
+    hasTouch: width === 390,
+    isMobile: width === 390,
   });
-  const px = parseFloat(tracking.letterSpacing);
-  const em = px / tracking.fontSize;
-  if (em < 0.015 || em > 0.07) {
-    fail(`Title-card tracking at ${tag} should be ~0.02-0.06em, got ${em}em (${tracking.letterSpacing})`);
+  await openLanding(custom, '/?intro=0');
+  await custom.getByTestId('focus-task').fill('Write the spec');
+  await custom.getByTestId('duration-custom').click();
+  await custom.getByTestId('custom-minutes').waitFor();
+  await publish(custom, `custom_duration_after_${tag}.png`);
+  await custom.getByTestId('custom-minutes').fill('40');
+  await custom.getByTestId('focus-start').click();
+  await custom.getByTestId('focus-countdown').waitFor({ timeout: 4000 });
+  const countdown = await custom.getByTestId('focus-countdown').textContent();
+  if (!countdown || !countdown.includes('40m')) {
+    fail(`custom ${tag}: should start a 40m block, got ${countdown}`);
   }
-  if (tag === '1440' && tracking.wraps) fail('1440 title card should stay on one line');
-  if (tracking.overflow) fail(`${tag} title card overflowed the viewport`);
-  await publish(card, `title_card_${tag}.png`);
-  await card.close();
+  await custom.close();
 }
+
+const endPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await seedFirstOpen(endPage);
+await endPage.goto(`${BASE}/?intro=0&settle=0&prompt=done&done=1&planned=50&task=Write%20the%20spec`, {
+  waitUntil: 'domcontentloaded',
+});
+await endPage.getByTestId('focused-today').waitFor({ timeout: 8000 });
+await endPage.getByTestId('focus-completed').waitFor({ timeout: 8000 });
+const today = await endPage.getByTestId('focused-today').textContent();
+const recap = await endPage.getByTestId('focus-completed').textContent();
+if (today !== '1m focused today.') fail(`end: today should be 1m focused today., got ${today}`);
+if (recap !== 'Focused 1 of 50 min on Write the spec') {
+  fail(`end: recap should agree, got ${recap}`);
+}
+if ((await endPage.getByTestId('take-break').textContent()) !== 'Take a break') {
+  fail('end: Take a break should be visible');
+}
+const anotherClass = await endPage.getByTestId('another-round').locator('span').getAttribute('class');
+if (anotherClass && anotherClass.includes('rounded-full')) {
+  fail('end: Start another should not be a pill');
+}
+await publish(endPage, 'reflection_after_1280.png');
+await endPage.close();
+
+const endMobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await seedFirstOpen(endMobile);
+await endMobile.goto(`${BASE}/?intro=0&settle=0&prompt=done&done=1&planned=50&task=Write%20the%20spec`, {
+  waitUntil: 'domcontentloaded',
+});
+await endMobile.getByTestId('focus-completed').waitFor({ timeout: 8000 });
+await publish(endMobile, 'reflection_after_390.png');
+await endMobile.close();
+
+for (const [width, height, tag] of [
+  [1280, 800, '1280'],
+  [390, 844, '390'],
+]) {
+  const settings = await browser.newPage({ viewport: { width, height } });
+  await seedFirstOpen(settings);
+  await settings.goto(`${BASE}/?intro=0&settings=1`, { waitUntil: 'domcontentloaded' });
+  await settings.getByTestId('settings-sheet').waitFor();
+  if ((await settings.getByTestId('play-intro').count()) !== 0) fail(`settings ${tag}: Play intro should be gone`);
+  if ((await settings.getByTestId('intro-sound').count()) !== 1) fail(`settings ${tag}: Intro sound should stay`);
+  await settings.getByTestId('default-duration-custom').click();
+  await settings.getByTestId('default-custom-minutes').waitFor();
+  await publish(settings, `settings_after_${tag}.png`);
+  await settings.close();
+}
+
+const guest = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await openLanding(guest, '/?intro=0');
+await guest.getByTestId('focus-task').fill('One thing');
+await guest.getByTestId('focus-start').click();
+await guest.getByTestId('focus-countdown').waitFor({ timeout: 4000 });
+await guest.keyboard.press(' ');
+await guest.getByTestId('end-focus').waitFor({ timeout: 4000 });
+await guest.getByTestId('end-focus').click();
+await guest.getByTestId('focus-completed').waitFor({ timeout: 8000 });
+const guestToday = await guest.getByTestId('focused-today').textContent();
+const guestRecap = await guest.getByTestId('focus-completed').textContent();
+if (!guestToday || !guestToday.includes('focused today')) {
+  fail(`guest complete: missing today line, got ${guestToday}`);
+}
+if (!guestRecap || !guestRecap.includes('Focused') || !guestRecap.includes('One thing')) {
+  fail(`guest complete: missing recap, got ${guestRecap}`);
+}
+const todayMins = guestToday.match(/(\d+)m/)?.[1];
+const recapMins = guestRecap.match(/Focused (\d+)/)?.[1];
+if (todayMins && recapMins && todayMins !== recapMins) {
+  fail(`guest complete: today ${guestToday} disagrees with recap ${guestRecap}`);
+}
+await guest.close();
 
 await browser.close();
 if (process.exitCode) {
